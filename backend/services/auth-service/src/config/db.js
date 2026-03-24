@@ -3,9 +3,9 @@ import mongoose from "mongoose";
 const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGO_URI);
-    console.log(`Patient DB connected: ${conn.connection.host}`);
+    console.log(`Auth DB connected: ${conn.connection.host}`);
   } catch (error) {
-    console.error("Patient DB connection failed:", error.message);
+    console.error("Auth DB connection failed:", error.message);
     process.exit(1);
   }
 };

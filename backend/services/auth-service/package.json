@@ -1,6 +1,7 @@
 {
-  "name": "patient-service",
+  "name": "auth-service",
   "version": "1.0.0",
+  "description": "MEDIGO Auth Service",
   "main": "src/server.js",
   "type": "module",
   "scripts": {
@@ -8,13 +9,15 @@
     "start": "node src/server.js"
   },
   "dependencies": {
+    "axios": "^1.7.9",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "jsonwebtoken": "^9.0.3",
+    "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.9.5",
-    "morgan": "^1.10.0"
+    "morgan": "^1.10.0",
+    "nodemailer": "^8.0.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.7"
