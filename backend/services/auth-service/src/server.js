@@ -1,12 +1,12 @@
+import "dotenv/config";
 import express from "express";
-import dotenv from "dotenv";
 import cors from "cors";
 import morgan from "morgan";
 import connectDB from "./config/db.js";
-import patientRoutes from "./routes/patientRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 import { notFound, errorHandler } from "./middlewares/errorMiddleware.js";
 
-dotenv.config();
 connectDB();
 
 const app = express();
@@ -18,17 +18,18 @@ app.use(morgan("dev"));
 app.get("/", (req, res) => {
   res.json({
     success: true,
-    message: "MEDIGO Patient Service is running"
+    message: "MEDIGO Auth Service is running"
   });
 });
 
-app.use("/api/patients", patientRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5002;
+const PORT = process.env.PORT || 5001;
 
 app.listen(PORT, () => {
-  console.log(`Patient service running on port ${PORT}`);
+  console.log(`Auth service running on port ${PORT}`);
 });
