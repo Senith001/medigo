@@ -10,13 +10,20 @@ const internalHeaders = {
 export const loginAdmin = async (req, res) => {
   try {
     const { email, password } = req.body;
-    
-    // Call Auth Service to verify credentials
-    const response = await httpClient.post(`${process.env.AUTH_SERVICE_URL}/api/auth/login`, { email, password });
-    
-    // Ensure the user trying to log in is actually an admin
-    if (response.data.data.role !== "admin" && response.data.data.role !== "superadmin") {
-      return res.status(403).json({ success: false, message: "Access denied. Not an admin." });
+
+    const response = await httpClient.post(
+      `${process.env.AUTH_SERVICE_URL}/api/auth/login`,
+      { email, password }
+    );
+
+    if (
+      response.data.data.role !== "admin" &&
+      response.data.data.role !== "superadmin"
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Not an admin."
+      });
     }
 
     res.status(200).json(response.data);
@@ -31,12 +38,14 @@ export const loginAdmin = async (req, res) => {
 export const bootstrapSuperAdmin = async (req, res) => {
   try {
     const { fullName, email, password } = req.body;
-    
+
     if (req.headers["x-admin-super-key"] !== process.env.ADMIN_SUPER_KEY) {
-      return res.status(403).json({ success: false, message: "Invalid admin super key" });
+      return res.status(403).json({
+        success: false,
+        message: "Invalid admin super key"
+      });
     }
 
-    // 1. Create Identity in Auth Service
     let authUser;
     try {
       const authResponse = await httpClient.post(
@@ -46,10 +55,12 @@ export const bootstrapSuperAdmin = async (req, res) => {
       );
       authUser = authResponse.data.data;
     } catch (err) {
-      return res.status(400).json({ success: false, message: err.response?.data?.message || "Auth service error" });
+      return res.status(400).json({
+        success: false,
+        message: err.response?.data?.message || "Auth service error"
+      });
     }
 
-    // 2. Create Profile in Admin Service
     const superadmin = await Admin.create({
       authUserId: authUser._id,
       userId: authUser.userId,
@@ -65,21 +76,19 @@ export const bootstrapSuperAdmin = async (req, res) => {
       data: superadmin
     });
   } catch (error) {
-    res.status(500);
-    throw new Error(error.message);
-  }
+      return res.status(500).json({ success: false, message: error.message });
+    }
 };
 
 export const createAdmin = async (req, res) => {
   try {
     const { fullName, email, password, phone } = req.body;
 
-    // 🛡️ Pre-Check: See if the admin already exists locally before calling Auth Service
     const existingAdmin = await Admin.findOne({ email: email.toLowerCase() });
     if (existingAdmin) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "An admin with this email already exists." 
+      return res.status(400).json({
+        success: false,
+        message: "An admin with this email already exists."
       });
     }
 
@@ -92,9 +101,9 @@ export const createAdmin = async (req, res) => {
       );
       authUser = authResponse.data.data;
     } catch (err) {
-      return res.status(400).json({ 
-        success: false, 
-        message: err.response?.data?.message || "Auth service error" 
+      return res.status(400).json({
+        success: false,
+        message: err.response?.data?.message || "Auth service error"
       });
     }
 
@@ -107,27 +116,24 @@ export const createAdmin = async (req, res) => {
       role: "admin"
     });
 
-    res.status(201).json({ 
-      success: true, 
-      message: "Admin created successfully", 
-      data: admin 
+    res.status(201).json({
+      success: true,
+      message: "Admin created successfully",
+      data: admin
     });
-    
   } catch (error) {
     console.error("Create Admin Error:", error);
 
-    // 🛡️ Handle MongoDB Duplicate Key Error (E11000) gracefully
     if (error.code === 11000) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Duplicate entry detected. This record already exists." 
+      return res.status(400).json({
+        success: false,
+        message: "Duplicate entry detected. This record already exists."
       });
     }
 
-    // 🛡️ Return JSON instead of throwing an error to prevent server crash
-    res.status(500).json({ 
-      success: false, 
-      message: "An unexpected error occurred while creating the admin." 
+    res.status(500).json({
+      success: false,
+      message: "An unexpected error occurred while creating the admin."
     });
   }
 };
@@ -135,7 +141,11 @@ export const createAdmin = async (req, res) => {
 export const getAdmins = async (req, res) => {
   try {
     const admins = await Admin.find();
-    res.status(200).json({ success: true, count: admins.length, data: admins });
+    res.status(200).json({
+      success: true,
+      count: admins.length,
+      data: admins
+    });
   } catch (error) {
     res.status(500);
     throw new Error("Failed to fetch admins");
@@ -145,7 +155,10 @@ export const getAdmins = async (req, res) => {
 // Fetches patients from the Auth Service
 export const getPatients = async (req, res) => {
   try {
-    const response = await httpClient.get(`${process.env.AUTH_SERVICE_URL}/api/auth/internal/users?role=patient`, internalHeaders);
+    const response = await httpClient.get(
+      `${process.env.AUTH_SERVICE_URL}/api/auth/internal/users?role=patient`,
+      internalHeaders
+    );
     res.status(200).json(response.data);
   } catch (error) {
     res.status(500);
@@ -153,84 +166,104 @@ export const getPatients = async (req, res) => {
   }
 };
 
-
 // ==========================================
 // DELETION ORCHESTRATORS
 // ==========================================
 
 export const deleteAdminAccount = async (req, res) => {
   try {
-    // --- 🛡️ DEFENSE IN DEPTH: STRICT SECURITY CHECKS ---
-    
-    // 1. Hard block: Only Superadmins can execute this function
     if (req.user.role !== "superadmin") {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Security Violation: Only Superadmins can delete admin accounts." 
+      return res.status(403).json({
+        success: false,
+        message: "Security Violation: Only Superadmins can delete admin accounts."
       });
     }
 
-    // 2. Prevent self-deletion: A Superadmin cannot delete themselves
-    if (req.user.userId === req.params.id || req.user._id.toString() === req.params.id) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Action Denied: You cannot delete your own account." 
+    if (
+      req.user.userId === req.params.id ||
+      req.user._id.toString() === req.params.id
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Action Denied: You cannot delete your own account."
       });
     }
-    // ---------------------------------------------------
 
-    // Check if the ID is a MongoDB _id or your custom userId (e.g., A002)
     const isMongoId = /^[0-9a-fA-F]{24}$/.test(req.params.id);
     const query = isMongoId ? { _id: req.params.id } : { userId: req.params.id };
 
     const admin = await Admin.findOne(query);
-    
+
     if (!admin) {
-      return res.status(404).json({ success: false, message: "Admin not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Admin not found"
+      });
     }
 
-    // Tell Auth Service to delete the master identity
     await httpClient.delete(
-      `${process.env.AUTH_SERVICE_URL}/api/auth/internal/users/${admin.authUserId}`,
+      `${process.env.AUTH_SERVICE_URL}/api/auth/internal/identities/${admin.authUserId}`,
       internalHeaders
     );
 
-    // Delete the local profile
     await admin.deleteOne();
 
-    res.status(200).json({ success: true, message: "Admin account fully deleted" });
+    res.status(200).json({
+      success: true,
+      message: "Admin account fully deleted"
+    });
   } catch (error) {
     console.error("Delete Admin Error:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.response?.data?.message || "Failed to delete admin" 
+    res.status(500).json({
+      success: false,
+      message: error.response?.data?.message || "Failed to delete admin"
     });
   }
 };
 
-
 export const deletePatientAccount = async (req, res) => {
   try {
-    const targetUserId = req.params.id; // This will now be "P001"
+    const targetId = req.params.id;
+    const isMongoId = /^[0-9a-fA-F]{24}$/.test(targetId);
 
-    // 1. Tell Auth Service to delete the master identity
+    // 1. Delete patient profile from Patient Service first
+    try {
+      await httpClient.delete(
+        `${process.env.PATIENT_SERVICE_URL}/api/patients/internal/delete-profile`,
+        {
+          headers: {
+            "x-service-secret": process.env.SERVICE_SECRET
+          },
+          data: isMongoId ? { authUserId: targetId } : { userId: targetId }
+        }
+      );
+    } catch (serviceError) {
+      const status = serviceError.response?.status;
+
+      if (status !== 404) {
+        return res.status(status || 500).json({
+          success: false,
+          message:
+            serviceError.response?.data?.message || "Failed to delete patient profile"
+        });
+      }
+    }
+
+    // 2. Delete Auth identity + OTP records
     await httpClient.delete(
-      `${process.env.AUTH_SERVICE_URL}/api/auth/internal/users/${targetUserId}`,
+      `${process.env.AUTH_SERVICE_URL}/api/auth/internal/identities/${targetId}`,
       internalHeaders
     );
 
-    // 2. Tell Patient Service to delete the medical profile
-    await httpClient.delete(
-      `http://localhost:5002/api/patients/${targetUserId}`, 
-      { headers: { Authorization: req.headers.authorization } }
-    ).catch(err => console.log("Note: Patient profile may not exist yet or was already deleted"));
-
-    res.status(200).json({ success: true, message: "Patient account fully deleted" });
+    res.status(200).json({
+      success: true,
+      message: "Patient account fully deleted"
+    });
   } catch (error) {
     console.error("Delete Patient Error:", error.message);
-    res.status(500).json({ 
-      success: false, 
-      message: error.response?.data?.message || "Failed to delete patient" 
+    res.status(500).json({
+      success: false,
+      message: error.response?.data?.message || "Failed to delete patient"
     });
   }
 };
