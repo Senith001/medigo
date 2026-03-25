@@ -371,3 +371,64 @@ export const getMe = async (req, res) => {
     data: req.user
   });
 };
+
+
+// ==========================================
+// INTERNAL SERVICE METHODS (For Admin Service)
+// ==========================================
+
+export const createInternalUser = async (req, res) => {
+  try {
+    const { fullName, email, password, phone, role } = req.body;
+    
+    const existing = await User.findOne({ email: email.toLowerCase() });
+    if (existing) {
+      return res.status(400).json({ success: false, message: "Email already exists" });
+    }
+
+    const user = await User.create({
+      fullName,
+      email: email.toLowerCase(),
+      password,
+      phone,
+      role,
+      isVerified: true // Admins do not need OTPs
+    });
+
+    res.status(201).json({ success: true, data: user });
+  } catch (error) {
+    res.status(500);
+    throw new Error(error.message);
+  }
+};
+
+export const getInternalUsersByRole = async (req, res) => {
+  try {
+    const { role } = req.query;
+    const users = await User.find({ role }).select("-password");
+    res.status(200).json({ success: true, count: users.length, data: users });
+  } catch (error) {
+    res.status(500);
+    throw new Error(error.message);
+  }
+};
+
+export const deleteInternalUser = async (req, res) => {
+  try {
+    // Check if the param is a Mongo ID or a custom userId (like P001)
+    const isMongoId = /^[0-9a-fA-F]{24}$/.test(req.params.id);
+    const query = isMongoId ? { _id: req.params.id } : { userId: req.params.id };
+
+    const user = await User.findOne(query);
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found in Auth DB" });
+    }
+    
+    await user.deleteOne();
+    res.status(200).json({ success: true, message: "User deleted successfully" });
+  } catch (error) {
+    res.status(500);
+    throw new Error(error.message);
+  }
+};
