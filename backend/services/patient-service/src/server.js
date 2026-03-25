@@ -15,6 +15,9 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
 
+// Make the uploads folder publicly accessible so the frontend can display the images
+app.use("/uploads", express.static("uploads"));
+
 app.get("/", (req, res) => {
   res.json({
     success: true,

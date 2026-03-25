@@ -7,11 +7,13 @@ import {
   resetPassword,
   changePassword,
   getMe,
-  createInternalUser,      
-  getInternalUsersByRole,  
-  deleteInternalUser       
+  deleteMyAccount,
+  createInternalUser,
+  getInternalUsersByRole,
+  deleteInternalIdentity,
+  updateInternalUser,
 } from "../controllers/authController.js";
-import { protect, verifyInternalService } from "../middlewares/authMiddleware.js"; // Import internal checker
+import { protect, authorize, verifyInternalService } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
@@ -23,9 +25,13 @@ router.post("/reset-password", resetPassword);
 router.put("/change-password", protect, changePassword);
 router.get("/me", protect, getMe);
 
+// Patient self-account deletion
+router.delete("/me", protect, authorize("patient"), deleteMyAccount);
+
 // --- INTERNAL ROUTES (Server-to-Server Only) ---
 router.post("/internal/users", verifyInternalService, createInternalUser);
 router.get("/internal/users", verifyInternalService, getInternalUsersByRole);
-router.delete("/internal/users/:id", verifyInternalService, deleteInternalUser);
+router.delete("/internal/identities/:id", verifyInternalService, deleteInternalIdentity);
+router.put("/internal/users/:id", verifyInternalService, updateInternalUser);
 
 export default router;

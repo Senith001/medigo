@@ -28,7 +28,7 @@ export const validatePatientRegistration = (data) => {
   if (!data.password) {
     errors.password = "Password is required";
   } else if (!validatePassword(data.password)) {
-    errors.password = "Password must be more than 8 characters and contain at least one uppercase, one lowercase, one number, and one special character";
+    errors.password = "Password must be at least 8 characters and contain at least one uppercase, one lowercase, one number, and one special character";
   }
 
   // 5. Gender: Validate against expected frontend checkbox values
