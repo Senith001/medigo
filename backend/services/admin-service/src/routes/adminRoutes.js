@@ -1,0 +1,27 @@
+import express from "express";
+import {
+  loginAdmin,
+  bootstrapSuperAdmin,
+  createAdmin,
+  getAdmins,
+  getPatients,
+  deleteAdminAccount,
+  deletePatientAccount
+} from "../controllers/adminController.js";
+import { protect, authorize } from "../middlewares/authMiddleware.js";
+
+const router = express.Router();
+
+// Public / Bootstrap
+router.post("/login", loginAdmin);
+router.post("/bootstrap-superadmin", bootstrapSuperAdmin);
+
+// Protected Admin Routes
+router.post("/create", protect, authorize("superadmin"), createAdmin);
+router.get("/list", protect, authorize("superadmin"), getAdmins);
+router.get("/patients", protect, authorize("admin", "superadmin"), getPatients);
+
+router.delete("/admins/:id", protect, authorize("superadmin"), deleteAdminAccount);
+router.delete("/patients/:id", protect, authorize("admin", "superadmin"), deletePatientAccount);
+
+export default router;
