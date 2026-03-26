@@ -1,9 +1,11 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
-const connectDB = require("./config/db");
 
 dotenv.config();
+
+const connectDB = require("./config/db");
+const paymentRoutes = require("./routes/paymentRoutes");
 
 const app = express();
 
@@ -26,6 +28,8 @@ app.get("/health", (req, res) => {
     message: "Payment service is healthy",
   });
 });
+
+app.use("/api/payments", paymentRoutes);
 
 const PORT = process.env.PORT || 5007;
 
