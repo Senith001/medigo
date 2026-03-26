@@ -6,3 +6,6 @@ dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+# Frontend vite cache
+frontend/.vite/
+frontend/dist/
