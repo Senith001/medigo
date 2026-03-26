@@ -4,7 +4,6 @@ import cors from "cors";
 import morgan from "morgan";
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
-import adminRoutes from "./routes/adminRoutes.js";
 import { notFound, errorHandler } from "./middlewares/errorMiddleware.js";
 
 connectDB();
@@ -22,8 +21,7 @@ app.get("/", (req, res) => {
   });
 });
 
-app.use("/api/auth", authRoutes);
-app.use("/api/admin", adminRoutes);
+app.use("/api/auth", authRoutes); // Admin routes removed from here
 
 app.use(notFound);
 app.use(errorHandler);
