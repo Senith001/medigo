@@ -19,3 +19,7 @@ yarn-error.log*
 
 # Ignore the uploads folder so you don't commit test images
 **/uploads/
+
+# Frontend vite cache
+frontend/.vite/
+frontend/dist/
