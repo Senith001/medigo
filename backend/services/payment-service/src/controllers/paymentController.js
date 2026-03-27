@@ -25,16 +25,17 @@ const createPayment = async (req, res) => {
       !patientEmail ||
       !doctorId ||
       !doctorName ||
-      amount === undefined
+      !amount
     ) {
       return res.status(400).json({
         message: "All required payment fields must be provided.",
       });
     }
 
-    if (Number(amount) <= 0) {
-      return res.status(400).json({
-        message: "Payment amount must be greater than zero.",
+    // Patient can only create payment for themselves
+    if (req.user.role === "patient" && req.user.userId !== patientId) {
+      return res.status(403).json({
+        message: "Access denied. You can only create payments for your own appointments.",
       });
     }
 
@@ -42,15 +43,15 @@ const createPayment = async (req, res) => {
 
     const successUrl =
       process.env.STRIPE_SUCCESS_URL ||
-      "http://localhost:5173/payment-success";
+      "http://localhost:5007/api/payments/success";
     const cancelUrl =
       process.env.STRIPE_CANCEL_URL ||
-      "http://localhost:5173/payment-cancel";
+      "http://localhost:5007/api/payments/cancel";
 
     const stripeSession = await createCheckoutSession({
       appointmentId,
       doctorName,
-      amount: Number(amount),
+      amount,
       currency: "lkr",
       successUrl,
       cancelUrl,
@@ -63,7 +64,7 @@ const createPayment = async (req, res) => {
       patientEmail,
       doctorId,
       doctorName,
-      amount: Number(amount),
+      amount,
       currency: "LKR",
       paymentMethod: "stripe",
       status: "pending",
@@ -71,7 +72,7 @@ const createPayment = async (req, res) => {
       stripeSessionId: stripeSession.id,
     });
 
-    return res.status(201).json({
+    res.status(201).json({
       message: "Payment session created successfully.",
       payment,
       checkoutUrl: stripeSession.url,
@@ -81,6 +82,78 @@ const createPayment = async (req, res) => {
 
     return res.status(500).json({
       message: "Server error while creating payment session.",
+    });
+  }
+};
+
+const createBankTransferPayment = async (req, res) => {
+  try {
+    const {
+      appointmentId,
+      patientId,
+      patientName,
+      patientEmail,
+      doctorId,
+      doctorName,
+      amount,
+      transferReference,
+    } = req.body;
+
+    if (
+      !appointmentId ||
+      !patientId ||
+      !patientName ||
+      !patientEmail ||
+      !doctorId ||
+      !doctorName ||
+      !amount
+    ) {
+      return res.status(400).json({
+        message: "All required bank transfer payment fields must be provided.",
+      });
+    }
+
+    // Patient can only create payment for themselves
+    if (req.user.role === "patient" && req.user.userId !== patientId) {
+      return res.status(403).json({
+        message: "Access denied. You can only submit payments for your own appointments.",
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        message: "Payment slip is required for bank transfer.",
+      });
+    }
+
+    const invoiceNumber = generateInvoiceNumber();
+
+    const paymentSlipUrl = `/uploads/payment-slips/${req.file.filename}`;
+
+    const payment = await Payment.create({
+      appointmentId,
+      patientId,
+      patientName,
+      patientEmail,
+      doctorId,
+      doctorName,
+      amount,
+      currency: "LKR",
+      paymentMethod: "bank_transfer",
+      status: "verification_pending",
+      invoiceNumber,
+      paymentSlipUrl,
+      transferReference: transferReference || null,
+    });
+
+    res.status(201).json({
+      message: "Bank transfer payment submitted successfully and is pending verification.",
+      payment,
+    });
+  } catch (error) {
+    console.error("createBankTransferPayment error:", error.message);
+    res.status(500).json({
+      message: "Server error while submitting bank transfer payment.",
     });
   }
 };
@@ -153,17 +226,21 @@ const handlePaymentCancel = async (req, res) => {
 
 const getPaymentById = async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: "Invalid payment ID." });
-    }
-
     const payment = await Payment.findById(req.params.id);
 
     if (!payment) {
       return res.status(404).json({ message: "Payment not found." });
     }
 
-    return res.status(200).json(payment);
+    // Patient can only access their own payment
+    if (
+      req.user.role !== "admin" &&
+      payment.patientId !== req.user.userId
+    ) {
+      return res.status(403).json({ message: "Access denied." });
+    }
+
+    res.status(200).json(payment);
   } catch (error) {
     console.error("getPaymentById error:", error.message);
 
@@ -175,9 +252,17 @@ const getPaymentsByPatient = async (req, res) => {
   try {
     const { patientId } = req.params;
 
+    // Patient can only access their own billing history
+    if (
+      req.user.role !== "admin" &&
+      req.user.userId !== patientId
+    ) {
+      return res.status(403).json({ message: "Access denied." });
+    }
+
     const payments = await Payment.find({ patientId }).sort({ createdAt: -1 });
 
-    return res.status(200).json({
+    res.status(200).json({
       total: payments.length,
       payments,
     });
@@ -190,10 +275,115 @@ const getPaymentsByPatient = async (req, res) => {
   }
 };
 
+const getPendingBankTransfers = async (req, res) => {
+  try {
+    const payments = await Payment.find({
+      paymentMethod: "bank_transfer",
+      status: "verification_pending",
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      total: payments.length,
+      payments,
+    });
+  } catch (error) {
+    console.error("getPendingBankTransfers error:", error.message);
+    res.status(500).json({
+      message: "Server error while fetching pending bank transfer payments.",
+    });
+  }
+};
+
+const approveBankTransferPayment = async (req, res) => {
+  try {
+    const payment = await Payment.findById(req.params.id);
+
+    if (!payment) {
+      return res.status(404).json({ message: "Payment not found." });
+    }
+
+    if (payment.paymentMethod !== "bank_transfer") {
+      return res.status(400).json({
+        message: "Only bank transfer payments can be approved through this route.",
+      });
+    }
+
+    if (payment.status !== "verification_pending") {
+      return res.status(400).json({
+        message: "Only pending verification payments can be approved.",
+      });
+    }
+
+    payment.status = "paid";
+    payment.verifiedBy = req.user.userId;
+    payment.verifiedAt = new Date();
+    payment.paidAt = new Date();
+    payment.rejectionReason = null;
+    payment.failureReason = null;
+
+    await payment.save();
+
+    res.status(200).json({
+      message: "Bank transfer payment approved successfully.",
+      payment,
+    });
+  } catch (error) {
+    console.error("approveBankTransferPayment error:", error.message);
+    res.status(500).json({
+      message: "Server error while approving bank transfer payment.",
+    });
+  }
+};
+
+const rejectBankTransferPayment = async (req, res) => {
+  try {
+    const { rejectionReason } = req.body;
+
+    const payment = await Payment.findById(req.params.id);
+
+    if (!payment) {
+      return res.status(404).json({ message: "Payment not found." });
+    }
+
+    if (payment.paymentMethod !== "bank_transfer") {
+      return res.status(400).json({
+        message: "Only bank transfer payments can be rejected through this route.",
+      });
+    }
+
+    if (payment.status !== "verification_pending") {
+      return res.status(400).json({
+        message: "Only pending verification payments can be rejected.",
+      });
+    }
+
+    payment.status = "rejected";
+    payment.verifiedBy = req.user.userId;
+    payment.verifiedAt = new Date();
+    payment.rejectionReason = rejectionReason || "Payment verification rejected by admin.";
+
+    await payment.save();
+
+    res.status(200).json({
+      message: "Bank transfer payment rejected successfully.",
+      payment,
+    });
+  } catch (error) {
+    console.error("rejectBankTransferPayment error:", error.message);
+    res.status(500).json({
+      message: "Server error while rejecting bank transfer payment.",
+    });
+  }
+};
+
 module.exports = {
   createPayment,
-  getPaymentById,
-  getPaymentsByPatient,
+  createBankTransferPayment,
   handlePaymentSuccess,
   handlePaymentCancel,
+  getPaymentById,
+  getPaymentsByPatient,
+  getPendingBankTransfers,
+  approveBankTransferPayment,
+  rejectBankTransferPayment,
 };
