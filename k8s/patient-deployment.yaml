@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: patient-service-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: patient-service
+  template:
+    metadata:
+      labels:
+        app: patient-service
+    spec:
+      containers:
+      - name: patient-service
+        image: medigo-patient-service:latest
+        imagePullPolicy: Never # Crucial for local testing: tells K8s to use the local image we just built
+        ports:
+        - containerPort: 5002
