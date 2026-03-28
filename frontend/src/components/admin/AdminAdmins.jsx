@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react'
 import { Shield, Plus, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminAPI } from '../../services/api'
-import Header from '../../components/common/Header'
+import Header from '../common/Header'
 import Badge from '../../components/common/Badge'
-import Button from '../../components/common/Button'
+import Button from '../common/Button'
 import Input from '../../components/common/Input'
-import Spinner from '../../components/common/Spinner'
+import Spinner from '../common/Spinner'
 
 export default function AdminAdmins() {
   const [admins, setAdmins] = useState([])
