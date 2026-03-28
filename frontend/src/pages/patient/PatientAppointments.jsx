@@ -1,118 +1,258 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { format } from 'date-fns'
-import { appointmentAPI } from '../../services/api'
-import { Badge, EmptyState, PageLoader } from '../../components/ui/index.jsx'
+import { appointmentAPI, paymentAPI } from '../../services/api'
+import { useAuth } from '../../context/AuthContext'
+import toast from 'react-hot-toast'
+import { format, addDays } from 'date-fns'
+import { Calendar, X, CreditCard, RefreshCw } from 'lucide-react'
 
-const FILTERS = ['all','pending','confirmed','completed','cancelled']
+const statusBadge = (s) => {
+  const m = { pending: 'badge-amber', confirmed: 'badge-blue', completed: 'badge-green', cancelled: 'badge-red', 'no-show': 'badge-gray' }
+  return <span className={`badge ${m[s] || 'badge-gray'}`}>{s}</span>
+}
+
+const TIME_SLOTS = ['09:00','09:30','10:00','10:30','11:00','11:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30']
 
 export default function PatientAppointments() {
-  const navigate = useNavigate()
+  const { user } = useAuth()
   const [appointments, setAppointments] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [filter, setFilter] = useState('all')
-  const [cancelling, setCancelling] = useState(null)
+  const [filter, setFilter] = useState('')
+  const [payingId, setPayingId] = useState(null)
 
-  const fetch = () => {
-    setLoading(true); setError('')
-    appointmentAPI.getAll(filter !== 'all' ? { status: filter } : {})
+  // Reschedule modal state
+  const [rescheduleAppt, setRescheduleAppt] = useState(null)
+  const [newDate, setNewDate] = useState('')
+  const [newSlot, setNewSlot] = useState('')
+  const [bookedSlots, setBookedSlots] = useState([])
+  const [rescheduling, setRescheduling] = useState(false)
+
+  const load = () => {
+    const params = filter ? { status: filter } : {}
+    appointmentAPI.getMy(params)
       .then(r => setAppointments(r.data.appointments || []))
-      .catch(() => setError('Could not load appointments. Make sure appointment-service is running.'))
+      .catch(() => {})
       .finally(() => setLoading(false))
   }
-  useEffect(() => { fetch() }, [filter])
 
-  const handleCancel = async (id) => {
-    if (!window.confirm('Cancel this appointment?')) return
-    setCancelling(id)
-    try { await appointmentAPI.cancel(id, 'Patient cancelled'); fetch() }
-    catch { alert('Failed to cancel. Please try again.') }
-    finally { setCancelling(null) }
+  useEffect(() => { load() }, [filter])
+
+  // Load booked slots when date changes in modal
+  useEffect(() => {
+    if (rescheduleAppt && newDate) {
+      appointmentAPI.getAvailability(rescheduleAppt.doctorId, newDate)
+        .then(r => setBookedSlots(r.data.bookedSlots || []))
+        .catch(() => setBookedSlots([]))
+    }
+  }, [newDate, rescheduleAppt])
+
+  const openReschedule = (appt) => {
+    setRescheduleAppt(appt)
+    setNewDate(format(addDays(new Date(), 1), 'yyyy-MM-dd'))
+    setNewSlot('')
+    setBookedSlots([])
   }
 
-  const filtered = filter === 'all' ? appointments : appointments.filter(a => a.status === filter)
-  const counts = FILTERS.slice(1).reduce((acc, s) => { acc[s] = appointments.filter(a => a.status === s).length; return acc }, {})
+  const closeReschedule = () => {
+    setRescheduleAppt(null)
+    setNewDate('')
+    setNewSlot('')
+    setBookedSlots([])
+  }
+
+  const handleReschedule = async () => {
+    if (!newSlot) return toast.error('Please select a time slot')
+    setRescheduling(true)
+    try {
+      await appointmentAPI.modify(rescheduleAppt._id, {
+        appointmentDate: newDate,
+        timeSlot: newSlot,
+      })
+      toast.success('Appointment rescheduled!')
+      closeReschedule()
+      load()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Reschedule failed')
+    } finally {
+      setRescheduling(false)
+    }
+  }
+
+  const handleCancel = async (id) => {
+    if (!confirm('Cancel this appointment?')) return
+    try {
+      await appointmentAPI.cancel(id, { reason: 'Cancelled by patient' })
+      toast.success('Appointment cancelled')
+      load()
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed') }
+  }
+
+  const handlePay = async (a) => {
+    setPayingId(a._id)
+    try {
+      const res = await paymentAPI.create({
+        appointmentId: a._id,
+        patientId: user?.userId,
+        patientName: user?.fullName,
+        patientEmail: user?.email,
+        doctorId: a.doctorId,
+        doctorName: a.doctorName,
+        amount: a.fee || 0,
+      })
+      const checkoutUrl = res.data.checkoutUrl
+      if (checkoutUrl) window.location.href = checkoutUrl
+      else toast.error('Could not get payment URL')
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Payment failed')
+    } finally {
+      setPayingId(null)
+    }
+  }
+
+  const dates = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i + 1))
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="font-display font-bold text-2xl text-gray-900">My Appointments</h1>
-            <p className="text-sm text-gray-400 mt-0.5">{appointments.length} total appointments</p>
-          </div>
-          <button className="btn-primary" onClick={() => navigate('/search')}>+ New Appointment</button>
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-wrap gap-2 mb-5">
-          {FILTERS.map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-bold border transition-all ${
-                filter === f ? 'bg-navy border-navy text-white' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}>
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-              {f !== 'all' && counts[f] > 0 && (
-                <span className={`text-xs px-1.5 py-0.5 rounded-full ${filter===f?'bg-white/20':'bg-gray-100'}`}>{counts[f]}</span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {error ? (
-          <div className="card p-8 text-center">
-            <p className="text-red-400 mb-3">{error}</p>
-            <button className="btn-outline btn-sm" onClick={fetch}>Retry</button>
-          </div>
-        ) : loading ? <PageLoader/> : filtered.length === 0 ? (
-          <div className="card">
-            <EmptyState icon="📅" title="No appointments" message="Book your first appointment">
-              <button className="btn-primary btn-sm mt-3" onClick={() => navigate('/search')}>Find a Doctor</button>
-            </EmptyState>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filtered.map((appt, i) => (
-              <div key={appt._id} className={`card p-5 hover:shadow-md transition-all ${['completed','cancelled'].includes(appt.status) ? 'opacity-75' : ''}`}
-                style={{ animation: `fadeUp 0.3s ease ${i*0.04}s both` }}>
-                <div className="flex items-center gap-4">
-                  <div className="bg-teal-lighter border border-teal/20 rounded-xl p-3 text-center min-w-[52px] flex-shrink-0">
-                    <div className="font-display font-black text-2xl text-teal leading-none">{format(new Date(appt.appointmentDate),'d')}</div>
-                    <div className="text-xs font-bold text-teal/70 uppercase">{format(new Date(appt.appointmentDate),'MMM')}</div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="font-display font-bold text-gray-900">{appt.doctorName}</span>
-                      <Badge status={appt.status}/>
-                    </div>
-                    <div className="flex flex-wrap gap-3 text-xs text-gray-400">
-                      {appt.hospital && <span>🏥 {appt.hospital}</span>}
-                      <span>⏰ {appt.timeSlot}</span>
-                      <span>{appt.type === 'telemedicine' ? '📹 Video' : '🏥 In-Person'}</span>
-                      {appt.fee > 0 && <span>💰 Rs. {appt.fee?.toLocaleString()}</span>}
-                    </div>
-                    {appt.reason && <p className="text-xs text-gray-400 italic mt-1">"{appt.reason}"</p>}
-                    {appt.cancellationReason && <p className="text-xs text-red-400 mt-1">Cancelled: {appt.cancellationReason}</p>}
-                  </div>
-                  <div className="flex flex-col gap-2 flex-shrink-0">
-                    {appt.meetingLink && appt.status === 'confirmed' && (
-                      <a href={appt.meetingLink} target="_blank" rel="noreferrer" className="btn-primary btn-sm text-xs">📹 Join</a>
-                    )}
-                    {['pending','confirmed'].includes(appt.status) && (
-                      <>
-                        <button className="btn-outline btn-sm text-xs" onClick={() => navigate(`/patient/appointments/${appt._id}/reschedule`)}>Reschedule</button>
-                        <button className="btn-danger btn-sm text-xs" onClick={() => handleCancel(appt._id)} disabled={cancelling === appt._id}>
-                          {cancelling === appt._id ? '...' : 'Cancel'}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+    <div>
+      <div className="page-header">
+        <h1 className="page-title">My Appointments</h1>
+        <p className="page-subtitle">Manage your scheduled visits</p>
       </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        {['', 'pending', 'confirmed', 'completed', 'cancelled'].map(s => (
+          <button key={s} className={`btn btn-sm ${filter === s ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFilter(s)}>
+            {s ? s.charAt(0).toUpperCase() + s.slice(1) : 'All'}
+          </button>
+        ))}
+      </div>
+
+      <div className="card">
+        {loading
+          ? <div style={{ textAlign: 'center', padding: 40 }}><div className="spinner" style={{ margin: '0 auto' }} /></div>
+          : appointments.length === 0
+          ? <div style={{ textAlign: 'center', padding: 60, color: 'var(--gray-400)' }}>
+              <Calendar size={40} style={{ margin: '0 auto 12px' }} /><p>No appointments found</p>
+            </div>
+          : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Doctor</th><th>Specialty</th><th>Date</th><th>Time</th><th>Type</th><th>Fee</th><th>Payment</th><th>Status</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                  {appointments.map(a => (
+                    <tr key={a._id}>
+                      <td style={{ fontWeight: 500 }}>Dr. {a.doctorName}</td>
+                      <td style={{ color: 'var(--gray-500)', fontSize: 13 }}>{a.specialty}</td>
+                      <td>{format(new Date(a.appointmentDate), 'dd MMM yyyy')}</td>
+                      <td>{a.timeSlot}</td>
+                      <td><span className="badge badge-gray">{a.type}</span></td>
+                      <td style={{ fontWeight: 600, fontSize: 13 }}>LKR {a.fee || 0}</td>
+                      <td><span className={`badge ${a.paymentStatus === 'paid' ? 'badge-green' : 'badge-amber'}`}>{a.paymentStatus}</span></td>
+                      <td>{statusBadge(a.status)}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          {a.paymentStatus === 'unpaid' && ['pending', 'confirmed'].includes(a.status) && (
+                            <button className="btn btn-sm btn-primary" onClick={() => handlePay(a)} disabled={payingId === a._id}>
+                              {payingId === a._id ? <span className="spinner" style={{ width: 12, height: 12, borderWidth: 1.5 }} /> : <CreditCard size={13} />}
+                              Pay
+                            </button>
+                          )}
+                          {a.status === 'pending' && (
+                            <button className="btn btn-sm btn-secondary" onClick={() => openReschedule(a)}>
+                              <RefreshCw size={13} /> Reschedule
+                            </button>
+                          )}
+                          {['pending', 'confirmed'].includes(a.status) && (
+                            <button className="btn btn-sm btn-danger" onClick={() => handleCancel(a._id)}>
+                              <X size={13} /> Cancel
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+      </div>
+
+      {/* Reschedule Modal */}
+      {rescheduleAppt && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: 20,
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: 540, maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600 }}>Reschedule Appointment</h3>
+              <button className="btn btn-secondary btn-sm" onClick={closeReschedule}><X size={14} /></button>
+            </div>
+
+            <div style={{ background: 'var(--blue-50)', borderRadius: 10, padding: 12, marginBottom: 20, fontSize: 13 }}>
+              <div style={{ fontWeight: 500 }}>Dr. {rescheduleAppt.doctorName}</div>
+              <div style={{ color: 'var(--gray-500)', marginTop: 2 }}>
+                Current: {format(new Date(rescheduleAppt.appointmentDate), 'dd MMM yyyy')} at {rescheduleAppt.timeSlot}
+              </div>
+            </div>
+
+            {/* Date Selection */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--gray-700)', marginBottom: 10 }}>Select New Date</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {dates.map(date => {
+                  const val = format(date, 'yyyy-MM-dd')
+                  const active = newDate === val
+                  return (
+                    <button key={val} onClick={() => { setNewDate(val); setNewSlot('') }}
+                      style={{
+                        padding: '8px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
+                        border: `1.5px solid ${active ? 'var(--blue-600)' : 'var(--gray-200)'}`,
+                        background: active ? 'var(--blue-600)' : 'white',
+                        color: active ? 'white' : 'var(--gray-700)',
+                      }}>
+                      <div style={{ fontSize: 11, fontWeight: 500 }}>{format(date, 'EEE')}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700 }}>{format(date, 'd')}</div>
+                      <div style={{ fontSize: 11 }}>{format(date, 'MMM')}</div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Time Slot Selection */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--gray-700)', marginBottom: 10 }}>Select New Time Slot</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                {TIME_SLOTS.map(slot => {
+                  const booked = bookedSlots.includes(slot)
+                  const active = newSlot === slot
+                  return (
+                    <button key={slot} disabled={booked} onClick={() => setNewSlot(slot)}
+                      style={{
+                        padding: '9px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: booked ? 'not-allowed' : 'pointer',
+                        border: `1.5px solid ${active ? 'var(--blue-600)' : booked ? 'var(--gray-200)' : 'var(--gray-300)'}`,
+                        background: active ? 'var(--blue-600)' : booked ? 'var(--gray-100)' : 'white',
+                        color: active ? 'white' : booked ? 'var(--gray-400)' : 'var(--gray-700)',
+                        textDecoration: booked ? 'line-through' : 'none',
+                      }}>
+                      {slot}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn btn-primary" onClick={handleReschedule} disabled={rescheduling || !newSlot} style={{ flex: 1 }}>
+                {rescheduling ? <span className="spinner" /> : <><RefreshCw size={14} /> Confirm Reschedule</>}
+              </button>
+              <button className="btn btn-secondary" onClick={closeReschedule}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -46,7 +46,7 @@ const bookAppointment = async (req, res) => {
     // ── Step 2: Check if slot is already taken ────────────────
     const existing = await Appointment.findOne({
       doctorId,
-      appointmentDate: new Date(appointmentDate),
+      appointmentDate: new Date(`${appointmentDate}T00:00:00.000Z`),
       timeSlot,
       status: { $in: ['pending', 'confirmed'] },
     });
@@ -78,9 +78,11 @@ const bookAppointment = async (req, res) => {
       patientId,
       patientName,
       patientEmail,
+      patientPhone: req.user.phone || null,
       doctorId,
       doctorName,
       doctorEmail,
+      doctorPhone: null,
       hospital,
       specialty,
       appointmentDate,
@@ -176,7 +178,7 @@ const modifyAppointment = async (req, res) => {
     const { appointmentDate, timeSlot, reason } = req.body;
 
     if (appointmentDate || timeSlot) {
-      const newDate = appointmentDate ? new Date(appointmentDate) : appointment.appointmentDate;
+      const newDate = appointmentDate ? new Date(`${appointmentDate}T00:00:00.000Z`) : appointment.appointmentDate;
       const newSlot = timeSlot || appointment.timeSlot;
 
       const conflict = await Appointment.findOne({
@@ -202,6 +204,8 @@ const modifyAppointment = async (req, res) => {
       doctorEmail:     appointment.doctorEmail,
       patientName:     appointment.patientName,
       doctorName:      appointment.doctorName,
+      patientPhone:    null,
+      doctorPhone:     null,
       hospital:        appointment.hospital,
       appointmentDate: appointment.appointmentDate,
       timeSlot:        appointment.timeSlot,
@@ -241,6 +245,8 @@ const cancelAppointment = async (req, res) => {
       doctorEmail:        appointment.doctorEmail,
       patientName:        appointment.patientName,
       doctorName:         appointment.doctorName,
+      patientPhone:       null,
+      doctorPhone:        null,
       hospital:           appointment.hospital,
       appointmentDate:    appointment.appointmentDate,
       timeSlot:           appointment.timeSlot,
@@ -279,6 +285,24 @@ const updateAppointmentStatus = async (req, res) => {
     if (meetingLink) appointment.meetingLink = meetingLink;
     await appointment.save();
 
+    // Publish confirmation event when doctor confirms
+    if (status === 'confirmed') {
+      await publishEvent('appointment.updated', {
+        appointmentId:   appointment._id,
+        patientEmail:    appointment.patientEmail,
+        doctorEmail:     appointment.doctorEmail,
+        patientName:     appointment.patientName,
+        doctorName:      appointment.doctorName,
+        patientPhone:    null,
+        doctorPhone:     null,
+        hospital:        appointment.hospital,
+        appointmentDate: appointment.appointmentDate,
+        timeSlot:        appointment.timeSlot,
+        meetingLink:     appointment.meetingLink,
+        confirmed:       true,
+      });
+    }
+
     res.status(200).json({ message: `Appointment status updated to ${status}.`, appointment });
   } catch (error) {
     console.error('updateAppointmentStatus error:', error);
@@ -296,8 +320,8 @@ const getDoctorAvailability = async (req, res) => {
 
     if (!date) return res.status(400).json({ message: 'Date query parameter is required.' });
 
-    const start = new Date(date); start.setHours(0, 0, 0, 0);
-    const end   = new Date(date); end.setHours(23, 59, 59, 999);
+    const start = new Date(`${date}T00:00:00.000Z`);
+    const end   = new Date(`${date}T23:59:59.999Z`);
 
     const bookedSlots = await Appointment.find({
       doctorId,
@@ -360,6 +384,39 @@ const getAllAppointments = async (req, res) => {
   }
 };
 
+// ─────────────────────────────────────────────────────────────
+// PUT /api/appointments/internal/payment-status
+// Internal — called by payment-service only (x-service-secret)
+// Updates paymentStatus on an appointment after Stripe confirms
+// ─────────────────────────────────────────────────────────────
+const updatePaymentStatus = async (req, res) => {
+  try {
+    const { appointmentId, paymentStatus } = req.body;
+
+    if (!appointmentId || !paymentStatus) {
+      return res.status(400).json({ message: 'appointmentId and paymentStatus are required.' });
+    }
+
+    const allowed = ['unpaid', 'paid', 'refunded'];
+    if (!allowed.includes(paymentStatus)) {
+      return res.status(400).json({ message: `Invalid paymentStatus. Allowed: ${allowed.join(', ')}` });
+    }
+
+    const appointment = await Appointment.findById(appointmentId);
+    if (!appointment) {
+      return res.status(404).json({ message: 'Appointment not found.' });
+    }
+
+    appointment.paymentStatus = paymentStatus;
+    await appointment.save();
+
+    res.status(200).json({ message: `Payment status updated to ${paymentStatus}.`, appointment });
+  } catch (error) {
+    console.error('updatePaymentStatus error:', error);
+    res.status(500).json({ message: 'Server error updating payment status.' });
+  }
+};
+
 module.exports = {
   bookAppointment,
   getMyAppointments,
@@ -367,6 +424,7 @@ module.exports = {
   modifyAppointment,
   cancelAppointment,
   updateAppointmentStatus,
+  updatePaymentStatus,
   getDoctorAvailability,
   searchDoctorsBySpecialty,
   getAllAppointments,

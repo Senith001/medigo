@@ -1,6 +1,11 @@
 import MedicalReport from '../models/MedicalReport.js';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const BASE_DIR = path.resolve(__dirname, '../../../../');
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/reports/upload
@@ -140,7 +145,7 @@ export const downloadReport = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied.' });
     }
 
-    const filePath = path.join(process.cwd(), report.fileUrl);
+    const filePath = path.join(BASE_DIR, report.fileUrl);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, message: 'File not found on server.' });
     }
@@ -218,7 +223,7 @@ export const deleteReport = async (req, res) => {
     }
 
     // Delete file from disk
-    const filePath = path.join(process.cwd(), report.fileUrl);
+    const filePath = path.join(BASE_DIR, report.fileUrl);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
     await report.deleteOne();

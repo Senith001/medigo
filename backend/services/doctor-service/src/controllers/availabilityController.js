@@ -6,7 +6,7 @@ import Doctor from '../models/Doctor.js';
 // ─────────────────────────────────────────────────────────────
 export const getMyAvailability = async (req, res) => {
   try {
-    const doctor = await Doctor.findOne({ email: req.user.email }).select('availability fullName specialty');
+    const doctor = await Doctor.findById(req.user.id).select('availability fullName specialty');
     if (!doctor) return res.status(404).json({ success: false, message: 'Doctor not found.' });
     res.status(200).json({ success: true, availability: doctor.availability });
   } catch (error) {
@@ -27,8 +27,8 @@ export const updateMyAvailability = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Availability must be an array.' });
     }
 
-    const doctor = await Doctor.findOneAndUpdate(
-      { email: req.user.email },
+    const doctor = await Doctor.findByIdAndUpdate(
+      req.user.id,
       { $set: { availability } },
       { new: true, runValidators: true }
     ).select('availability fullName');

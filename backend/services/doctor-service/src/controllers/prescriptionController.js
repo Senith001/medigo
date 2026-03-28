@@ -13,7 +13,7 @@ export const createPrescription = async (req, res) => {
     } = req.body;
 
     // Get doctor details from DB
-    const doctor = await Doctor.findOne({ email: req.user.email }).select('-password');
+    const doctor = await Doctor.findById(req.user.id).select('-password');
     if (!doctor) {
       return res.status(404).json({ success: false, message: 'Doctor not found.' });
     }
@@ -52,10 +52,7 @@ export const createPrescription = async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 export const getMyPrescriptions = async (req, res) => {
   try {
-    const doctor = await Doctor.findOne({ email: req.user.email });
-    if (!doctor) return res.status(404).json({ success: false, message: 'Doctor not found.' });
-
-    const prescriptions = await Prescription.find({ doctorId: doctor._id.toString() })
+    const prescriptions = await Prescription.find({ doctorId: req.user.id })
       .sort({ createdAt: -1 });
 
     res.status(200).json({ success: true, total: prescriptions.length, prescriptions });
@@ -126,8 +123,7 @@ export const updatePrescription = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Prescription not found.' });
     }
 
-    const doctor = await Doctor.findOne({ email: req.user.email });
-    if (prescription.doctorId !== doctor._id.toString() && req.user.role !== 'admin') {
+    if (prescription.doctorId !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Access denied.' });
     }
 

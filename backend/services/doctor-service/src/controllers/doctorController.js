@@ -1,5 +1,47 @@
 import Doctor from '../models/Doctor.js';
 import axios from 'axios';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+
+const generateDoctorToken = (doctor) => {
+  return jwt.sign(
+    { id: doctor._id, userId: doctor._id, email: doctor.email, fullName: doctor.fullName, role: 'doctor' },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+  );
+};
+
+export const loginDoctor = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and password are required.' });
+    }
+    const doctor = await Doctor.findOne({ email: email.toLowerCase() }).select('+password');
+    if (!doctor) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password.' });
+    }
+
+    const isMatch = await bcrypt.compare(password, doctor.password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password.' });
+    }
+    if (!doctor.isActive) {
+      return res.status(403).json({ success: false, message: 'Your account has been deactivated.' });
+    }
+    const token = generateDoctorToken(doctor);
+    res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      token,
+      data: { userId: doctor._id, fullName: doctor.fullName, email: doctor.email, role: 'doctor', isVerified: doctor.isVerified },
+    });
+  } catch (error) {
+    res.status(500);
+    throw new Error(error.message);
+  }
+};
+
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/doctors/register
@@ -38,7 +80,7 @@ export const registerDoctor = async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 export const getMyProfile = async (req, res) => {
   try {
-    const doctor = await Doctor.findOne({ email: req.user.email }).select('-password');
+    const doctor = await Doctor.findById(req.user.id).select('-password');
     if (!doctor) {
       return res.status(404).json({ success: false, message: 'Doctor profile not found.' });
     }
@@ -66,8 +108,8 @@ export const updateMyProfile = async (req, res) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     });
 
-    const doctor = await Doctor.findOneAndUpdate(
-      { email: req.user.email },
+    const doctor = await Doctor.findByIdAndUpdate(
+      req.user.id,
       { $set: updates },
       { new: true, runValidators: true }
     ).select('-password');

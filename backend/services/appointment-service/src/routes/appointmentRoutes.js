@@ -10,10 +10,22 @@ const {
   modifyAppointment,
   cancelAppointment,
   updateAppointmentStatus,
+  updatePaymentStatus,
   getDoctorAvailability,
   searchDoctorsBySpecialty,
   getAllAppointments,
 } = require('../controllers/appointmentController');
+
+// ── Internal (service-to-service only) ───────────────────────
+const verifyInternalService = (req, res, next) => {
+  const secret = req.headers['x-service-secret'];
+  if (!secret || secret !== process.env.SERVICE_SECRET) {
+    return res.status(403).json({ message: 'Unauthorized internal service call.' });
+  }
+  next();
+};
+
+router.put('/internal/payment-status', verifyInternalService, updatePaymentStatus);
 
 // Search doctors by specialty
 router.get('/search', authenticate, searchDoctorsBySpecialty);
