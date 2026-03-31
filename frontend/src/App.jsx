@@ -3,27 +3,54 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'
 
-import LoginPage              from './pages/LoginPage'
-import HomePage               from './pages/HomePage'
+// --- Auth Imports ---
+import LoginPage              from './pages/Auth/LoginPage'
+import RegisterPage           from './pages/Auth/RegisterPage'
+import VerifyOTPPage          from './pages/Auth/VerifyOTPPage'
+import AdminLogin             from './pages/Auth/AdminLogin'
+
+// --- Dashboard Imports ---
+import PatientDashboard       from './pages/Patient/PatientDashboard'
+import AdminDashboard         from './pages/Admin/AdminDashboard'
+
+// --- Teammate's Existing Imports ---
 import SearchDoctors          from './pages/SearchDoctors'
 import { BookAppointment }    from './pages/BookAppointment'
 import MyAppointments         from './pages/MyAppointments'
 import RescheduleAppointment  from './pages/RescheduleAppointment'
 
 function Layout() {
-  const { token } = useAuth()
+  const { token, user } = useAuth()
+
+  // Only show the standard patient/public navbar if it's NOT an admin.
+  // Admins usually have their own sidebar/navbar layout.
+  const showStandardNavbar = token && user?.role !== 'admin'
 
   return (
     <>
-      {token && <Navbar />}
+      {showStandardNavbar && <Navbar />}
       <Routes>
+        {/* --- Public Auth Routes --- */}
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
-        <Route path="/search" element={<ProtectedRoute><SearchDoctors /></ProtectedRoute>} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/verify-otp" element={<VerifyOTPPage />} />
+        
+        {/* --- Admin Auth Routes --- */}
+        <Route path="/admin-login" element={<AdminLogin />} />
+
+        {/* --- Protected Admin Routes --- */}
+        <Route path="/admin" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
+
+        {/* --- Protected Patient Routes --- */}
+        <Route path="/dashboard" element={<ProtectedRoute roles={['patient']}><PatientDashboard /></ProtectedRoute>} />
+        <Route path="/search" element={<ProtectedRoute roles={['patient']}><SearchDoctors /></ProtectedRoute>} />
         <Route path="/book" element={<ProtectedRoute roles={['patient']}><BookAppointment /></ProtectedRoute>} />
-        <Route path="/appointments" element={<ProtectedRoute><MyAppointments /></ProtectedRoute>} />
+        <Route path="/appointments" element={<ProtectedRoute roles={['patient']}><MyAppointments /></ProtectedRoute>} />
         <Route path="/appointments/:id/reschedule" element={<ProtectedRoute roles={['patient','admin']}><RescheduleAppointment /></ProtectedRoute>} />
-        <Route path="*" element={<Navigate to={token ? '/' : '/login'} replace />} />
+        
+        {/* --- Fallback Redirect --- */}
+        {/* If logged in as admin, default to /admin. If patient, default to /dashboard. Otherwise /login */}
+        <Route path="*" element={<Navigate to={token ? (user?.role === 'admin' ? '/admin' : '/dashboard') : '/login'} replace />} />
       </Routes>
     </>
   )

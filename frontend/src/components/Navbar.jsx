@@ -23,7 +23,7 @@ export default function Navbar() {
       {/* Nav links */}
       {user && (
         <div className="navbar-links">
-          <Link to="/"            className={`nav-link ${isActive('/')            ? 'active' : ''}`}>Home</Link>
+          <Link to="/dashboard"   className={`nav-link ${isActive('/dashboard')            ? 'active' : ''}`}>Home</Link>
           <Link to="/search"      className={`nav-link ${isActive('/search')      ? 'active' : ''}`}>Find Doctors</Link>
           <Link to="/appointments"className={`nav-link ${isActive('/appointments') ? 'active' : ''}`}>My Appointments</Link>
         </div>
