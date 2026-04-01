@@ -16,7 +16,7 @@ const {
 const { protect, authorize } = require("../middleware/auth");
 const upload = require("../middleware/upload");
 
-// Patient creates payment
+// Patient creates a Stripe payment.
 router.post("/", protect, authorize("patient"), createPayment);
 
 // Patient submits bank transfer payment + slip

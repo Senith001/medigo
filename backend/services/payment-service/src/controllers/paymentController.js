@@ -1,11 +1,58 @@
 const Payment = require("../models/Payment");
 const mongoose = require("mongoose");
+const axios = require("axios");
 const generateInvoiceNumber = require("../utils/generateInvoiceNumber");
 const {
   createCheckoutSession,
   retrieveCheckoutSession,
 } = require("../services/stripeService");
 
+
+// Helper: sync appointment paymentStatus to appointment-service
+const syncAppointmentPayment = async (appointmentId, paymentStatus) => {
+  try {
+    await axios.put(
+      `${process.env.APPOINTMENT_SERVICE_URL}/api/appointments/internal/payment-status`,
+      { appointmentId, paymentStatus },
+      {
+        headers: {
+          "x-service-secret": process.env.SERVICE_SECRET,
+        },
+      }
+    );
+  } catch (err) {
+    console.error("Failed to sync appointment payment status:", err.message);
+  }
+};
+
+// Helper: trigger notification-service for payment-related messages
+const sendNotification = async (payment, type) => {
+  try {
+    await axios.post(
+      `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/internal/payment-status`,
+      {
+        appointmentId: payment.appointmentId,
+        patientName: payment.patientName,
+        patientEmail: payment.patientEmail,
+        patientPhone: payment.patientPhone || null,
+        doctorName: payment.doctorName,
+        amount: payment.amount,
+        currency: payment.currency,
+        invoiceNumber: payment.invoiceNumber,
+        type,
+      },
+      {
+        headers: {
+          "x-service-secret": process.env.SERVICE_SECRET,
+        },
+      }
+    );
+  } catch (err) {
+    console.error(`Failed to send ${type} notification:`, err.message);
+  }
+};
+
+// Create a Stripe payment and save its details in the database.
 const createPayment = async (req, res) => {
   try {
     const {
@@ -128,6 +175,7 @@ const createBankTransferPayment = async (req, res) => {
 
     const invoiceNumber = generateInvoiceNumber();
 
+    // Save the uploaded slip path so admins can review it later.
     const paymentSlipUrl = `/uploads/payment-slips/${req.file.filename}`;
 
     const payment = await Payment.create({
@@ -145,6 +193,9 @@ const createBankTransferPayment = async (req, res) => {
       paymentSlipUrl,
       transferReference: transferReference || null,
     });
+
+    // Notify notification-service that bank transfer is awaiting verification
+    await sendNotification(payment, "verification_pending");
 
     res.status(201).json({
       message: "Bank transfer payment submitted successfully and is pending verification.",
@@ -166,6 +217,7 @@ const handlePaymentSuccess = async (req, res) => {
       return res.status(400).json({ message: "Stripe session ID is required." });
     }
 
+    // Use the Stripe session id to find and update the local payment record.
     const stripeSession = await retrieveCheckoutSession(session_id);
 
     const payment = await Payment.findOne({ stripeSessionId: session_id });
@@ -180,6 +232,12 @@ const handlePaymentSuccess = async (req, res) => {
       payment.stripePaymentIntentId = stripeSession.payment_intent || null;
       payment.failureReason = null;
       await payment.save();
+
+      // Sync appointment payment status to appointment-service
+      await syncAppointmentPayment(payment.appointmentId, "paid");
+
+      // Trigger payment confirmation notification
+      await sendNotification(payment, "paid");
     }
 
     res.status(200).json({
@@ -277,6 +335,7 @@ const getPaymentsByPatient = async (req, res) => {
 
 const getPendingBankTransfers = async (req, res) => {
   try {
+    // Return bank transfer payments that still need admin verification.
     const payments = await Payment.find({
       paymentMethod: "bank_transfer",
       status: "verification_pending",
@@ -314,6 +373,7 @@ const approveBankTransferPayment = async (req, res) => {
       });
     }
 
+    // Mark the verified bank transfer as paid.
     payment.status = "paid";
     payment.verifiedBy = req.user.userId;
     payment.verifiedAt = new Date();
@@ -322,6 +382,12 @@ const approveBankTransferPayment = async (req, res) => {
     payment.failureReason = null;
 
     await payment.save();
+
+    // Sync appointment payment status to appointment-service
+    await syncAppointmentPayment(payment.appointmentId, "paid");
+
+    // Trigger approved payment notification
+    await sendNotification(payment, "approved");
 
     res.status(200).json({
       message: "Bank transfer payment approved successfully.",
@@ -363,6 +429,9 @@ const rejectBankTransferPayment = async (req, res) => {
     payment.rejectionReason = rejectionReason || "Payment verification rejected by admin.";
 
     await payment.save();
+
+    // Trigger rejected payment notification
+    await sendNotification(payment, "rejected");
 
     res.status(200).json({
       message: "Bank transfer payment rejected successfully.",

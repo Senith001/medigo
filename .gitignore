@@ -9,3 +9,6 @@ yarn-error.log*
 # Frontend vite cache
 frontend/.vite/
 frontend/dist/
+
+# Ignore uploaded files (payment slips)
+backend/services/payment-service/uploads/
