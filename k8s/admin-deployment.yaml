@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin-service-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: admin-service
+  template:
+    metadata:
+      labels:
+        app: admin-service
+    spec:
+      containers:
+      - name: admin-service
+        image: medigo-admin-service:latest
+        imagePullPolicy: Never # Crucial for local testing
+        ports:
+        - containerPort: 5003
