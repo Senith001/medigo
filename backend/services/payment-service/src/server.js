@@ -7,6 +7,7 @@ dotenv.config();
 
 const connectDB = require("./config/db");
 const paymentRoutes = require("./routes/paymentRoutes");
+const { notFound, errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
 
@@ -15,7 +16,7 @@ connectDB();
 app.use(cors());
 app.use(express.json());
 
-// Make uploaded payment slips available through a public URL.
+// Serve uploaded payment slip files.
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 app.get("/", (req, res) => {
@@ -34,6 +35,10 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/api/payments", paymentRoutes);
+
+// Error handlers must come after routes.
+app.use(notFound);
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5007;
 

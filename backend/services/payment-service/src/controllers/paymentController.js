@@ -1,5 +1,4 @@
 const Payment = require("../models/Payment");
-const mongoose = require("mongoose");
 const axios = require("axios");
 const generateInvoiceNumber = require("../utils/generateInvoiceNumber");
 const {
@@ -52,6 +51,17 @@ const sendNotification = async (payment, type) => {
   }
 };
 
+const findBlockingPayment = async (appointmentId, patientId, paymentMethod) => {
+  const blockingStatuses = ["pending", "paid", "verification_pending"];
+
+  return Payment.findOne({
+    appointmentId,
+    patientId,
+    paymentMethod,
+    status: { $in: blockingStatuses },
+  });
+};
+
 // Create a Stripe payment and save its details in the database.
 const createPayment = async (req, res) => {
   try {
@@ -83,6 +93,18 @@ const createPayment = async (req, res) => {
     if (req.user.role === "patient" && req.user.userId !== patientId) {
       return res.status(403).json({
         message: "Access denied. You can only create payments for your own appointments.",
+      });
+    }
+
+    const existingPayment = await findBlockingPayment(
+      appointmentId,
+      patientId,
+      "stripe"
+    );
+
+    if (existingPayment) {
+      return res.status(409).json({
+        message: "A Stripe payment already exists for this appointment.",
       });
     }
 
@@ -173,6 +195,18 @@ const createBankTransferPayment = async (req, res) => {
       });
     }
 
+    const existingPayment = await findBlockingPayment(
+      appointmentId,
+      patientId,
+      "bank_transfer"
+    );
+
+    if (existingPayment) {
+      return res.status(409).json({
+        message: "A bank transfer payment already exists for this appointment.",
+      });
+    }
+
     const invoiceNumber = generateInvoiceNumber();
 
     // Save the uploaded slip path so admins can review it later.
@@ -238,10 +272,15 @@ const handlePaymentSuccess = async (req, res) => {
 
       // Trigger payment confirmation notification
       await sendNotification(payment, "paid");
+
+      return res.status(200).json({
+        message: "Payment marked as successful.",
+        payment,
+      });
     }
 
-    res.status(200).json({
-      message: "Payment marked as successful.",
+    return res.status(400).json({
+      message: "Payment is not completed in Stripe.",
       payment,
     });
   } catch (error) {
@@ -260,10 +299,19 @@ const handlePaymentCancel = async (req, res) => {
       return res.status(400).json({ message: "Stripe session ID is required." });
     }
 
+    const stripeSession = await retrieveCheckoutSession(session_id);
+
     const payment = await Payment.findOne({ stripeSessionId: session_id });
 
     if (!payment) {
       return res.status(404).json({ message: "Payment record not found." });
+    }
+
+    if (stripeSession.payment_status === "paid") {
+      return res.status(409).json({
+        message: "Payment is already completed in Stripe and cannot be cancelled.",
+        payment,
+      });
     }
 
     payment.status = "cancelled";
