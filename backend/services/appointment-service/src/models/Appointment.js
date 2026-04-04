@@ -77,7 +77,7 @@ const appointmentSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ['unpaid', 'paid', 'refunded'],
+      enum: ['unpaid', 'processing', 'paid', 'refunded'],
       default: 'unpaid',
     },
     meetingLink: {
@@ -93,6 +93,9 @@ const appointmentSchema = new mongoose.Schema(
 appointmentSchema.index({ patientId: 1, appointmentDate: -1 });
 appointmentSchema.index({ doctorId: 1, appointmentDate: 1 });
 appointmentSchema.index({ status: 1 });
-appointmentSchema.index({ appointmentDate: 1, doctorId: 1, timeSlot: 1 }, { unique: true });
+appointmentSchema.index(
+  { appointmentDate: 1, doctorId: 1, timeSlot: 1 },
+  { unique: true, partialFilterExpression: { status: { $in: ['pending', 'confirmed'] } } }
+);
 
 module.exports = mongoose.model('Appointment', appointmentSchema);
