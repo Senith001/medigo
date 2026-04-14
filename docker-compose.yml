@@ -1,0 +1,38 @@
+services:
+
+#====================================================
+#                PATIENT SERVICE
+#====================================================
+  patient-service:
+    build:
+      context: ./backend/services/patient-service
+    container_name: medigo-patient-service
+    ports:
+      - "5002:5002"
+    env_file:
+      - ./backend/services/patient-service/.env
+
+#====================================================
+#                AUTH SERVICE
+#====================================================
+  auth-service:
+    build:
+      context: ./backend/services/auth-service
+    container_name: medigo-auth-service
+    ports:
+      - "5001:5001" 
+    env_file:
+      - ./backend/services/auth-service/.env
+
+
+#====================================================
+#                ADMIN SERVICE
+#====================================================
+  admin-service:
+    build:
+      context: ./backend/services/admin-service
+    container_name: medigo-admin-service
+    ports:
+      - "5003:5003" 
+    env_file:
+      - ./backend/services/admin-service/.env

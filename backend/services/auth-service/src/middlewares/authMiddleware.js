@@ -52,3 +52,17 @@ export const authorize = (...roles) => {
     next();
   };
 };
+
+// --- INTERNAL CHECKER ---
+export const verifyInternalService = (req, res, next) => {
+  const secret = req.headers["x-service-secret"];
+  
+  if (!secret || secret !== process.env.SERVICE_SECRET) {
+    return res.status(403).json({ 
+      success: false, 
+      message: "Unauthorized internal service call" 
+    });
+  }
+  
+  next();
+};
