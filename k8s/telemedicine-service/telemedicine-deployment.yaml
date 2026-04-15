@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telemedicine-service-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: telemedicine-service
+  template:
+    metadata:
+      labels:
+        app: telemedicine-service
+    spec:
+      containers:
+      - name: telemedicine-service
+        image: medigo-telemedicine-service:latest
+        imagePullPolicy: Never # Use the locally built Docker image for local testing
+        envFrom:
+        - configMapRef:
+            name: telemedicine-service-config
+        - secretRef:
+            name: telemedicine-service-secret
+        ports:
+        - containerPort: 5008
