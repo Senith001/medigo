@@ -396,6 +396,44 @@ export const getMe = async (req, res) => {
 //         SELF DELETE PATIENT ACCOUNT
 //============================================
 
+export const requestDeleteOtp = async (req, res) => {
+  try {
+    const user = req.user;
+
+    if (user.role !== "patient") {
+      return res.status(403).json({
+        success: false,
+        message: "Only patients can request account deletion OTP"
+      });
+    }
+
+    const otp = generateOtp();
+
+    await Otp.deleteMany({
+      userId: user._id,
+      purpose: "DELETE_ACCOUNT",
+      usedAt: null
+    });
+
+    await Otp.create({
+      userId: user._id,
+      purpose: "DELETE_ACCOUNT",
+      otpCode: otp,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000)
+    });
+
+    await sendOtpEmail(user.email, "Confirm Account Deletion", otp);
+
+    res.status(200).json({
+      success: true,
+      message: "Deletion OTP sent to your email"
+    });
+  } catch (error) {
+    res.status(500);
+    throw new Error(error.message);
+  }
+};
+
 export const deleteMyAccount = async (req, res) => {
   try {
     const user = req.user;
@@ -406,6 +444,47 @@ export const deleteMyAccount = async (req, res) => {
         message: "Only patients can delete their own account through this endpoint"
       });
     }
+
+    const { otp } = req.body;
+
+    if (!otp) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP is required to delete the account"
+      });
+    }
+
+    const otpRecord = await Otp.findOne({
+      userId: user._id,
+      purpose: "DELETE_ACCOUNT",
+      usedAt: null
+    }).sort({ createdAt: -1 });
+
+    if (!otpRecord) {
+      return res.status(400).json({
+        success: false,
+        message: "No active deletion request found. Please request a new OTP."
+      });
+    }
+
+    if (otpRecord.expiresAt < new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP expired"
+      });
+    }
+
+    const isMatch = await otpRecord.compareOtp(otp);
+
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP"
+      });
+    }
+
+    otpRecord.usedAt = new Date();
+    await otpRecord.save();
 
     try {
       await httpClient.delete(

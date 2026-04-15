@@ -7,6 +7,7 @@ import {
   resetPassword,
   changePassword,
   getMe,
+  requestDeleteOtp,
   deleteMyAccount,
   createInternalUser,
   getInternalUsersByRole,
@@ -26,6 +27,7 @@ router.put("/change-password", protect, changePassword);
 router.get("/me", protect, getMe);
 
 // Patient self-account deletion
+router.post("/me/request-delete-otp", protect, authorize("patient"), requestDeleteOtp);
 router.delete("/me", protect, authorize("patient"), deleteMyAccount);
 
 // --- INTERNAL ROUTES (Server-to-Server Only) ---

@@ -41,6 +41,8 @@ export const authAPI = {
   verifyOtp:      (data) => api.post('http://localhost:5001/api/auth/verify-otp', data),
   getMe:          () => api.get('http://localhost:5001/api/auth/me'),
   changePassword: (data) => api.put('http://localhost:5001/api/auth/change-password', data),
+  requestDeleteOtp: () => api.post('http://localhost:5001/api/auth/me/request-delete-otp'),
+  deleteMyAccount: (data) => api.delete('http://localhost:5001/api/auth/me', { data }),
 }
 
 //===============================================================================
