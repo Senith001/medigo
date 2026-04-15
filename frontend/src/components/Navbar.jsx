@@ -33,7 +33,12 @@ export default function Navbar() {
       <div className="navbar-right">
         {user ? (
           <>
-            <div className="user-chip">
+            <div 
+              className="user-chip" 
+              onClick={() => navigate('/profile')}
+              style={{ cursor: 'pointer' }}
+              title="View Profile"
+            >
               <div className="user-chip-avatar">{user.name?.[0]?.toUpperCase()}</div>
               <div>
                 <div className="user-chip-name">{user.name}</div>
