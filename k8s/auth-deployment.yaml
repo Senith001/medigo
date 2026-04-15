@@ -15,6 +15,40 @@ spec:
       containers:
       - name: auth-service
         image: medigo-auth-service:latest
-        imagePullPolicy: Never # Crucial for local testing
+        imagePullPolicy: Never
         ports:
         - containerPort: 5001
+        env:
+        # --- Core Settings ---
+        - name: PORT
+          value: "5001"
+        - name: MONGO_URI
+          value: "mongodb+srv://medigoAdmin:mediGo%40SE127@medigo-cluster.ega902t.mongodb.net/auth_db?retryWrites=true&w=majority"
+        
+        # --- Secrets & Keys ---
+        - name: JWT_SECRET
+          value: "medigo_super_secret_key"
+        - name: JWT_EXPIRES_IN
+          value: "7d"
+        - name: ADMIN_SUPER_KEY
+          value: "medigo_admin_super_key_123"
+        - name: SERVICE_SECRET
+          value: "medigo_super_secret_key"
+        
+        # --- Email (Mailtrap) ---
+        - name: EMAIL_HOST
+          value: "sandbox.smtp.mailtrap.io"
+        - name: EMAIL_PORT
+          value: "2525"
+        - name: EMAIL_USER
+          value: "af13fd1a966019"
+        - name: EMAIL_PASS
+          value: "1d975f407a7da0"
+        - name: EMAIL_FROM
+          value: "MediGo <no-reply@medigo.com>"
+          
+        # --- K8s Internal Networking ---
+        - name: PATIENT_SERVICE_URL
+          value: "http://patient-service-network:5002"
+        - name: ADMIN_SERVICE_URL
+          value: "http://admin-service-network:5003"

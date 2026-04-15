@@ -15,6 +15,22 @@ spec:
       containers:
       - name: patient-service
         image: medigo-patient-service:latest
-        imagePullPolicy: Never # Crucial for local testing: tells K8s to use the local image we just built
+        imagePullPolicy: Never
         ports:
         - containerPort: 5002
+        env:
+        # --- Core Settings ---
+        - name: PORT
+          value: "5002"
+        - name: MONGO_URI
+          value: "mongodb+srv://medigoAdmin:mediGo%40SE127@medigo-cluster.ega902t.mongodb.net/patient_db?retryWrites=true&w=majority"
+        
+        # --- Secrets & Keys ---
+        - name: JWT_SECRET
+          value: "medigo_super_secret_key"
+        - name: SERVICE_SECRET
+          value: "medigo_super_secret_key"
+          
+        # --- K8s Internal Networking ---
+        - name: AUTH_SERVICE_URL
+          value: "http://auth-service-network:5001"
