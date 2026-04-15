@@ -5,6 +5,7 @@ import {
   createAdmin,
   getAdmins,
   getPatients,
+  getPatientById,
   deleteAdminAccount,
   deletePatientAccount
 } from "../controllers/adminController.js";
@@ -20,6 +21,7 @@ router.post("/bootstrap-superadmin", bootstrapSuperAdmin);
 router.post("/create", protect, authorize("superadmin"), createAdmin);
 router.get("/list", protect, authorize("superadmin"), getAdmins);
 router.get("/patients", protect, authorize("admin", "superadmin"), getPatients);
+router.get("/patients/:id", protect, authorize("admin", "superadmin"), getPatientById);
 
 router.delete("/admins/:id", protect, authorize("superadmin"), deleteAdminAccount);
 router.delete("/patients/:id", protect, authorize("admin", "superadmin"), deletePatientAccount);

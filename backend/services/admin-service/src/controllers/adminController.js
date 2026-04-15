@@ -166,6 +166,30 @@ export const getPatients = async (req, res) => {
   }
 };
 
+// ============================================
+// GET PATIENT BY ID - CALL PATIENT CONTROLLER
+// ============================================
+
+export const getPatientById = async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const response = await httpClient.get(
+      `${process.env.PATIENT_SERVICE_URL}/api/patients/${targetId}`,
+      {
+        headers: {
+          Authorization: req.headers.authorization
+        }
+      }
+    );
+    res.status(200).json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({
+      success: false,
+      message: error.response?.data?.message || "Failed to fetch patient details"
+    });
+  }
+};
+
 // ==========================================
 // DELETION ORCHESTRATORS
 // ==========================================
