@@ -44,9 +44,18 @@ const rejectPaymentValidation = [
     .withMessage("Rejection reason must be a string"),
 ];
 
+const refundPaymentValidation = [
+  param("id").notEmpty().withMessage("Payment ID is required"),
+  body("refundReason")
+    .optional()
+    .isString()
+    .withMessage("Refund reason must be a string"),
+];
+
 module.exports = {
   createPaymentValidation,
   createBankTransferValidation,
   paymentIdValidation,
   rejectPaymentValidation,
+  refundPaymentValidation,
 };

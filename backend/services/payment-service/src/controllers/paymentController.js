@@ -4,6 +4,7 @@ const generateInvoiceNumber = require("../utils/generateInvoiceNumber");
 const {
   createCheckoutSession,
   retrieveCheckoutSession,
+  createRefund,
 } = require("../services/stripeService");
 
 
@@ -493,6 +494,60 @@ const rejectBankTransferPayment = async (req, res) => {
   }
 };
 
+const refundPayment = async (req, res) => {
+  try {
+    const { refundReason } = req.body;
+
+    const payment = await Payment.findById(req.params.id);
+
+    if (!payment) {
+      return res.status(404).json({ message: "Payment not found." });
+    }
+
+    if (payment.status === "refunded") {
+      return res.status(400).json({
+        message: "Payment is already refunded.",
+      });
+    }
+
+    if (payment.status !== "paid") {
+      return res.status(400).json({
+        message: "Only paid payments can be refunded.",
+      });
+    }
+
+    if (payment.paymentMethod === "stripe") {
+      if (!payment.stripePaymentIntentId) {
+        return res.status(400).json({
+          message: "Stripe payment intent is missing for this payment.",
+        });
+      }
+
+      await createRefund(payment.stripePaymentIntentId);
+    }
+
+    payment.status = "refunded";
+    payment.refundedAt = new Date();
+    payment.refundReason = refundReason || "Refund processed by admin.";
+    payment.failureReason = null;
+
+    await payment.save();
+
+    await syncAppointmentPayment(payment.appointmentId, "refunded");
+    await sendNotification(payment, "refunded");
+
+    res.status(200).json({
+      message: "Payment refunded successfully.",
+      payment,
+    });
+  } catch (error) {
+    console.error("refundPayment error:", error.message);
+    res.status(500).json({
+      message: "Server error while refunding payment.",
+    });
+  }
+};
+
 module.exports = {
   createPayment,
   createBankTransferPayment,
@@ -503,4 +558,5 @@ module.exports = {
   getPendingBankTransfers,
   approveBankTransferPayment,
   rejectBankTransferPayment,
+  refundPayment,
 };

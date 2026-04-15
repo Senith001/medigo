@@ -136,6 +136,17 @@ const paymentSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    refundedAt: {
+      type: Date,
+      default: null,
+    },
+
+    refundReason: {
+      type: String,
+      default: null,
+      trim: true,
+    },
   },
   {
     timestamps: true,

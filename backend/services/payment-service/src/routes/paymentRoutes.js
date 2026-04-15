@@ -11,6 +11,7 @@ const {
   getPendingBankTransfers,
   approveBankTransferPayment,
   rejectBankTransferPayment,
+  refundPayment,
 } = require("../controllers/paymentController");
 
 const { protect, authorize } = require("../middleware/auth");
@@ -23,6 +24,7 @@ const {
   createBankTransferValidation,
   paymentIdValidation,
   rejectPaymentValidation,
+  refundPaymentValidation,
 } = require("../validators/paymentValidators");
 
 // Patient creates a Stripe payment session.
@@ -78,6 +80,17 @@ router.put(
   validate,
   validateObjectId("id"),
   rejectBankTransferPayment
+);
+
+// Admin refunds a paid payment.
+router.put(
+  "/:id/refund",
+  protect,
+  authorize("admin"),
+  refundPaymentValidation,
+  validate,
+  validateObjectId("id"),
+  refundPayment
 );
 
 // Patient or admin gets billing history for a patient.

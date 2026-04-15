@@ -3,20 +3,6 @@ const jwt = require("jsonwebtoken");
 // Check the user and attach their data to req.user.
 const protect = (req, res, next) => {
   try {
-    const testingMode = process.env.TEST_MODE === "true";
-
-    // In test mode, use headers or default test values instead of a real JWT.
-    if (testingMode) {
-      req.user = {
-        id: "temp-mongo-id",
-        userId: req.headers["x-test-userid"] || "patient001",
-        email: req.headers["x-test-email"] || "patient@medigo.com",
-        role: req.headers["x-test-role"] || "patient",
-      };
-
-      return next();
-    }
-
     let token;
 
     // Read the token from the Authorization header.

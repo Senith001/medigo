@@ -38,7 +38,14 @@ const retrieveCheckoutSession = async (sessionId) => {
   return await stripe.checkout.sessions.retrieve(sessionId);
 };
 
+const createRefund = async (paymentIntentId) => {
+  return await stripe.refunds.create({
+    payment_intent: paymentIntentId,
+  });
+};
+
 module.exports = {
   createCheckoutSession,
   retrieveCheckoutSession,
+  createRefund,
 };
