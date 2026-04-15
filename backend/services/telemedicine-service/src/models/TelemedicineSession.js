@@ -6,6 +6,7 @@ const telemedicineSessionSchema = new mongoose.Schema(
       type: String,
       required: [true, "Appointment ID is required"],
       index: true,
+      unique: true,
       trim: true,
     },
     patientId: {

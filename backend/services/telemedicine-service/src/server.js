@@ -6,6 +6,7 @@ dotenv.config();
 
 const connectDB = require("./config/db");
 const telemedicineRoutes = require("./routes/telemedicineRoutes");
+const { notFound, errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
 
@@ -30,6 +31,9 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/api/telemedicine", telemedicineRoutes);
+
+app.use(notFound);
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5008;
 
