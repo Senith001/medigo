@@ -9,7 +9,8 @@ import {
   deleteAdminAccount,
   deletePatientAccount,
   getDoctors,
-  updateDoctorStatus
+  updateDoctorStatus,
+  toggleAdminStatus
 } from "../controllers/adminController.js";
 import { protect, authorize } from "../middlewares/authMiddleware.js";
 
@@ -22,6 +23,7 @@ router.post("/bootstrap-superadmin", bootstrapSuperAdmin);
 // Protected Admin Routes
 router.post("/create", protect, authorize("superadmin"), createAdmin);
 router.get("/list", protect, authorize("superadmin"), getAdmins);
+router.patch("/admins/:id/status", protect, authorize("superadmin"), toggleAdminStatus);
 router.get("/patients", protect, authorize("admin", "superadmin"), getPatients);
 router.get("/patients/:id", protect, authorize("admin", "superadmin"), getPatientById);
 

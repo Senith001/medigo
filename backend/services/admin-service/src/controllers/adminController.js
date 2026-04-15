@@ -26,6 +26,22 @@ export const loginAdmin = async (req, res) => {
       });
     }
 
+    const adminCheck = await Admin.findOne({ email: email.toLowerCase() });
+    
+    if (!adminCheck) {
+      return res.status(403).json({
+        success: false,
+        message: "Admin profile not found in Admin Service."
+      });
+    }
+
+    if (!adminCheck.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: "Account disabled. Please contact the super admin."
+      });
+    }
+
     res.status(200).json(response.data);
   } catch (error) {
     res.status(error.response?.status || 500).json({
@@ -140,7 +156,9 @@ export const createAdmin = async (req, res) => {
 
 export const getAdmins = async (req, res) => {
   try {
-    const admins = await Admin.find();
+    // Added the filter to only match documents where role is "admin"
+    const admins = await Admin.find({ role: "admin" });
+    
     res.status(200).json({
       success: true,
       count: admins.length,
@@ -149,6 +167,43 @@ export const getAdmins = async (req, res) => {
   } catch (error) {
     res.status(500);
     throw new Error("Failed to fetch admins");
+  }
+};
+
+export const toggleAdminStatus = async (req, res) => {
+  try {
+    if (req.user.role !== "superadmin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only superadmins can toggle admin status."
+      });
+    }
+
+    if (req.user.userId === req.params.id || req.user._id.toString() === req.params.id) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot change your own status."
+      });
+    }
+
+    const isMongoId = /^[0-9a-fA-F]{24}$/.test(req.params.id);
+    const query = isMongoId ? { _id: req.params.id } : { userId: req.params.id };
+
+    const admin = await Admin.findOne(query);
+
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Admin not found." });
+    }
+
+    admin.isActive = !admin.isActive;
+    await admin.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Admin ${admin.fullName} has been ${admin.isActive ? 'enabled' : 'disabled'}.`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to update admin status." });
   }
 };
 

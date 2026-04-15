@@ -51,6 +51,11 @@ export default function AdminLayout() {
           <NavLink to="/admin" end style={navItemStyle}>
             <span style={{ marginRight: '16px', fontSize: '1.2rem' }}>⊞</span> Dashboard
           </NavLink>
+          {user?.role === 'superadmin' && (
+            <NavLink to="/admin/admins" style={navItemStyle}>
+              <span style={{ marginRight: '16px', fontSize: '1.2rem' }}>🛡️</span> Admins
+            </NavLink>
+          )}
           <NavLink to="/admin/patients" style={navItemStyle}>
             <span style={{ marginRight: '16px', fontSize: '1.2rem' }}>👥</span> Patients
           </NavLink>
@@ -136,7 +141,9 @@ export default function AdminLayout() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{ fontSize: '0.8rem', fontWeight: '600', lineHeight: 1.2 }}>{user?.name || "Admin"}</span>
-                <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>System Admin</span>
+                <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>
+                  {user?.role === 'superadmin' ? 'System Super Admin' : 'System Admin'}
+                </span>
               </div>
             </Link>
           </div>

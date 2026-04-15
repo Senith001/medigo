@@ -16,6 +16,7 @@ import AdminLayout            from './pages/Admin/AdminLayout'
 import AdminDashboard         from './pages/Admin/AdminDashboard'
 import PatientManagement      from './pages/Admin/PatientManagement'
 import DoctorManagement       from './pages/Admin/DoctorManagement'
+import AdminManagement        from './pages/Admin/AdminManagement'
 import AdminProfile           from './pages/Admin/AdminProfile'
 
 // --- Teammate's Existing Imports ---
@@ -29,7 +30,7 @@ function Layout() {
 
   // Only show the standard patient/public navbar if it's NOT an admin.
   // Admins usually have their own sidebar/navbar layout.
-  const showStandardNavbar = token && user?.role !== 'admin'
+  const showStandardNavbar = token && !['admin', 'superadmin'].includes(user?.role)
 
   return (
     <>
@@ -46,6 +47,7 @@ function Layout() {
         {/* --- Protected Admin Routes --- */}
         <Route path="/admin" element={<ProtectedRoute roles={['admin', 'superadmin']}><AdminLayout /></ProtectedRoute>}>
           <Route index element={<AdminDashboard />} />
+          <Route path="admins" element={<AdminManagement />} />
           <Route path="patients" element={<PatientManagement />} />
           <Route path="doctors" element={<DoctorManagement />} />
           <Route path="profile" element={<AdminProfile />} />
