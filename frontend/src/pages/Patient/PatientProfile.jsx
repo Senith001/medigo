@@ -125,7 +125,7 @@ export default function PatientProfile() {
             <h2 style={{ margin: 0, textTransform: 'uppercase', color: '#1a3c6e', letterSpacing: '0.5px', fontSize: '1.4rem' }}>
               {profileData?.fullName || user?.name}
             </h2>
-            <p style={{ margin: '0.3rem 0', color: '#94a3b8', fontSize: '0.85rem' }}>Member ID : M{(profileData?._id || "815118").slice(-6).toUpperCase()}</p>
+            <p style={{ margin: '0.3rem 0', color: '#94a3b8', fontSize: '0.85rem' }}>Member ID : {profileData?.userId || "Loading..."}</p>
             <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.85rem' }}>Registration date : {new Date(profileData?.createdAt || Date.now()).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric'})}</p>
             <div style={{ marginTop: '0.6rem' }}>
               <span style={{ 
