@@ -10,9 +10,11 @@ import {
   deletePatientAccount,
   getDoctors,
   updateDoctorStatus,
-  toggleAdminStatus
+  toggleAdminStatus,
+  activateAdmin,
+  resendAdminInvitation
 } from "../controllers/adminController.js";
-import { protect, authorize } from "../middlewares/authMiddleware.js";
+import { protect, authorize, verifyInternalService } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
@@ -20,10 +22,14 @@ const router = express.Router();
 router.post("/login", loginAdmin);
 router.post("/bootstrap-superadmin", bootstrapSuperAdmin);
 
+// Internal service-to-service routes
+router.patch("/internal/admins/:id/activate", verifyInternalService, activateAdmin);
+
 // Protected Admin Routes
 router.post("/create", protect, authorize("superadmin"), createAdmin);
 router.get("/list", protect, authorize("superadmin"), getAdmins);
 router.patch("/admins/:id/status", protect, authorize("superadmin"), toggleAdminStatus);
+router.post("/admins/:adminId/resend-invitation", protect, authorize("superadmin"), resendAdminInvitation);
 router.get("/patients", protect, authorize("admin", "superadmin"), getPatients);
 router.get("/patients/:id", protect, authorize("admin", "superadmin"), getPatientById);
 

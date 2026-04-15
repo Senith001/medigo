@@ -18,6 +18,8 @@ import PatientManagement      from './pages/Admin/PatientManagement'
 import DoctorManagement       from './pages/Admin/DoctorManagement'
 import AdminManagement        from './pages/Admin/AdminManagement'
 import AdminProfile           from './pages/Admin/AdminProfile'
+import AdminSetup             from './pages/Admin/AdminSetup'
+import SuperAdminBootstrap    from './pages/Admin/SuperAdminBootstrap'
 
 // --- Teammate's Existing Imports ---
 import SearchDoctors          from './pages/SearchDoctors'
@@ -43,6 +45,8 @@ function Layout() {
         
         {/* --- Admin Auth Routes --- */}
         <Route path="/admin-login" element={<AdminLogin />} />
+        <Route path="/admin/setup" element={<AdminSetup />} />
+        <Route path="/admin/bootstrap" element={<SuperAdminBootstrap />} />
 
         {/* --- Protected Admin Routes --- */}
         <Route path="/admin" element={<ProtectedRoute roles={['admin', 'superadmin']}><AdminLayout /></ProtectedRoute>}>

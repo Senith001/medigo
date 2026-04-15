@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authAPI } from '../../services/api';
+import { adminAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 export default function AdminLogin() {
@@ -19,7 +19,7 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      const res = await authAPI.login(credentials);
+      const res = await adminAPI.adminLogin(credentials);
       const userData = res.data.data;
 
       // Extra Guard: Ensure only admins can use this portal

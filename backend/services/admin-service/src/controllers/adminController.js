@@ -98,7 +98,7 @@ export const bootstrapSuperAdmin = async (req, res) => {
 
 export const createAdmin = async (req, res) => {
   try {
-    const { fullName, email, password, phone } = req.body;
+    const { fullName, email, phone } = req.body;
 
     const existingAdmin = await Admin.findOne({ email: email.toLowerCase() });
     if (existingAdmin) {
@@ -112,7 +112,7 @@ export const createAdmin = async (req, res) => {
     try {
       const authResponse = await httpClient.post(
         `${process.env.AUTH_SERVICE_URL}/api/auth/internal/users`,
-        { fullName, email, password, phone, role: "admin" },
+        { fullName, email, phone, role: "admin" },
         internalHeaders
       );
       authUser = authResponse.data.data;
@@ -129,12 +129,13 @@ export const createAdmin = async (req, res) => {
       fullName: authUser.fullName,
       email: authUser.email,
       phone: authUser.phone,
-      role: "admin"
+      role: "admin",
+      isActive: false  // Stays inactive until they set their password
     });
 
     res.status(201).json({
       success: true,
-      message: "Admin created successfully",
+      message: "Admin invitation sent. They will receive an email to set up their account.",
       data: admin
     });
   } catch (error) {
@@ -167,6 +168,67 @@ export const getAdmins = async (req, res) => {
   } catch (error) {
     res.status(500);
     throw new Error("Failed to fetch admins");
+  }
+};
+
+// Called internally by auth-service after a new admin completes password setup
+export const activateAdmin = async (req, res) => {
+  try {
+    const isMongoId = /^[0-9a-fA-F]{24}$/.test(req.params.id);
+    const query = isMongoId ? { authUserId: req.params.id } : { userId: req.params.id };
+
+    const admin = await Admin.findOne(query);
+
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Admin profile not found." });
+    }
+
+    admin.isActive = true;
+    await admin.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Admin ${admin.fullName} has been activated.`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to activate admin." });
+  }
+};
+
+export const resendAdminInvitation = async (req, res) => {
+  try {
+    const { adminId } = req.params;
+
+    // First fetch the admin profile to get their email
+    const isMongoId = /^[0-9a-fA-F]{24}$/.test(adminId);
+    const query = isMongoId ? { _id: adminId } : { userId: adminId };
+    const admin = await Admin.findOne(query);
+
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Admin not found." });
+    }
+
+    if (admin.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot resend invitation to an already active admin."
+      });
+    }
+
+    // Proxy to auth-service which handles token generation and email
+    await httpClient.post(
+      `${process.env.AUTH_SERVICE_URL}/api/auth/internal/resend-admin-invitation`,
+      { email: admin.email },
+      internalHeaders
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Invitation resent to ${admin.email}.`
+    });
+  } catch (error) {
+    const msg = error.response?.data?.message || "Failed to resend invitation.";
+    res.status(error.response?.status || 500).json({ success: false, message: msg });
   }
 };
 
