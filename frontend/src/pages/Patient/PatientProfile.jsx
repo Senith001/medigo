@@ -73,7 +73,8 @@ export default function PatientProfile() {
       setProfileData(res.data.data);
       alert("Profile updated successfully!");
     } catch (err) {
-      alert("Failed to update profile");
+      const msg = err.response?.data?.message || err.message || 'Unknown error';
+      alert(`Failed to update profile: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -89,14 +90,8 @@ export default function PatientProfile() {
 
   const tabs = [
     { id: 'profile', label: 'My profile' },
-    { id: 'doctors', label: 'My favorite doctors' },
     { id: 'emergency_contacts', label: 'Emergency Contact Numbers' },
-    { id: 'offers', label: 'Member offers' },
-    { id: 'subscriptions', label: 'My subscriptions' },
-    { id: 'topup', label: 'Account top up' },
-    { id: 'rewards', label: 'My reward points' },
     { id: 'password', label: 'Change password' },
-    { id: 'wallet', label: 'My wallet' },
   ];
 
   return (
@@ -255,18 +250,33 @@ export default function PatientProfile() {
                 <input type="text" name="address" value={formData.address} onChange={handleInputChange} className="form-input" placeholder="Please enter your permanent address" style={{ borderRadius: '6px', padding: '0.6rem 0.8rem', color: '#475569' }} />
               </div>
 
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', color: '#475569', cursor: 'pointer' }}>
-                    <input type="radio" name="idType" defaultChecked style={{ accentColor: '#3b82f6' }} /> NIC
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', color: '#475569', cursor: 'pointer' }}>
-                    <input type="radio" name="idType" style={{ accentColor: '#3b82f6' }} /> Passport
-                  </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem' }}>Gender</label>
+                  <select name="gender" value={formData.gender} onChange={handleInputChange} className="form-input" style={{ borderRadius: '6px', padding: '0.6rem 0.8rem', color: '#475569', width: '100%' }}>
+                    <option value="">Select gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem' }}>NIC</label>
-                  <input type="text" name="nic" value={formData.nic} onChange={handleInputChange} className="form-input" style={{ borderRadius: '6px', padding: '0.6rem 0.8rem', color: '#475569', width: '50%' }} />
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem' }}>Date of Birth</label>
+                  <input type="date" name="dateOfBirth" value={formData.dateOfBirth} onChange={handleInputChange} className="form-input" style={{ borderRadius: '6px', padding: '0.6rem 0.8rem', color: '#475569', width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem' }}>Blood Group</label>
+                  <select name="bloodGroup" value={formData.bloodGroup} onChange={handleInputChange} className="form-input" style={{ borderRadius: '6px', padding: '0.6rem 0.8rem', color: '#475569', width: '100%' }}>
+                    <option value="">Select blood group</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                  </select>
                 </div>
               </div>
 

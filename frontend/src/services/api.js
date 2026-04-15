@@ -36,9 +36,11 @@ api.interceptors.response.use(
 //                    Auth Service APIs (Port 5001)
 //===============================================================================
 export const authAPI = {
-  login:     (data) => api.post('http://localhost:5001/api/auth/login', data),
-  register:  (data) => api.post('http://localhost:5001/api/auth/register/patient', data),
-  verifyOtp: (data) => api.post('http://localhost:5001/api/auth/verify-otp', data),
+  login:          (data) => api.post('http://localhost:5001/api/auth/login', data),
+  register:       (data) => api.post('http://localhost:5001/api/auth/register/patient', data),
+  verifyOtp:      (data) => api.post('http://localhost:5001/api/auth/verify-otp', data),
+  getMe:          () => api.get('http://localhost:5001/api/auth/me'),
+  changePassword: (data) => api.put('http://localhost:5001/api/auth/change-password', data),
 }
 
 //===============================================================================
@@ -58,9 +60,11 @@ export const appointmentAPI = {
 //===============================================================================
 //                    Admin Service APIs (Port 5003)
 //===============================================================================
-
-
-
+export const adminAPI = {
+  getPatients: () => api.get('http://localhost:5003/api/admin/patients'),
+  getPatientById: (id) => api.get(`http://localhost:5003/api/admin/patients/${id}`),
+  deletePatient: (id) => api.delete(`http://localhost:5003/api/admin/patients/${id}`),
+}
 
 //===============================================================================
 //                    Patient Service APIs (Port 5002)
