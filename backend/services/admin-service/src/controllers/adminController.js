@@ -191,6 +191,43 @@ export const getPatientById = async (req, res) => {
 };
 
 // ==========================================
+// DOCTOR MANAGEMENT
+// ==========================================
+
+export const getDoctors = async (req, res) => {
+  try {
+    const response = await httpClient.get(
+      `${process.env.DOCTOR_SERVICE_URL}/api/doctors`
+    );
+    res.status(200).json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({
+      success: false,
+      message: error.response?.data?.message || "Failed to fetch doctors"
+    });
+  }
+};
+
+export const updateDoctorStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['pending', 'verified', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: "Invalid status value. Must be pending, verified, or rejected." });
+    }
+    const response = await httpClient.patch(
+      `${process.env.DOCTOR_SERVICE_URL}/api/doctors/${req.params.id}/status`,
+      { status }
+    );
+    res.status(200).json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({
+      success: false,
+      message: error.response?.data?.message || "Failed to update doctor status"
+    });
+  }
+};
+
+// ==========================================
 // DELETION ORCHESTRATORS
 // ==========================================
 

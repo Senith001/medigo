@@ -7,7 +7,9 @@ import {
   getPatients,
   getPatientById,
   deleteAdminAccount,
-  deletePatientAccount
+  deletePatientAccount,
+  getDoctors,
+  updateDoctorStatus
 } from "../controllers/adminController.js";
 import { protect, authorize } from "../middlewares/authMiddleware.js";
 
@@ -25,5 +27,9 @@ router.get("/patients/:id", protect, authorize("admin", "superadmin"), getPatien
 
 router.delete("/admins/:id", protect, authorize("superadmin"), deleteAdminAccount);
 router.delete("/patients/:id", protect, authorize("admin", "superadmin"), deletePatientAccount);
+
+// Doctor Management
+router.get("/doctors", protect, authorize("admin", "superadmin"), getDoctors);
+router.patch("/doctors/:id/status", protect, authorize("admin", "superadmin"), updateDoctorStatus);
 
 export default router;

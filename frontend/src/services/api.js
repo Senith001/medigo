@@ -64,6 +64,8 @@ export const adminAPI = {
   getPatients: () => api.get('http://localhost:5003/api/admin/patients'),
   getPatientById: (id) => api.get(`http://localhost:5003/api/admin/patients/${id}`),
   deletePatient: (id) => api.delete(`http://localhost:5003/api/admin/patients/${id}`),
+  getDoctors: () => api.get('http://localhost:5003/api/admin/doctors'),
+  updateDoctorStatus: (id, status) => api.patch(`http://localhost:5003/api/admin/doctors/${id}/status`, { status }),
 }
 
 //===============================================================================
