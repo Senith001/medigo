@@ -279,7 +279,7 @@ export const resetPassword = async (req, res) => {
       return res.status(400).json({
         success: false,
         message:
-          "Password must be more than 8 characters and contain at least one uppercase, one lowercase, one number, and one special character"
+          "Password must be at least 8 characters and contain at least one uppercase, one lowercase, one number, and one special character"
       });
     }
 
@@ -351,7 +351,7 @@ export const changePassword = async (req, res) => {
       return res.status(400).json({
         success: false,
         message:
-          "Password must be more than 8 characters and contain at least one uppercase, one lowercase, one number, and one special character"
+          "Password must be at least 8 characters and contain at least one uppercase, one lowercase, one number, and one special character"
       });
     }
 
