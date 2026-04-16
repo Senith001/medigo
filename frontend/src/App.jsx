@@ -4,7 +4,7 @@ import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'
 
 // --- Public Imports ---
-import LandingPage          from './pages/LandingPage'
+import LandingPage          from './pages/Landingpage'
 
 // --- Auth Imports ---
 import LoginPage              from './pages/Auth/LoginPage'

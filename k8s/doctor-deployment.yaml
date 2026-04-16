@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: doctor-service-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: doctor-service
+  template:
+    metadata:
+      labels:
+        app: doctor-service
+    spec:
+      containers:
+      - name: doctor-service
+        image: medigo-doctor-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5004
+        env:
+        # --- Core Settings ---
+        - name: PORT
+          value: "5004"
+        - name: MONGO_URI
+          value: "mongodb+srv://medigoAdmin:mediGo%40SE127@medigo-cluster.ega902t.mongodb.net/doctor_db?retryWrites=true&w=majority"
+
+        # --- Secrets & Keys ---
+        - name: JWT_SECRET
+          value: "medigo_super_secret_key"
+        - name: SERVICE_SECRET
+          value: "medigo_super_secret_key"
+
+        # --- K8s Internal Networking ---
+        - name: AUTH_SERVICE_URL
+          value: "http://auth-service-network:5001"

@@ -1,14 +1,14 @@
 import axios from 'axios'
 
-// Service URLs (Local Dev Environment)
-const AUTH_URL     = 'http://localhost:5001'
-const PATIENT_URL  = 'http://localhost:5002'
-const ADMIN_URL    = 'http://localhost:5003'
-const DOCTOR_URL   = 'http://localhost:5004'
-const APPT_URL     = 'http://localhost:5005'
-const REPORT_URL   = 'http://localhost:5006'
-const PAYMENT_URL  = 'http://localhost:5007'
-const TELE_URL     = 'http://localhost:5008'
+// Service URLs (Pulled from Vite Environment Variables)
+const AUTH_URL     = import.meta.env.VITE_AUTH_API_URL     || 'http://localhost:5001'
+const PATIENT_URL  = import.meta.env.VITE_PATIENT_API_URL  || 'http://localhost:5002'
+const ADMIN_URL    = import.meta.env.VITE_ADMIN_API_URL    || 'http://localhost:5003'
+const DOCTOR_URL   = import.meta.env.VITE_DOCTOR_API_URL   || 'http://localhost:5004'
+const APPT_URL     = import.meta.env.VITE_APPT_API_URL     || 'http://localhost:5005'
+const REPORT_URL   = import.meta.env.VITE_REPORT_API_URL   || 'http://localhost:5006'
+const PAYMENT_URL  = import.meta.env.VITE_PAYMENT_API_URL  || 'http://localhost:5007'
+const TELE_URL     = import.meta.env.VITE_TELE_API_URL     || 'http://localhost:5008'
 
 const api = axios.create({ baseURL: '/api', headers: { 'Content-Type': 'application/json' } })
 
