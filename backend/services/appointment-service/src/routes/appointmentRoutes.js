@@ -10,10 +10,24 @@ const {
   modifyAppointment,
   cancelAppointment,
   updateAppointmentStatus,
+  updatePaymentStatus,
   getDoctorAvailability,
   searchDoctorsBySpecialty,
   getAllAppointments,
+  getInternalAppointmentDetails,
 } = require('../controllers/appointmentController');
+
+// ── Internal (service-to-service only) ───────────────────────
+const verifyInternalService = (req, res, next) => {
+  const secret = req.headers['x-service-secret'];
+  if (!secret || secret !== process.env.SERVICE_SECRET) {
+    return res.status(403).json({ message: 'Unauthorized internal service call.' });
+  }
+  next();
+};
+
+router.put('/internal/payment-status', verifyInternalService, updatePaymentStatus);
+router.get('/internal/:id', verifyInternalService, getInternalAppointmentDetails);
 
 // Search doctors by specialty
 router.get('/search', authenticate, searchDoctorsBySpecialty);
@@ -21,7 +35,6 @@ router.get('/search', authenticate, searchDoctorsBySpecialty);
 // Get doctor's booked slots for a date
 router.get(
   '/doctor/:doctorId/availability',
-  authenticate,
   [
     param('doctorId').notEmpty().withMessage('Doctor ID is required'),
     query('date').notEmpty().isISO8601().withMessage('Valid date is required'),

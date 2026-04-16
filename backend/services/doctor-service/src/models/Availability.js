@@ -22,6 +22,15 @@ const availabilitySchema = new mongoose.Schema(
       type: String,
       required: true
     },
+    hospital: {
+      type: String
+    },
+    location: {
+      type: String
+    },
+    fee: {
+      type: Number
+    },
     isAvailable: {
       type: Boolean,
       default: true
