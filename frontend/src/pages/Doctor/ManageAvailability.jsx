@@ -31,6 +31,7 @@ export default function ManageAvailability() {
   })
 
   const fetchAvailability = async () => {
+    if (!user?.doctorId) return
     try {
       setLoading(true)
       const res = await doctorAPI.getAvailability(user.doctorId)
@@ -44,10 +45,18 @@ export default function ManageAvailability() {
     }
   }
 
-  useEffect(() => { if (user?.doctorId) fetchAvailability() }, [user])
+  useEffect(() => { 
+    if (user?.role === 'doctor' && user.doctorId) {
+      fetchAvailability() 
+    }
+  }, [user])
 
   const handleAdd = async (e) => {
     e.preventDefault()
+    if (!user?.doctorId) {
+      alert("Consultant profile still synchronizing. Please wait a moment.")
+      return
+    }
     setAdding(true)
     try {
       const res = await doctorAPI.addAvailability(user.doctorId, form)
@@ -72,6 +81,17 @@ export default function ManageAvailability() {
     } catch (err) {
       alert('Removal failed.')
     }
+  }
+
+  if (user?.role === 'doctor' && !user.doctorId) {
+    return (
+      <DashboardLayout isDoctor={true}>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+           <Loader2 size={48} className="animate-spin text-medigo-blue" />
+           <p className="text-sm font-black text-medigo-navy uppercase tracking-widest italic">Synchronizing Clinical Identity...</p>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (
@@ -184,7 +204,10 @@ export default function ManageAvailability() {
                             type="number" 
                             className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl px-5 text-sm font-bold text-white outline-none focus:border-medigo-blue transition-all italic"
                             value={form.fee}
-                            onChange={e => setForm({...form, fee: parseInt(e.target.value)})}
+                            onChange={e => {
+                              const val = parseInt(e.target.value);
+                              setForm({...form, fee: isNaN(val) ? 0 : val});
+                            }}
                           />
                        </div>
                     </div>

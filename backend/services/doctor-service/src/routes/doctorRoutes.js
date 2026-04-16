@@ -4,7 +4,8 @@ import {
   getAllDoctors,
   getDoctorById,
   updateDoctor,
-  deleteDoctor
+  deleteDoctor,
+  getDoctorByEmail
 } from "../controllers/doctorController.js";
 import {
   addAvailability,
@@ -17,6 +18,7 @@ const router = express.Router();
 router.post("/", createDoctor);
 router.get("/", getAllDoctors);
 router.get("/:id", getDoctorById);
+router.get("/profile/:email", getDoctorByEmail);
 router.put("/:id", updateDoctor);
 router.patch("/:id/status", updateDoctor);  // admin status update (uses same handler, body is restricted by caller)
 router.delete("/:id", deleteDoctor);

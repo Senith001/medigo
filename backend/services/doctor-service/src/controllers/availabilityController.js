@@ -4,7 +4,13 @@ import Availability from "../models/Availability.js";
 // @route   POST /api/availability
 export const createAvailability = async (req, res) => {
   try {
-    const { doctorId, day, date, startTime, endTime, hospital, location, fee } = req.body;
+    const { day, date, startTime, endTime, hospital, location, fee } = req.body;
+    const doctorId = req.body.doctorId || req.params.doctorId;
+
+    if (!doctorId) {
+      return res.status(400).json({ success: false, message: "Doctor ID is required" });
+    }
+
     const availability = await Availability.create({
       doctorId,
       day,

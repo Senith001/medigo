@@ -159,3 +159,29 @@ export const deleteDoctor = async (req, res) => {
     });
   }
 };
+
+// @desc    Get doctor profile by email
+// @route   GET /api/doctors/profile/:email
+export const getDoctorByEmail = async (req, res) => {
+  try {
+    const doctor = await Doctor.findOne({ email: req.params.email });
+
+    if (!doctor) {
+      return res.status(404).json({
+        success: false,
+        message: "Doctor profile not found"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: doctor
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch doctor profile",
+      error: error.message
+    });
+  }
+};
