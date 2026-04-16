@@ -1,4 +1,4 @@
-const jwt = require("jsonwebtoken");
+import jwt from "jsonwebtoken";
 
 // Read the token from the Authorization header and attach the decoded user.
 const protect = (req, res, next) => {
@@ -46,7 +46,7 @@ const authorize = (...roles) => {
   };
 };
 
-module.exports = {
+export {
   protect,
   authorize,
 };

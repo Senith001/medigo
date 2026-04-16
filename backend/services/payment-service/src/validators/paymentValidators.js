@@ -1,4 +1,4 @@
-const { body, param } = require("express-validator");
+import { body, param } from "express-validator";
 
 // Validation rules for Stripe payment creation.
 const createPaymentValidation = [
@@ -52,7 +52,7 @@ const refundPaymentValidation = [
     .withMessage("Refund reason must be a string"),
 ];
 
-module.exports = {
+export {
   createPaymentValidation,
   createBankTransferValidation,
   paymentIdValidation,

@@ -1,6 +1,29 @@
-const Appointment = require('../models/Appointment');
-const { publishEvent } = require('../config/rabbitmq');
-const axios = require('axios');
+import Appointment from '../models/Appointment.js';
+import { publishEvent } from '../config/rabbitmq.js';
+import axios from 'axios';
+
+// ─────────────────────────────────────────────────────────────
+// Helper: Parse doctor details from doctor-service response
+// Doctor-service returns: { success: true, data: { fullName, email,
+//   specialty, clinicLocation, consultationFee, phone, ... } }
+// ─────────────────────────────────────────────────────────────
+const parseDoctorDetails = (responseData) => {
+  // Support both response shapes:
+  //   New shape  → { success: true, data: { ... } }   (doctor-service)
+  //   Legacy     → { doctor: { ... } }                (old contracts)
+  const doctor = responseData.data || responseData.doctor || responseData;
+
+  return {
+    doctorName:  doctor.fullName  || doctor.name  || 'Unknown Doctor',
+    doctorEmail: doctor.email                     || 'unknown@hospital.lk',
+    specialty:   doctor.specialty                 || 'General',
+    // clinicLocation is what doctor-service stores; we map it to hospital
+    hospital:    doctor.clinicLocation || doctor.hospital || null,
+    // consultationFee is what doctor-service stores; we map it to fee
+    fee:         doctor.consultationFee ?? doctor.fee ?? 0,
+    phone:       doctor.phone || null,
+  };
+};
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/appointments
@@ -16,37 +39,36 @@ const bookAppointment = async (req, res) => {
     const patientEmail = req.user.email;
 
     // ── Step 1: Fetch doctor details from doctor-service ─────
-    let doctorName, doctorEmail, specialty, hospital, fee;
+    let doctorDetails;
 
     try {
       const doctorRes = await axios.get(
         `${process.env.DOCTOR_SERVICE_URL}/api/doctors/${doctorId}`,
-        { headers: { Authorization: req.headers.authorization } }
+        {
+          headers: { Authorization: req.headers.authorization },
+          timeout: 5000,
+        }
       );
-
-      // Handle different response shapes: { doctor: {...} } or just {...}
-      const doctor = doctorRes.data.doctor || doctorRes.data;
-
-      doctorName  = doctor.fullName  || doctor.name;
-      doctorEmail = doctor.email;
-      specialty   = doctor.specialty;
-      hospital    = doctor.hospital  || null;
-      fee         = doctor.fee       || req.body.fee || 0;
-
+      doctorDetails = parseDoctorDetails(doctorRes.data);
     } catch (err) {
       // Doctor-service unavailable — use request body fields as fallback
-      console.warn('Doctor-service unavailable, using request body fallback.');
-      doctorName  = req.body.doctorName  || 'Unknown Doctor';
-      doctorEmail = req.body.doctorEmail || 'unknown@hospital.lk';
-      specialty   = req.body.specialty   || 'General';
-      hospital    = req.body.hospital    || null;
-      fee         = req.body.fee         || 0;
+      console.warn('Doctor-service unavailable, using request body fallback:', err.message);
+      doctorDetails = {
+        doctorName:  req.body.doctorName  || 'Unknown Doctor',
+        doctorEmail: req.body.doctorEmail || 'unknown@hospital.lk',
+        specialty:   req.body.specialty   || 'General',
+        hospital:    req.body.hospital    || null,
+        fee:         req.body.fee         || 0,
+        phone:       null,
+      };
     }
+
+    const { doctorName, doctorEmail, specialty, hospital, fee } = doctorDetails;
 
     // ── Step 2: Check if slot is already taken ────────────────
     const existing = await Appointment.findOne({
       doctorId,
-      appointmentDate: new Date(appointmentDate),
+      appointmentDate: new Date(`${appointmentDate}T00:00:00.000Z`),
       timeSlot,
       status: { $in: ['pending', 'confirmed'] },
     });
@@ -60,6 +82,7 @@ const bookAppointment = async (req, res) => {
       patientId,
       patientName,
       patientEmail,
+      patientPhone: req.user.phone || null,
       doctorId,
       doctorName,
       doctorEmail,
@@ -74,18 +97,20 @@ const bookAppointment = async (req, res) => {
 
     // ── Step 4: Publish event to RabbitMQ ─────────────────────
     await publishEvent('appointment.booked', {
-      appointmentId: appointment._id,
+      appointmentId:  appointment._id,
       patientId,
       patientName,
       patientEmail,
+      patientPhone:   req.user.phone || null,
       doctorId,
       doctorName,
       doctorEmail,
+      doctorPhone:    doctorDetails.phone || null,
       hospital,
       specialty,
       appointmentDate,
       timeSlot,
-      type: appointment.type,
+      type:           appointment.type,
     });
 
     res.status(201).json({
@@ -118,7 +143,7 @@ const getMyAppointments = async (req, res) => {
 
     if (status) filter.status = status;
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const skip  = (parseInt(page) - 1) * parseInt(limit);
     const total = await Appointment.countDocuments(filter);
     const appointments = await Appointment.find(filter)
       .sort({ appointmentDate: -1 })
@@ -127,7 +152,7 @@ const getMyAppointments = async (req, res) => {
 
     res.status(200).json({
       total,
-      page: parseInt(page),
+      page:       parseInt(page),
       totalPages: Math.ceil(total / parseInt(limit)),
       appointments,
     });
@@ -170,27 +195,31 @@ const modifyAppointment = async (req, res) => {
     }
 
     if (!['pending', 'confirmed'].includes(appointment.status)) {
-      return res.status(400).json({ message: `Cannot modify an appointment with status: ${appointment.status}` });
+      return res.status(400).json({
+        message: `Cannot modify an appointment with status: ${appointment.status}`,
+      });
     }
 
     const { appointmentDate, timeSlot, reason } = req.body;
 
     if (appointmentDate || timeSlot) {
-      const newDate = appointmentDate ? new Date(appointmentDate) : appointment.appointmentDate;
+      const newDate = appointmentDate
+        ? new Date(`${appointmentDate}T00:00:00.000Z`)
+        : appointment.appointmentDate;
       const newSlot = timeSlot || appointment.timeSlot;
 
       const conflict = await Appointment.findOne({
-        _id: { $ne: appointment._id },
-        doctorId: appointment.doctorId,
+        _id:             { $ne: appointment._id },
+        doctorId:        appointment.doctorId,
         appointmentDate: newDate,
-        timeSlot: newSlot,
-        status: { $in: ['pending', 'confirmed'] },
+        timeSlot:        newSlot,
+        status:          { $in: ['pending', 'confirmed'] },
       });
 
       if (conflict) return res.status(409).json({ message: 'The new time slot is not available.' });
 
       if (appointmentDate) appointment.appointmentDate = newDate;
-      if (timeSlot) appointment.timeSlot = newSlot;
+      if (timeSlot)        appointment.timeSlot = newSlot;
     }
 
     if (reason !== undefined) appointment.reason = reason;
@@ -202,6 +231,8 @@ const modifyAppointment = async (req, res) => {
       doctorEmail:     appointment.doctorEmail,
       patientName:     appointment.patientName,
       doctorName:      appointment.doctorName,
+      patientPhone:    appointment.patientPhone,
+      doctorPhone:     appointment.doctorPhone || null, // Map from internal logic if available
       hospital:        appointment.hospital,
       appointmentDate: appointment.appointmentDate,
       timeSlot:        appointment.timeSlot,
@@ -227,11 +258,13 @@ const cancelAppointment = async (req, res) => {
       return res.status(403).json({ message: 'Access denied.' });
     }
 
-    if (appointment.status === 'cancelled') return res.status(400).json({ message: 'Appointment is already cancelled.' });
-    if (appointment.status === 'completed')  return res.status(400).json({ message: 'Cannot cancel a completed appointment.' });
+    if (appointment.status === 'cancelled')
+      return res.status(400).json({ message: 'Appointment is already cancelled.' });
+    if (appointment.status === 'completed')
+      return res.status(400).json({ message: 'Cannot cancel a completed appointment.' });
 
-    appointment.status = 'cancelled';
-    appointment.cancelledBy = role;
+    appointment.status             = 'cancelled';
+    appointment.cancelledBy        = role;
     appointment.cancellationReason = req.body.reason || 'No reason provided';
     await appointment.save();
 
@@ -241,6 +274,8 @@ const cancelAppointment = async (req, res) => {
       doctorEmail:        appointment.doctorEmail,
       patientName:        appointment.patientName,
       doctorName:         appointment.doctorName,
+      patientPhone:       appointment.patientPhone,
+      doctorPhone:        null, // Fallback if not easily searchable
       hospital:           appointment.hospital,
       appointmentDate:    appointment.appointmentDate,
       timeSlot:           appointment.timeSlot,
@@ -264,7 +299,9 @@ const updateAppointmentStatus = async (req, res) => {
     const allowedStatuses = ['confirmed', 'completed', 'no-show'];
 
     if (!allowedStatuses.includes(status)) {
-      return res.status(400).json({ message: `Invalid status. Allowed: ${allowedStatuses.join(', ')}` });
+      return res.status(400).json({
+        message: `Invalid status. Allowed: ${allowedStatuses.join(', ')}`,
+      });
     }
 
     const appointment = await Appointment.findById(req.params.id);
@@ -279,7 +316,28 @@ const updateAppointmentStatus = async (req, res) => {
     if (meetingLink) appointment.meetingLink = meetingLink;
     await appointment.save();
 
-    res.status(200).json({ message: `Appointment status updated to ${status}.`, appointment });
+    // Publish confirmation event when doctor confirms
+    if (status === 'confirmed') {
+      await publishEvent('appointment.updated', {
+        appointmentId:   appointment._id,
+        patientEmail:    appointment.patientEmail,
+        doctorEmail:     appointment.doctorEmail,
+        patientName:     appointment.patientName,
+        doctorName:      appointment.doctorName,
+        patientPhone:    appointment.patientPhone,
+        doctorPhone:     null,
+        hospital:        appointment.hospital,
+        appointmentDate: appointment.appointmentDate,
+        timeSlot:        appointment.timeSlot,
+        meetingLink:     appointment.meetingLink,
+        confirmed:       true,
+      });
+    }
+
+    res.status(200).json({
+      message: `Appointment status updated to ${status}.`,
+      appointment,
+    });
   } catch (error) {
     console.error('updateAppointmentStatus error:', error);
     res.status(500).json({ message: 'Server error updating status.' });
@@ -288,21 +346,22 @@ const updateAppointmentStatus = async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────
 // GET /api/appointments/doctor/:doctorId/availability
+// Returns booked time-slots for a doctor on a given date
 // ─────────────────────────────────────────────────────────────
 const getDoctorAvailability = async (req, res) => {
   try {
     const { doctorId } = req.params;
-    const { date } = req.query;
+    const { date }     = req.query;
 
     if (!date) return res.status(400).json({ message: 'Date query parameter is required.' });
 
-    const start = new Date(date); start.setHours(0, 0, 0, 0);
-    const end   = new Date(date); end.setHours(23, 59, 59, 999);
+    const start = new Date(`${date}T00:00:00.000Z`);
+    const end   = new Date(`${date}T23:59:59.999Z`);
 
     const bookedSlots = await Appointment.find({
       doctorId,
       appointmentDate: { $gte: start, $lte: end },
-      status: { $in: ['pending', 'confirmed'] },
+      status:          { $in: ['pending', 'confirmed'] },
     }).select('timeSlot -_id');
 
     res.status(200).json({
@@ -317,19 +376,102 @@ const getDoctorAvailability = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// GET /api/appointments/search  — Search doctors by specialty
+// GET /api/appointments/doctor/:doctorId/schedule
+// Returns doctor-service availability slots MERGED with booked
+// slots from this service — gives frontend a full picture
+// ─────────────────────────────────────────────────────────────
+const getDoctorSchedule = async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+    const { date }     = req.query;
+
+    if (!date) return res.status(400).json({ message: 'Date query parameter is required.' });
+
+    // ── Fetch doctor availability from doctor-service ─────────
+    let availabilitySlots = [];
+    try {
+      const availRes = await axios.get(
+        `${process.env.DOCTOR_SERVICE_URL}/api/availability/doctor/${doctorId}`,
+        { timeout: 5000 }
+      );
+      // doctor-service returns { success: true, data: [...] }
+      availabilitySlots = availRes.data.data || [];
+    } catch (err) {
+      console.warn('Could not fetch doctor availability from doctor-service:', err.message);
+    }
+
+    // ── Fetch booked slots from this service ──────────────────
+    const start = new Date(`${date}T00:00:00.000Z`);
+    const end   = new Date(`${date}T23:59:59.999Z`);
+
+    const bookedAppointments = await Appointment.find({
+      doctorId,
+      appointmentDate: { $gte: start, $lte: end },
+      status:          { $in: ['pending', 'confirmed'] },
+    }).select('timeSlot patientName status -_id');
+
+    const bookedSlots = bookedAppointments.map((a) => a.timeSlot);
+
+    res.status(200).json({
+      doctorId,
+      date,
+      availabilitySlots,          // Raw slots from doctor-service
+      bookedSlots,                // Time strings already taken
+      availableCount: availabilitySlots.length,
+      bookedCount:    bookedSlots.length,
+    });
+  } catch (error) {
+    console.error('getDoctorSchedule error:', error);
+    res.status(500).json({ message: 'Server error fetching doctor schedule.' });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/appointments/search  — Proxy to doctor-service
+// Because doctor-service has no /search endpoint, we fetch all
+// doctors and filter by specialty locally.
 // ─────────────────────────────────────────────────────────────
 const searchDoctorsBySpecialty = async (req, res) => {
   try {
     const { specialty } = req.query;
-    if (!specialty) return res.status(400).json({ message: 'Specialty query parameter is required.' });
+    if (!specialty) {
+      return res.status(400).json({ message: 'Specialty query parameter is required.' });
+    }
 
+    // Fetch all doctors from doctor-service, then filter locally
     const response = await axios.get(
-      `${process.env.DOCTOR_SERVICE_URL}/api/doctors/search`,
-      { params: { specialty }, headers: { Authorization: req.headers.authorization } }
+      `${process.env.DOCTOR_SERVICE_URL}/api/doctors`,
+      {
+        headers: { Authorization: req.headers.authorization },
+        timeout: 5000,
+      }
     );
 
-    res.status(200).json(response.data);
+    // doctor-service returns { success: true, count: N, data: [...] }
+    const allDoctors = response.data.data || response.data.doctors || [];
+
+    const filtered = allDoctors.filter(
+      (doc) =>
+        doc.specialty &&
+        doc.specialty.toLowerCase().includes(specialty.toLowerCase())
+    );
+
+    res.status(200).json({
+      success: true,
+      count:   filtered.length,
+      doctors: filtered.map((doc) => ({
+        _id:             doc._id,
+        fullName:        doc.fullName,
+        email:           doc.email,
+        specialty:       doc.specialty,
+        hospital:        doc.clinicLocation || null,
+        fee:             doc.consultationFee ?? 0,
+        qualifications:  doc.qualifications,
+        experienceYears: doc.experienceYears,
+        bio:             doc.bio || null,
+        status:          doc.status,
+      })),
+    });
   } catch (error) {
     console.error('searchDoctorsBySpecialty error:', error.message);
     res.status(error.response?.status || 500).json({
@@ -347,7 +489,7 @@ const getAllAppointments = async (req, res) => {
     const filter = {};
     if (status) filter.status = status;
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const skip  = (parseInt(page) - 1) * parseInt(limit);
     const total = await Appointment.countDocuments(filter);
     const appointments = await Appointment.find(filter)
       .sort({ createdAt: -1 })
@@ -360,14 +502,79 @@ const getAllAppointments = async (req, res) => {
   }
 };
 
-module.exports = {
+// ─────────────────────────────────────────────────────────────
+// PUT /api/appointments/internal/payment-status
+// Internal — called by payment-service only (x-service-secret)
+// Updates paymentStatus on an appointment after Stripe confirms
+// ─────────────────────────────────────────────────────────────
+const updatePaymentStatus = async (req, res) => {
+  try {
+    const { appointmentId, paymentStatus } = req.body;
+
+    if (!appointmentId || !paymentStatus) {
+      return res.status(400).json({
+        message: 'appointmentId and paymentStatus are required.',
+      });
+    }
+
+    const allowed = ['unpaid', 'processing', 'paid', 'refunded'];
+    if (!allowed.includes(paymentStatus)) {
+      return res.status(400).json({
+        message: `Invalid paymentStatus. Allowed: ${allowed.join(', ')}`,
+      });
+    }
+
+    const appointment = await Appointment.findById(appointmentId);
+    if (!appointment) {
+      return res.status(404).json({ message: 'Appointment not found.' });
+    }
+
+    appointment.paymentStatus = paymentStatus;
+    await appointment.save();
+
+    res.status(200).json({
+      message: `Payment status updated to ${paymentStatus}.`,
+      appointment,
+    });
+  } catch (error) {
+    console.error('updatePaymentStatus error:', error);
+    res.status(500).json({ message: 'Server error updating payment status.' });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/appointments/internal/:id
+// INTERNAL EXCLUSIVE: Fetch trusted appointment details
+// ─────────────────────────────────────────────────────────────
+const getInternalAppointmentDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const appointment = await Appointment.findById(id);
+
+    if (!appointment) {
+      return res.status(404).json({ message: 'Appointment not found' });
+    }
+
+    res.status(200).json({ appointment });
+  } catch (error) {
+    console.error('getInternalAppointmentDetails error:', error);
+    res.status(500).json({
+      message: 'Server error fetching internal appointment payload',
+    });
+  }
+};
+
+export {
   bookAppointment,
   getMyAppointments,
   getAppointmentById,
   modifyAppointment,
   cancelAppointment,
   updateAppointmentStatus,
+  updatePaymentStatus,
   getDoctorAvailability,
+  getDoctorSchedule,
   searchDoctorsBySpecialty,
   getAllAppointments,
+  getInternalAppointmentDetails,
 };

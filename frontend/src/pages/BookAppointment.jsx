@@ -1,4 +1,3 @@
-// BookAppointment.jsx
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { format, addDays, startOfToday } from 'date-fns'
@@ -13,27 +12,27 @@ const TIME_SLOTS = [
 const getDates = () => Array.from({ length: 14 }, (_, i) => addDays(startOfToday(), i + 1))
 
 export function BookAppointment() {
-  const { state } = useLocation()
-  const navigate = useNavigate()
-  const doctor = state?.doctor || null
-  const [selectedDate, setSelectedDate] = useState(null)
-  const [selectedSlot, setSelectedSlot] = useState(null)
-  const [bookedSlots, setBookedSlots] = useState([])
-  const [type, setType] = useState('telemedicine')
+  const { state }  = useLocation()
+  const navigate   = useNavigate()
+  const doctor     = state?.doctor || null
+  const [selectedDate, setDate] = useState(null)
+  const [selectedSlot, setSlot] = useState(null)
+  const [bookedSlots, setBooked] = useState([])
+  const [type, setType]   = useState('telemedicine')
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
-  const [slotsLoading, setSlotsLoading] = useState(false)
+  const [sloading, setSloading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const dates = getDates()
 
   useEffect(() => {
     if (!selectedDate || !doctor) return
-    setSlotsLoading(true); setSelectedSlot(null)
-    appointmentAPI.getAvailability(doctor._id, format(selectedDate,'yyyy-MM-dd'))
-      .then(r => setBookedSlots(r.data.bookedSlots || []))
-      .catch(() => setBookedSlots([]))
-      .finally(() => setSlotsLoading(false))
+    setSloading(true); setSlot(null)
+    appointmentAPI.getAvailability(doctor._id, format(selectedDate, 'yyyy-MM-dd'))
+      .then(r => setBooked(r.data.bookedSlots || []))
+      .catch(() => setBooked([]))
+      .finally(() => setSloading(false))
   }, [selectedDate, doctor?._id])
 
   const handleSubmit = async () => {
@@ -41,14 +40,10 @@ export function BookAppointment() {
     setError(''); setLoading(true)
     try {
       await appointmentAPI.book({
-        doctorId:    doctor._id,
-        doctorName:  doctor.fullName || doctor.name,
-        doctorEmail: doctor.email || 'doctor@hospital.lk',
-        specialty:   doctor.specialty,
-        hospital:    doctor.hospital || null,
-        appointmentDate: format(selectedDate,'yyyy-MM-dd'),
-        timeSlot: selectedSlot, type, reason,
-        fee: doctor.fee || 0,
+        doctorId:        doctor._id,
+        appointmentDate: format(selectedDate, 'yyyy-MM-dd'),
+        timeSlot:        selectedSlot,
+        type, reason,
       })
       setSuccess(true)
       setTimeout(() => navigate('/appointments'), 2500)
@@ -58,103 +53,123 @@ export function BookAppointment() {
   }
 
   if (!doctor) return (
-    <div style={{ textAlign:'center', padding:60 }}>
-      <p style={{ marginBottom:16, color:'var(--gray-500)' }}>No doctor selected.</p>
-      <button className="btn btn-teal" onClick={() => navigate('/search')}>Find a Doctor</button>
-    </div>
-  )
-
-  if (success) return (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh', padding:24 }}>
-      <div className="card fade-up" style={{ padding:'48px 40px', textAlign:'center', maxWidth:420 }}>
-        <div style={{ width:72, height:72, borderRadius:'50%', background:'var(--green-100)', color:'var(--green-500)', fontSize:32, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px' }}>✓</div>
-        <h2 style={{ marginBottom:10 }}>Appointment Booked!</h2>
-        <p style={{ color:'var(--gray-500)', marginBottom:6 }}>
-          <strong>{doctor.fullName}</strong> · {selectedDate && format(selectedDate,'MMM d, yyyy')} · <strong>{selectedSlot}</strong>
-        </p>
-        <p style={{ fontSize:13, color:'var(--gray-400)', marginBottom:24 }}>📧 Confirmation email sent. Redirecting…</p>
-        <button className="btn btn-teal" style={{ width:'100%', justifyContent:'center' }} onClick={() => navigate('/appointments')}>View Appointments</button>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="card p-10 text-center max-w-sm w-full">
+        <div className="text-4xl mb-4 opacity-30">👨‍⚕️</div>
+        <p className="text-gray-500 mb-5">No doctor selected.</p>
+        <button className="btn btn-teal w-full justify-center" onClick={() => navigate('/search')}>
+          Find a Doctor →
+        </button>
       </div>
     </div>
   )
 
+  if (success) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="card p-10 text-center max-w-sm w-full animate-fade-up">
+        <div className="w-16 h-16 rounded-full bg-green-100 text-green-500 text-3xl flex items-center justify-center mx-auto mb-5">✓</div>
+        <h2 className="font-display font-black text-gray-900 text-2xl mb-2">Appointment Booked!</h2>
+        <p className="text-gray-500 text-sm mb-1">
+          <strong>{doctor.fullName}</strong> · {selectedDate && format(selectedDate,'MMM d, yyyy')} · <strong>{selectedSlot}</strong>
+        </p>
+        <p className="text-gray-400 text-xs mb-6">📧 Confirmation email sent. Redirecting…</p>
+        <button className="btn btn-teal w-full justify-center" onClick={() => navigate('/appointments')}>
+          View Appointments
+        </button>
+      </div>
+    </div>
+  )
+
+  const initials = (doctor.fullName || '').replace('Dr. ','').split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()
+
   return (
-    <div style={{ padding:'28px 0 60px' }}>
-      <div className="container">
-        {/* Doctor summary */}
-        <div className="card" style={{ padding:'18px 24px', marginBottom:20, display:'flex', alignItems:'center', gap:16 }}>
-          <div style={{ width:50, height:50, borderRadius:10, background:'var(--teal-50)', color:'var(--teal-700)', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-display)', fontSize:16, fontWeight:800 }}>
-            {(doctor.fullName||'').replace('Dr. ','').split(' ').map(n=>n[0]).join('').slice(0,2)}
+    <div className="min-h-screen bg-gray-50 pb-16">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-navy-700 to-navy-800 py-8">
+        <div className="max-w-4xl mx-auto px-6">
+          <button onClick={() => navigate(-1)} className="text-white/60 hover:text-white text-sm transition-colors mb-3">← Back</button>
+          <h1 className="font-display text-2xl font-black text-white">Book Appointment</h1>
+        </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto px-6 py-6">
+        {/* Doctor card */}
+        <div className="card p-5 mb-5 flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-teal-50 border border-teal-100 text-teal-700 font-display font-black text-base flex items-center justify-center flex-shrink-0">
+            {initials}
           </div>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:16, fontWeight:800, fontFamily:'var(--font-display)' }}>{doctor.fullName}</div>
-            <div style={{ fontSize:13, color:'var(--gray-400)' }}>{doctor.specialty} · {doctor.hospital} · Rs. {doctor.fee?.toLocaleString()}</div>
+          <div className="flex-1">
+            <h2 className="font-display font-bold text-gray-900 text-lg leading-tight">{doctor.fullName}</h2>
+            <p className="text-teal-600 text-sm">{doctor.specialty}{doctor.hospital ? ` · ${doctor.hospital}` : ''}</p>
           </div>
-          <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Back</button>
+          <div className="text-right">
+            <div className="text-xs text-gray-400">Consultation fee</div>
+            <div className="font-display font-black text-gray-900 text-xl">Rs. {(doctor.fee || 0).toLocaleString()}</div>
+          </div>
         </div>
 
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 280px', gap:20, alignItems:'start' }}>
-          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-            {/* Type */}
-            <div className="card" style={{ padding:20 }}>
-              <div className="form-label" style={{ marginBottom:10 }}>Appointment Type</div>
-              <div style={{ display:'flex', gap:10 }}>
-                {[{v:'telemedicine',i:'📹',l:'Video Consultation'},{v:'in-person',i:'🏥',l:'In-Person'}].map(t => (
-                  <button key={t.v} onClick={() => setType(t.v)} style={{
-                    flex:1, padding:'12px 10px', borderRadius:10, textAlign:'center',
-                    border:`2px solid ${type===t.v ? 'var(--teal-400)' : 'var(--gray-200)'}`,
-                    background: type===t.v ? 'var(--teal-50)' : '#fff',
-                    color: type===t.v ? 'var(--teal-700)' : 'var(--gray-600)',
-                    cursor:'pointer', fontFamily:'var(--font-body)', fontWeight:700, fontSize:13,
-                  }}>
-                    <div style={{ fontSize:22, marginBottom:4 }}>{t.i}</div>{t.l}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {/* Left: form */}
+          <div className="lg:col-span-2 space-y-4">
+
+            {/* Type selector */}
+            <div className="card p-5">
+              <p className="form-label mb-3">Appointment Type</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { v:'telemedicine', i:'📹', l:'Video Consultation' },
+                  { v:'in-person',    i:'🏥', l:'In-Person Visit' },
+                ].map(t => (
+                  <button key={t.v} onClick={() => setType(t.v)}
+                    className={`p-4 rounded-xl border-2 text-center transition-all ${
+                      type === t.v ? 'border-teal-400 bg-teal-50 text-teal-700' : 'border-gray-200 bg-white text-gray-600 hover:border-teal-200'
+                    }`}>
+                    <div className="text-2xl mb-1">{t.i}</div>
+                    <div className="text-sm font-bold">{t.l}</div>
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Date */}
-            <div className="card" style={{ padding:20 }}>
-              <div className="form-label" style={{ marginBottom:12 }}>Select Date</div>
-              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            {/* Date picker */}
+            <div className="card p-5">
+              <p className="form-label mb-3">Select Date</p>
+              <div className="flex flex-wrap gap-2">
                 {dates.map(d => {
                   const active = selectedDate?.toDateString() === d.toDateString()
                   return (
-                    <button key={d.toISOString()} onClick={() => setSelectedDate(d)} style={{
-                      display:'flex', flexDirection:'column', alignItems:'center',
-                      padding:'9px 11px', borderRadius:10, minWidth:52,
-                      border:`1.5px solid ${active ? 'var(--teal-400)' : 'var(--gray-200)'}`,
-                      background: active ? 'var(--teal-500)' : '#fff',
-                      cursor:'pointer', fontFamily:'var(--font-body)', transition:'all .15s',
-                    }}>
-                      <span style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', color: active ? 'rgba(255,255,255,.7)' : 'var(--gray-400)' }}>{format(d,'EEE')}</span>
-                      <span style={{ fontSize:20, fontWeight:800, fontFamily:'var(--font-display)', color: active ? '#fff' : 'var(--gray-800)', lineHeight:1.1 }}>{format(d,'d')}</span>
-                      <span style={{ fontSize:10, color: active ? 'rgba(255,255,255,.6)' : 'var(--gray-400)' }}>{format(d,'MMM')}</span>
+                    <button key={d.toISOString()} onClick={() => setDate(d)}
+                      className={`flex flex-col items-center px-3 py-2 rounded-xl border transition-all min-w-[50px] ${
+                        active ? 'bg-teal-500 border-teal-500 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-teal-300'
+                      }`}>
+                      <span className="text-[10px] font-bold uppercase opacity-70">{format(d,'EEE')}</span>
+                      <span className="text-xl font-black font-display leading-tight">{format(d,'d')}</span>
+                      <span className="text-[10px] opacity-70">{format(d,'MMM')}</span>
                     </button>
                   )
                 })}
               </div>
             </div>
 
-            {/* Slots */}
+            {/* Time slots */}
             {selectedDate && (
-              <div className="card fade-up" style={{ padding:20 }}>
-                <div className="form-label" style={{ marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
-                  Select Time Slot {slotsLoading && <span className="spinner spinner-dark" style={{ width:14, height:14 }}/>}
-                </div>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(130px,1fr))', gap:8 }}>
+              <div className="card p-5 animate-fade-up">
+                <p className="form-label mb-3 flex items-center gap-2">
+                  Select Time Slot
+                  {sloading && <span className="w-3 h-3 rounded-full border-2 border-teal-100 border-t-teal-500 animate-spin" />}
+                </p>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                   {TIME_SLOTS.map(slot => {
                     const booked = bookedSlots.includes(slot), active = selectedSlot === slot
                     return (
-                      <button key={slot} disabled={booked} onClick={() => !booked && setSelectedSlot(slot)} style={{
-                        padding:'9px', borderRadius:8, fontSize:13, fontWeight:600,
-                        border:`1.5px solid ${active ? 'var(--teal-400)' : booked ? 'var(--gray-100)' : 'var(--gray-200)'}`,
-                        background: active ? 'var(--teal-500)' : booked ? 'var(--gray-50)' : '#fff',
-                        color: active ? '#fff' : booked ? 'var(--gray-300)' : 'var(--gray-700)',
-                        cursor: booked ? 'not-allowed' : 'pointer',
-                        fontFamily:'var(--font-body)', transition:'all .15s', textAlign:'center',
-                      }}>
-                        {slot}{booked && <div style={{ fontSize:10, color:'var(--gray-400)' }}>Booked</div>}
+                      <button key={slot} disabled={booked} onClick={() => setSlot(slot)}
+                        className={`py-2.5 px-1 rounded-xl text-xs font-semibold border text-center transition-all ${
+                          active  ? 'bg-teal-500 border-teal-500 text-white' :
+                          booked  ? 'bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed' :
+                                    'bg-white border-gray-200 text-gray-700 hover:border-teal-300 hover:bg-teal-50'
+                        }`}>
+                        {slot}
+                        {booked && <div className="text-[9px] text-gray-300">Booked</div>}
                       </button>
                     )
                   })}
@@ -163,37 +178,51 @@ export function BookAppointment() {
             )}
 
             {/* Reason */}
-            <div className="card" style={{ padding:20 }}>
-              <div className="form-label" style={{ marginBottom:8 }}>Reason for Visit <span style={{ color:'var(--gray-400)', fontWeight:400, textTransform:'none' }}>(optional)</span></div>
-              <textarea className="form-input" rows={3} placeholder="Describe your symptoms..." value={reason} onChange={e => setReason(e.target.value)} style={{ resize:'none' }}/>
+            <div className="card p-5">
+              <label className="form-label">
+                Reason for Visit <span className="text-gray-400 font-normal normal-case text-xs">(optional)</span>
+              </label>
+              <textarea className="form-input mt-1.5 resize-none" rows={3}
+                placeholder="Describe your symptoms or reason for visit…"
+                value={reason} onChange={e => setReason(e.target.value)} />
             </div>
 
             {error && <div className="alert alert-error">⚠️ {error}</div>}
 
-            <button className="btn btn-teal btn-lg" style={{ width:'100%', justifyContent:'center' }} disabled={loading || !selectedDate || !selectedSlot} onClick={handleSubmit}>
-              {loading ? <><span className="spinner"/> Booking…</> : 'Confirm Appointment'}
+            <button onClick={handleSubmit} disabled={loading || !selectedDate || !selectedSlot}
+              className="w-full btn btn-teal btn-lg justify-center disabled:opacity-50">
+              {loading ? <><span className="spinner" /> Booking…</> : 'Confirm Appointment →'}
             </button>
           </div>
 
-          {/* Summary */}
-          <div style={{ position:'sticky', top:88 }}>
-            {selectedDate && selectedSlot && (
-              <div className="card fade-up" style={{ padding:20, background:'var(--teal-50)', borderColor:'var(--teal-200)' }}>
-                <div className="form-label" style={{ color:'var(--teal-700)', marginBottom:12 }}>Booking Summary</div>
-                {[
-                  { l:'Doctor', v: doctor.fullName },
-                  { l:'Date',   v: format(selectedDate,'EEE, MMM d yyyy') },
-                  { l:'Time',   v: selectedSlot },
-                  { l:'Type',   v: type === 'telemedicine' ? '📹 Video' : '🏥 In-Person' },
-                  { l:'Fee',    v: `Rs. ${(doctor.fee||0).toLocaleString()}` },
-                ].map(r => (
-                  <div key={r.l} style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid var(--teal-100)', fontSize:13 }}>
-                    <span style={{ color:'var(--gray-500)' }}>{r.l}</span>
-                    <strong style={{ color:'var(--gray-800)', textAlign:'right', maxWidth:160 }}>{r.v}</strong>
+          {/* Right: summary */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-20">
+              {selectedDate && selectedSlot ? (
+                <div className="card p-5 bg-teal-50 border-teal-200 animate-fade-up">
+                  <p className="text-xs font-bold text-teal-700 uppercase tracking-wide mb-3">Booking Summary</p>
+                  <div className="space-y-2.5">
+                    {[
+                      { l:'Doctor',   v: doctor.fullName },
+                      { l:'Date',     v: format(selectedDate,'EEE, MMM d yyyy') },
+                      { l:'Time',     v: selectedSlot },
+                      { l:'Type',     v: type === 'telemedicine' ? '📹 Video' : '🏥 In-Person' },
+                      { l:'Fee',      v: `Rs. ${(doctor.fee||0).toLocaleString()}` },
+                    ].map(r => (
+                      <div key={r.l} className="flex justify-between items-start text-sm py-2 border-b border-teal-100 last:border-0">
+                        <span className="text-gray-500">{r.l}</span>
+                        <strong className="text-gray-900 text-right max-w-[140px] leading-snug">{r.v}</strong>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              ) : (
+                <div className="card p-6 text-center border-dashed border-2 border-gray-200">
+                  <div className="text-3xl mb-2 opacity-20">📋</div>
+                  <p className="text-gray-400 text-sm">Select a date and time to see your booking summary</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

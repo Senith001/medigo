@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+import jwt from 'jsonwebtoken';
 
 /**
  * Middleware to verify JWT and attach user info to request.
@@ -31,6 +31,7 @@ const authenticate = (req, res, next) => {
       name:  decoded.fullName || decoded.name || decoded.email.split('@')[0],
       email: decoded.email,
       role:  decoded.role,
+      phone: decoded.phone || null,
     };
 
     next();
@@ -57,4 +58,4 @@ const authorize = (...roles) => {
   };
 };
 
-module.exports = { authenticate, authorize };
+export { authenticate, authorize };

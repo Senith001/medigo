@@ -1,180 +1,223 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { appointmentAPI } from '../../services/api'
 
 const SPECIALTIES = [
-  { name: 'Cardiology',       icon: '❤️',  color: '#fee2e2', border: '#fca5a5' },
-  { name: 'Dermatology',      icon: '🧴',  color: '#fef3c7', border: '#fcd34d' },
-  { name: 'Neurology',        icon: '🧠',  color: '#ede9fe', border: '#c4b5fd' },
-  { name: 'Orthopedics',      icon: '🦴',  color: '#dbeafe', border: '#93c5fd' },
-  { name: 'Pediatrics',       icon: '👶',  color: '#dcfce7', border: '#86efac' },
-  { name: 'Psychiatry',       icon: '🧘',  color: '#e0f2fe', border: '#7dd3fc' },
-  { name: 'Gynecology',       icon: '🌸',  color: '#fce7f3', border: '#f9a8d4' },
-  { name: 'General Medicine', icon: '🩺',  color: '#ccfbf1', border: '#5eead4' },
-  { name: 'Ophthalmology',    icon: '👁️', color: '#fef9c3', border: '#fde047' },
-  { name: 'ENT',              icon: '👂',  color: '#ffedd5', border: '#fdba74' },
-  { name: 'Urology',          icon: '🔬',  color: '#f0fdf4', border: '#86efac' },
-  { name: 'Oncology',         icon: '🎗️', color: '#fdf2f8', border: '#f0abfc' },
+  { name: 'Cardiology',       icon: '❤️',  color: 'bg-red-50 border-red-200' },
+  { name: 'Dermatology',      icon: '🧴',  color: 'bg-amber-50 border-amber-200' },
+  { name: 'Neurology',        icon: '🧠',  color: 'bg-purple-50 border-purple-200' },
+  { name: 'Orthopedics',      icon: '🦴',  color: 'bg-blue-50 border-blue-200' },
+  { name: 'Pediatrics',       icon: '👶',  color: 'bg-green-50 border-green-200' },
+  { name: 'Psychiatry',       icon: '🧘',  color: 'bg-sky-50 border-sky-200' },
+  { name: 'Gynecology',       icon: '🌸',  color: 'bg-pink-50 border-pink-200' },
+  { name: 'General Medicine', icon: '🩺',  color: 'bg-teal-50 border-teal-200' },
 ]
 
 export default function PatientDashboard() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const [doctorName, setDoctorName] = useState('')
   const [specialty, setSpecialty] = useState('')
-  const [hospital, setHospital] = useState('')
+  const [doctorName, setDoctorName] = useState('')
+  const [recentApts, setRecentApts] = useState([])
+  const [aptLoading, setAptLoading] = useState(true)
+
+  useEffect(() => {
+    appointmentAPI.getAll({ limit: 3 })
+      .then(r => setRecentApts(r.data.appointments || []))
+      .catch(() => setRecentApts([]))
+      .finally(() => setAptLoading(false))
+  }, [])
 
   const handleSearch = (e) => {
     e.preventDefault()
     navigate(`/search?specialty=${specialty}&name=${doctorName}`)
   }
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
+  const STATUS_STYLE = {
+    pending:'badge-pending', confirmed:'badge-confirmed',
+    completed:'badge-completed', cancelled:'badge-cancelled',
   }
 
   return (
-    <div className="page-wrapper">
-      {/* Hero banner */}
-      <div style={{
-        background: 'linear-gradient(135deg, var(--navy) 0%, #1a4a8a 60%, #0f3460 100%)',
-        padding: '30px 0 80px',
-        position: 'relative', overflow: 'hidden',
-      }}>
-        {/* Decorative circles */}
-        <div style={{ position:'absolute', width:300, height:300, borderRadius:'50%', background:'rgba(20,184,166,.08)', top:-60, right:80, pointerEvents:'none' }}/>
-        <div style={{ position:'absolute', width:180, height:180, borderRadius:'50%', background:'rgba(20,184,166,.05)', bottom:-40, left:60, pointerEvents:'none' }}/>
+    <div className="min-h-screen bg-gray-50">
 
-        <div className="container" style={{ position:'relative' }}>
-          
-          {/* Dashboard Header Controls */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginBottom: '30px' }}>
-            <button onClick={() => navigate('/appointments')} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer', fontWeight: 'bold' }}>
-              My Appointments
+      {/* Hero */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-navy-900 via-navy-700 to-navy-800 pb-20 pt-8">
+        <div className="absolute w-80 h-80 rounded-full bg-teal-500/10 -top-16 -right-16 pointer-events-none" />
+        <div className="absolute w-56 h-56 rounded-full bg-teal-400/5 bottom-0 left-10 pointer-events-none" />
+
+        <div className="max-w-6xl mx-auto px-6 relative">
+          {/* Top bar */}
+          <div className="flex justify-end gap-2 mb-6">
+            <button onClick={() => navigate('/appointments')}
+              className="btn btn-sm bg-white/10 border border-white/20 text-white hover:bg-white/20">
+              📋 My Appointments
             </button>
-            <button onClick={handleLogout} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(255,100,100,0.5)', background: 'transparent', color: '#ffb3b3', cursor: 'pointer' }}>
-              Log Out
+            <button onClick={() => { logout(); navigate('/login') }}
+              className="btn btn-sm bg-transparent border border-red-400/30 text-red-300 hover:bg-red-500/10">
+              Sign Out
             </button>
           </div>
 
-          <div style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center' }}>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              background: 'rgba(20,184,166,.15)', border: '1px solid rgba(20,184,166,.3)',
-              borderRadius: 99, padding: '5px 16px', marginBottom: 18,
-            }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--teal-400)', animation: 'pulse 2s infinite' }}/>
-              <span style={{ fontSize: 12, color: 'var(--teal-300)', fontWeight: 600 }}>Patient Portal Active</span>
+          {/* Greeting */}
+          <div className="max-w-2xl mx-auto text-center">
+            <div className="inline-flex items-center gap-2 bg-teal-500/15 border border-teal-400/30 text-teal-300 text-xs font-bold px-4 py-1.5 rounded-full mb-5 uppercase tracking-wider">
+              <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+              Patient Portal Active
             </div>
-            
-            {/* Personalized Greeting */}
-            <h1 style={{ fontSize: 40, color: '#fff', marginBottom: 14, fontFamily: 'var(--font-display)', fontWeight: 800 }}>
-              Welcome back, <br/>
-              <span style={{ color: 'var(--teal-400)' }}>{user?.name || 'Patient'}</span>
+            <h1 className="font-display text-5xl font-black text-white mb-4 leading-tight">
+              Welcome back,<br />
+              <span className="text-teal-400">{user?.name || 'Patient'}</span> 👋
             </h1>
-            <p style={{ fontSize: 16, color: 'rgba(255,255,255,.6)', marginBottom: 36 }}>
-              Find and book appointments with the best doctors across Sri Lanka
+            <p className="text-white/50 text-lg mb-8">
+              Find and book specialists across Sri Lanka
             </p>
-          </div>
 
-          {/* Search bar card */}
-          <div className="card" style={{ padding: '24px 28px', maxWidth: 900, margin: '0 auto', borderRadius: 14, background: '#fff' }}>
-            <form onSubmit={handleSearch}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 12, alignItems: 'end' }}>
-                <div>
-                  <label className="form-label" style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '600' }}>Doctor Name</label>
-                  <input className="form-input" style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }} placeholder="Search doctor name..." value={doctorName} onChange={e => setDoctorName(e.target.value)}/>
-                </div>
-                <div>
-                  <label className="form-label" style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '600' }}>Specialization</label>
-                  <select className="form-input" style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }} value={specialty} onChange={e => setSpecialty(e.target.value)}>
-                    <option value="">Select Specialization</option>
-                    {SPECIALTIES.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+            {/* Search card */}
+            <div className="bg-white rounded-2xl p-5 shadow-xl">
+              <form onSubmit={handleSearch}>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <input
+                    className="form-input sm:col-span-1"
+                    placeholder="Doctor name…"
+                    value={doctorName}
+                    onChange={e => setDoctorName(e.target.value)}
+                  />
+                  <select
+                    className="form-input"
+                    value={specialty}
+                    onChange={e => setSpecialty(e.target.value)}
+                  >
+                    <option value="">All Specialties</option>
+                    {SPECIALTIES.map(s => <option key={s.name}>{s.name}</option>)}
                   </select>
+                  <button type="submit" className="btn btn-navy w-full justify-center">
+                    🔍 Search
+                  </button>
                 </div>
-                <div>
-                  <label className="form-label" style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '600' }}>Hospital</label>
-                  <input className="form-input" style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }} placeholder="Select Hospital..." value={hospital} onChange={e => setHospital(e.target.value)}/>
-                </div>
-                <button type="submit" className="btn btn-navy btn-lg" style={{ height: 42, padding: '0 28px', background: 'var(--navy)', color: 'white', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
-                  Search
-                </button>
+              </form>
+              {/* Quick pills */}
+              <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
+                <span className="text-xs text-gray-400">Quick:</span>
+                {['Cardiology','Dermatology','Pediatrics','General Medicine'].map(s => (
+                  <button key={s} onClick={() => navigate(`/search?specialty=${s}`)}
+                    className="px-3 py-1 rounded-full text-xs font-semibold bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 transition-colors">
+                    {s}
+                  </button>
+                ))}
               </div>
-            </form>
-            <div style={{ marginTop: 12, borderTop: '1px solid var(--gray-100)', paddingTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 12, color: 'var(--gray-400)' }}>Quick search:</span>
-              {['Cardiology','Dermatology','Pediatrics','General Medicine'].map(s => (
-                <button key={s} onClick={() => navigate(`/search?specialty=${s}`)} style={{
-                  padding: '3px 12px', borderRadius: 99, fontSize: 12, fontWeight: 600,
-                  background: 'var(--teal-50)', color: 'var(--teal-700)',
-                  border: '1px solid var(--teal-200)', cursor: 'pointer',
-                  fontFamily: 'var(--font-body)',
-                }}>
-                  {s}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick stats */}
+      <div className="bg-navy-800 py-6">
+        <div className="max-w-6xl mx-auto px-6 grid grid-cols-4 gap-0">
+          {[
+            { val: '500+', label: 'Verified Doctors' },
+            { val: '20+',  label: 'Specializations' },
+            { val: '50K+', label: 'Appointments' },
+            { val: '4.9★', label: 'Average Rating' },
+          ].map((s, i) => (
+            <div key={s.label} className={`text-center py-1 ${i < 3 ? 'border-r border-white/10' : ''}`}>
+              <div className="font-display font-black text-2xl text-teal-400">{s.val}</div>
+              <div className="text-xs text-white/40 mt-0.5">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-6 py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+          {/* Specialties grid */}
+          <div className="lg:col-span-2">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-display text-xl font-black text-gray-900">Browse by Specialty</h2>
+              <button onClick={() => navigate('/search')} className="text-teal-600 text-sm font-bold hover:text-teal-700">
+                View All →
+              </button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {SPECIALTIES.map((s, i) => (
+                <button key={s.name} onClick={() => navigate(`/search?specialty=${s.name}`)}
+                  className={`card p-4 text-center hover:-translate-y-1 hover:shadow-md transition-all duration-200 cursor-pointer animate-fade-up border ${s.color}`}
+                  style={{ animationDelay: `${i * 0.05}s` }}>
+                  <div className="text-3xl mb-2">{s.icon}</div>
+                  <div className="text-xs font-bold text-gray-700 leading-tight">{s.name}</div>
                 </button>
               ))}
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Quick access — specialty grid */}
-      <div style={{ background: '#f5f7fa', padding: '40px 0 60px' }}>
-        <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <h2 className="section-title" style={{ marginBottom: 0, fontSize: '24px', fontWeight: 'bold' }}>Browse by Specialty</h2>
-            <button className="btn btn-ghost btn-sm" style={{ color: 'var(--teal-600)', fontWeight: 700, border: 'none', background: 'transparent', cursor: 'pointer' }} onClick={() => navigate('/search')}>
-              View All →
-            </button>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
-            {SPECIALTIES.map((s, i) => (
-              <button
-                key={s.name}
-                onClick={() => navigate(`/search?specialty=${s.name}`)}
-                className="card card-hover fade-up"
-                style={{
-                  padding: '22px 16px', textAlign: 'center', cursor: 'pointer',
-                  border: `1.5px solid ${s.border}`,
-                  borderRadius: '12px',
-                  animationDelay: `${i * .04}s`,
-                  background: '#fff',
-                  fontFamily: 'var(--font-body)',
-                  transition: 'transform 0.2s',
-                }}
-              >
-                <div style={{
-                  width: 56, height: 56, borderRadius: 14,
-                  background: s.color, margin: '0 auto 12px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 26,
-                }}>
-                  {s.icon}
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--gray-700)' }}>{s.name}</div>
+          {/* Recent appointments */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-display text-xl font-black text-gray-900">Recent Activity</h2>
+              <button onClick={() => navigate('/appointments')} className="text-teal-600 text-sm font-bold">
+                View All →
               </button>
-            ))}
-          </div>
-        </div>
-      </div>
+            </div>
 
-      {/* Stats bar */}
-      <div style={{ background: 'var(--navy)', padding: '32px 0', backgroundColor: '#0f3460' }}>
-        <div className="container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 0, textAlign: 'center' }}>
-            {[
-              { val: '500+', label: 'Verified Doctors' },
-              { val: '20+',  label: 'Specializations'  },
-              { val: '50K+', label: 'Appointments'     },
-              { val: '4.9★', label: 'Average Rating'   },
-            ].map((s, i) => (
-              <div key={s.label} style={{ borderRight: i < 3 ? '1px solid rgba(255,255,255,.1)' : 'none', padding: '0 24px' }}>
-                <div style={{ fontSize: 28, fontWeight: 800, color: '#2dd4bf', fontFamily: 'var(--font-display)' }}>{s.val}</div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,.7)' }}>{s.label}</div>
+            {aptLoading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="card p-4 animate-pulse">
+                    <div className="h-3 bg-gray-100 rounded w-2/3 mb-2" />
+                    <div className="h-3 bg-gray-100 rounded w-1/2" />
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : recentApts.length === 0 ? (
+              <div className="card p-8 text-center">
+                <div className="text-3xl mb-3 opacity-30">📋</div>
+                <p className="text-gray-400 text-sm mb-3">No appointments yet</p>
+                <button onClick={() => navigate('/search')} className="btn btn-teal btn-sm">
+                  Book now →
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentApts.map(apt => (
+                  <div key={apt._id} className="card p-4 hover:shadow-md transition-all">
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div>
+                        <p className="font-bold text-gray-900 text-sm">{apt.doctorName}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {new Date(apt.appointmentDate).toLocaleDateString('en-LK',{month:'short',day:'numeric'})} · {apt.timeSlot}
+                        </p>
+                      </div>
+                      <span className={`badge ${STATUS_STYLE[apt.status] || 'badge-no-show'}`}>{apt.status}</span>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      {apt.status === 'pending' && (
+                        <button 
+                          onClick={() => navigate(`/payment/${apt._id}`)}
+                          className="flex-1 py-1.5 bg-teal-600 text-white text-[10px] font-bold rounded-lg hover:bg-teal-700 transition"
+                        >
+                          💳 Pay Now
+                        </button>
+                      )}
+                      {apt.status === 'confirmed' && (
+                        <button 
+                          onClick={() => navigate(`/telemedicine/lobby/${apt._id}`)}
+                          className="flex-1 py-1.5 bg-navy-700 text-white text-[10px] font-bold rounded-lg hover:bg-navy-800 transition"
+                        >
+                          🎥 Join Meeting
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <button onClick={() => navigate('/appointments')}
+                  className="w-full btn btn-outline btn-sm mt-1">
+                  All Appointments →
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

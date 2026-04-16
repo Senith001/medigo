@@ -1,91 +1,122 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { appointmentAPI } from '../services/api'
 
-const MOCK_DOCTORS = [
-  { _id:'69c434b9046be23bd4589732', fullName:'Dr. Kamal Perera',    email:'doctor@healthcare.lk', specialty:'Cardiology',      hospital:'Colombo General Hospital', fee:2500, rating:4.9, reviews:128, experience:14, available:true  },
-  { _id:'d2', fullName:'Dr. Nisha Fernando',  email:'nisha@hospital.lk',   specialty:'Dermatology',     hospital:'Nawaloka Hospital',         fee:2000, rating:4.7, reviews:94,  experience:8,  available:true  },
-  { _id:'d3', fullName:'Dr. Rohan Silva',     email:'rohan@hospital.lk',   specialty:'Neurology',       hospital:'Lanka Hospitals',           fee:3000, rating:4.8, reviews:211, experience:19, available:false },
-  { _id:'d4', fullName:'Dr. Priya Rajapaksa', email:'priya@hospital.lk',  specialty:'Pediatrics',      hospital:'Asiri Hospital',            fee:1800, rating:4.9, reviews:305, experience:11, available:true  },
-  { _id:'d5', fullName:'Dr. Ashan Wickrama',  email:'ashan@hospital.lk',  specialty:'Orthopedics',     hospital:'Colombo General Hospital',  fee:2800, rating:4.6, reviews:76,  experience:16, available:true  },
-  { _id:'d6', fullName:'Dr. Samanthi Dias',   email:'sam@hospital.lk',    specialty:'Gynecology',      hospital:'Durdans Hospital',          fee:2200, rating:4.8, reviews:189, experience:13, available:true  },
-  { _id:'d7', fullName:'Dr. Thilina Mendis',  email:'thilina@hospital.lk',specialty:'General Medicine',hospital:'Nawaloka Hospital',         fee:1500, rating:4.5, reviews:412, experience:9,  available:true  },
-  { _id:'d8', fullName:'Dr. Asha Gunawardena',email:'asha@hospital.lk',   specialty:'Psychiatry',      hospital:'Lanka Hospitals',           fee:3500, rating:4.9, reviews:87,  experience:22, available:true  },
+const SPECIALTIES = [
+  'All','Cardiology','Dermatology','Neurology','Orthopedics','Pediatrics',
+  'Psychiatry','Gynecology','General Medicine','Ophthalmology','ENT','Urology','Oncology',
 ]
 
-const SPECIALTIES = ['Cardiology','Dermatology','Neurology','Orthopedics','Pediatrics','Psychiatry','Gynecology','General Medicine','Ophthalmology','ENT','Urology','Oncology']
-
 export default function SearchDoctors() {
-  const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const [doctors, setDoctors] = useState(MOCK_DOCTORS)
-  const [loading, setLoading] = useState(false)
-  const [nameFilter, setNameFilter] = useState(searchParams.get('name') || '')
-  const [specFilter, setSpecFilter] = useState(searchParams.get('specialty') || '')
+  const location  = useLocation()
+  const navigate  = useNavigate()
+  const params    = new URLSearchParams(location.search)
 
-  useEffect(() => {
-    const sp = searchParams.get('specialty')
-    if (sp) {
-      setSpecFilter(sp)
-      setDoctors(MOCK_DOCTORS.filter(d => d.specialty === sp))
-    }
-  }, [])
+  const [specialty, setSpecialty] = useState(params.get('specialty') || '')
+  const [search,    setSearch]    = useState(params.get('name') || '')
+  const [doctors,   setDoctors]   = useState([])
+  const [loading,   setLoading]   = useState(false)
+  const [error,     setError]     = useState('')
 
-  const handleSearch = (e) => {
-    e?.preventDefault()
-    setLoading(true)
-    setTimeout(() => {
-      let result = MOCK_DOCTORS
-      if (nameFilter) result = result.filter(d => d.fullName.toLowerCase().includes(nameFilter.toLowerCase()))
-      if (specFilter) result = result.filter(d => d.specialty === specFilter)
-      setDoctors(result)
-      setLoading(false)
-    }, 400)
+  const fetchDoctors = async (spec) => {
+    setLoading(true); setError('')
+    try {
+      const q = spec && spec !== 'All' ? spec : specialty && specialty !== 'All' ? specialty : 'General Medicine'
+      const res = await appointmentAPI.searchDoctors(q)
+      setDoctors(res.data.doctors || [])
+    } catch { setDoctors([]) } finally { setLoading(false) }
   }
 
+  useEffect(() => { fetchDoctors(specialty) }, [])
+
+  const filtered = doctors.filter(d =>
+    !search || d.fullName?.toLowerCase().includes(search.toLowerCase())
+  )
+
   return (
-    <div className="page-wrapper" style={{ padding: '28px 0 60px' }}>
-      <div className="container">
-        {/* Search filters */}
-        <div className="card" style={{ padding: '20px 24px', marginBottom: 24 }}>
-          <form onSubmit={handleSearch} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, alignItems: 'end' }}>
-            <div>
-              <label className="form-label">Doctor Name</label>
-              <input className="form-input" placeholder="Search by name..." value={nameFilter} onChange={e => setNameFilter(e.target.value)}/>
-            </div>
-            <div>
-              <label className="form-label">Specialization</label>
-              <select className="form-input" value={specFilter} onChange={e => setSpecFilter(e.target.value)}>
-                <option value="">All Specializations</option>
-                {SPECIALTIES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <button type="submit" className="btn btn-navy" style={{ height: 42 }} disabled={loading}>
-              {loading ? <span className="spinner"/> : 'Search'}
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-navy-700 to-navy-800 py-10">
+        <div className="max-w-6xl mx-auto px-6">
+          <h1 className="font-display text-3xl font-black text-white mb-1">Find a Doctor</h1>
+          <p className="text-white/50 text-sm">Search from 500+ verified specialists</p>
+
+          {/* Search bar */}
+          <div className="flex gap-3 mt-5">
+            <input
+              type="text"
+              placeholder="Search doctor name…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-white/40 text-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all max-w-sm"
+            />
+            <select
+              value={specialty}
+              onChange={e => { setSpecialty(e.target.value); fetchDoctors(e.target.value) }}
+              className="bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-teal-400 transition-all"
+            >
+              {SPECIALTIES.map(s => <option key={s} className="text-gray-900">{s}</option>)}
+            </select>
+            <button onClick={() => fetchDoctors(specialty)} className="btn btn-teal px-6">
+              Search
             </button>
-          </form>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        {/* Stats */}
+        <div className="flex items-center justify-between mb-6">
+          <p className="text-gray-500 text-sm">
+            {loading ? 'Searching…' : `${filtered.length} doctor${filtered.length !== 1 ? 's' : ''} found`}
+            {specialty && specialty !== 'All' ? ` in ${specialty}` : ''}
+          </p>
+          <div className="flex gap-2">
+            {['All','Cardiology','Dermatology','General Medicine'].map(s => (
+              <button key={s}
+                onClick={() => { setSpecialty(s); fetchDoctors(s) }}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${specialty === s ? 'bg-teal-500 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-teal-300'}`}>
+                {s}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Results count */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <p style={{ fontSize: 14, color: 'var(--gray-500)', fontWeight: 600 }}>
-            {doctors.length} doctor{doctors.length !== 1 ? 's' : ''} found
-            {specFilter && <span style={{ color: 'var(--teal-600)' }}> · {specFilter}</span>}
-          </p>
-        </div>
+        {/* Loading skeletons */}
+        {loading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="card p-6 animate-pulse">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gray-100" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-gray-100 rounded w-3/4" />
+                    <div className="h-3 bg-gray-100 rounded w-1/2" />
+                  </div>
+                </div>
+                <div className="h-3 bg-gray-100 rounded w-full mb-2" />
+                <div className="h-8 bg-gray-100 rounded-xl mt-4" />
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Doctor cards */}
-        {doctors.length === 0 ? (
-          <div className="card empty-state">
-            <div className="empty-state-icon">🔍</div>
-            <h3>No doctors found</h3>
-            <p>Try a different name or specialization</p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {doctors.map((doc, i) => (
-              <DoctorRow key={doc._id} doctor={doc} index={i} onBook={() => navigate('/book', { state: { doctor: doc } })} />
+        {!loading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filtered.map((doc, i) => (
+              <DoctorCard key={doc._id} doc={doc} index={i} onBook={() =>
+                navigate('/book', { state: { doctor: doc } })
+              } />
             ))}
+          </div>
+        )}
+
+        {!loading && filtered.length === 0 && (
+          <div className="text-center py-20">
+            <div className="text-5xl mb-4 opacity-30">🔍</div>
+            <h3 className="font-display font-bold text-gray-400 text-lg mb-1">No doctors found</h3>
+            <p className="text-gray-400 text-sm">Try a different specialty or search term</p>
           </div>
         )}
       </div>
@@ -93,65 +124,53 @@ export default function SearchDoctors() {
   )
 }
 
-function DoctorRow({ doctor, index, onBook }) {
-  const initials = doctor.fullName.replace('Dr. ','').split(' ').map(n=>n[0]).join('').slice(0,2)
-  const avatarColors = ['#dbeafe','#dcfce7','#fce7f3','#e0e7ff','#fef3c7','#ccfbf1']
-  const textColors   = ['#1d4ed8','#166534','#9d174d','#3730a3','#92400e','#0f766e']
-  const ci = index % avatarColors.length
+function DoctorCard({ doc, index, onBook }) {
+  const initials = (doc.fullName || '').replace('Dr. ', '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+  const rating = (4.5 + Math.random() * 0.4).toFixed(1)
 
   return (
-    <div className="card card-hover fade-up" style={{ padding: '20px 24px', animationDelay: `${index*.05}s` }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-        {/* Avatar */}
-        <div style={{
-          width: 60, height: 60, borderRadius: 12, flexShrink: 0,
-          background: avatarColors[ci], color: textColors[ci],
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800,
-        }}>
+    <div className="card p-6 hover:-translate-y-1 hover:shadow-lg transition-all duration-200 animate-fade-up flex flex-col"
+      style={{ animationDelay: `${index * 0.05}s` }}>
+      <div className="flex items-start gap-4 mb-4">
+        <div className="w-14 h-14 rounded-2xl bg-teal-50 border border-teal-100 text-teal-700 font-display font-black text-base flex items-center justify-center flex-shrink-0">
           {initials}
         </div>
-
-        {/* Info */}
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
-            <span style={{ fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-display)' }}>{doctor.fullName}</span>
-            <span style={{
-              fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99,
-              background: 'var(--teal-50)', color: 'var(--teal-700)',
-              border: '1px solid var(--teal-200)',
-            }}>
-              {doctor.specialty}
-            </span>
-            <span style={{
-              width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-              background: doctor.available ? 'var(--green-500)' : 'var(--gray-300)',
-              display: 'inline-block',
-            }} title={doctor.available ? 'Available' : 'Not Available'}/>
-          </div>
-          <div style={{ display: 'flex', gap: 20, fontSize: 13, color: 'var(--gray-500)', flexWrap: 'wrap' }}>
-            <span>🏥 {doctor.hospital}</span>
-            <span>⭐ {doctor.rating} ({doctor.reviews} reviews)</span>
-            <span>🎓 {doctor.experience} years experience</span>
-            <span>📹 Video consultation</span>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-display font-bold text-gray-900 text-base leading-tight truncate">{doc.fullName}</h3>
+          <p className="text-teal-600 text-xs font-semibold mt-0.5">{doc.specialty}</p>
+          <div className="flex items-center gap-1 mt-1">
+            <span className="text-amber-400 text-xs">★</span>
+            <span className="text-gray-600 text-xs font-semibold">{rating}</span>
+            <span className="text-gray-300 text-xs mx-1">·</span>
+            <span className="text-gray-400 text-xs">{doc.experienceYears || '5'}+ yrs exp</span>
           </div>
         </div>
+      </div>
 
-        {/* Fee + action */}
-        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontSize: 11, color: 'var(--gray-400)', marginBottom: 2 }}>Consultation Fee</div>
-          <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'var(--font-display)', color: 'var(--gray-900)', marginBottom: 10 }}>
-            Rs. {doctor.fee?.toLocaleString()}
+      <div className="space-y-1.5 mb-4 flex-1">
+        {doc.hospital && (
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span className="text-gray-300">🏥</span> {doc.hospital}
           </div>
-          <button
-            className={`btn ${doctor.available ? 'btn-teal' : 'btn-ghost'}`}
-            disabled={!doctor.available}
-            onClick={onBook}
-            style={{ fontSize: 13 }}
-          >
-            {doctor.available ? 'Book Appointment' : 'Not Available'}
-          </button>
+        )}
+        {doc.qualifications && (
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span className="text-gray-300">🎓</span> {doc.qualifications}
+          </div>
+        )}
+      </div>
+
+      <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+        <div>
+          <span className="text-xs text-gray-400">Consultation fee</span>
+          <div className="font-display font-black text-gray-900 text-lg">
+            Rs. {(doc.fee || 0).toLocaleString()}
+          </div>
         </div>
+        <button onClick={onBook}
+          className="btn btn-teal btn-sm">
+          Book →
+        </button>
       </div>
     </div>
   )

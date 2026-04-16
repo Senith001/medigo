@@ -1,20 +1,21 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const connectDB = require('./config/db');
-const { startConsumer } = require('./config/consumer');
-const notificationRoutes = require('./routes/notificationRoutes');
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import connectDB from './config/db.js';
+import { startConsumer } from './config/consumer.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 const app = express();
 
+// Middleware
 app.use(helmet());
 app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json());
 
-// Routes (for admin to query notification logs)
+// Routes
 app.use('/api/notifications', notificationRoutes);
 
 // Health check
@@ -22,8 +23,10 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'Notification Service is running', timestamp: new Date() });
 });
 
+// 404 handler
 app.use((req, res) => res.status(404).json({ message: 'Route not found' }));
 
+// Global error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: 'Internal Server Error' });
@@ -40,5 +43,3 @@ const start = async () => {
 };
 
 start();
-
-module.exports = app;

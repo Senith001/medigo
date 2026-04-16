@@ -1,22 +1,31 @@
-const amqp = require('amqplib');
-const Notification = require('../models/Notification');
-const {
+import amqp from 'amqplib';
+import Notification from '../models/Notification.js';
+import {
   sendEmail,
   buildBookingEmail,
+  buildConfirmationEmail,
   buildCancellationEmail,
   buildUpdateEmail,
-} = require('./emailService');
-const {
+} from './emailService.js';
+import {
   sendSMS,
   buildBookingSMS,
   buildCancellationSMS,
   buildUpdateSMS,
-} = require('./smsService');
+} from './smsService.js';
 
 /**
  * Helper: log a notification result to MongoDB.
  */
-const logNotification = async (appointmentId, recipientEmail, recipientName, type, channel, status, errorMessage = null) => {
+const logNotification = async (
+  appointmentId,
+  recipientEmail,
+  recipientName,
+  type,
+  channel,
+  status,
+  errorMessage = null
+) => {
   try {
     await Notification.create({
       appointmentId,
@@ -38,20 +47,29 @@ const logNotification = async (appointmentId, recipientEmail, recipientName, typ
  */
 const handleAppointmentBooked = async (data) => {
   const recipients = [
-    { name: data.patientName, email: data.patientEmail },
-    { name: data.doctorName, email: data.doctorEmail },
+    { name: data.patientName, email: data.patientEmail, phone: data.patientPhone || null },
+    { name: data.doctorName,  email: data.doctorEmail,  phone: data.doctorPhone  || null },
   ];
 
   for (const recipient of recipients) {
+    // Guard: skip if no email address
+    if (!recipient.email) continue;
+
     const emailPayload = buildBookingEmail({ ...data, recipientName: recipient.name });
 
     // Email
     try {
       await sendEmail(recipient.email, emailPayload.subject, emailPayload.html);
-      await logNotification(data.appointmentId, recipient.email, recipient.name, 'appointment_booked', 'email', 'sent');
+      await logNotification(
+        data.appointmentId, recipient.email, recipient.name,
+        'appointment_booked', 'email', 'sent'
+      );
     } catch (err) {
       console.error(`Email failed for ${recipient.email}:`, err.message);
-      await logNotification(data.appointmentId, recipient.email, recipient.name, 'appointment_booked', 'email', 'failed', err.message);
+      await logNotification(
+        data.appointmentId, recipient.email, recipient.name,
+        'appointment_booked', 'email', 'failed', err.message
+      );
     }
 
     // SMS (if phone number available)
@@ -59,9 +77,15 @@ const handleAppointmentBooked = async (data) => {
       const smsBody = buildBookingSMS({ ...data, recipientName: recipient.name });
       try {
         await sendSMS(recipient.phone, smsBody);
-        await logNotification(data.appointmentId, recipient.email, recipient.name, 'appointment_booked', 'sms', 'sent');
+        await logNotification(
+          data.appointmentId, recipient.email, recipient.name,
+          'appointment_booked', 'sms', 'sent'
+        );
       } catch (err) {
-        await logNotification(data.appointmentId, recipient.email, recipient.name, 'appointment_booked', 'sms', 'failed', err.message);
+        await logNotification(
+          data.appointmentId, recipient.email, recipient.name,
+          'appointment_booked', 'sms', 'failed', err.message
+        );
       }
     }
   }
@@ -72,28 +96,42 @@ const handleAppointmentBooked = async (data) => {
  */
 const handleAppointmentCancelled = async (data) => {
   const recipients = [
-    { name: data.patientName, email: data.patientEmail },
-    { name: data.doctorName, email: data.doctorEmail },
+    { name: data.patientName, email: data.patientEmail, phone: data.patientPhone || null },
+    { name: data.doctorName,  email: data.doctorEmail,  phone: data.doctorPhone  || null },
   ];
 
   for (const recipient of recipients) {
+    if (!recipient.email) continue;
+
     const emailPayload = buildCancellationEmail({ ...data, recipientName: recipient.name });
 
     try {
       await sendEmail(recipient.email, emailPayload.subject, emailPayload.html);
-      await logNotification(data.appointmentId, recipient.email, recipient.name, 'appointment_cancelled', 'email', 'sent');
+      await logNotification(
+        data.appointmentId, recipient.email, recipient.name,
+        'appointment_cancelled', 'email', 'sent'
+      );
     } catch (err) {
       console.error(`Cancellation email failed for ${recipient.email}:`, err.message);
-      await logNotification(data.appointmentId, recipient.email, recipient.name, 'appointment_cancelled', 'email', 'failed', err.message);
+      await logNotification(
+        data.appointmentId, recipient.email, recipient.name,
+        'appointment_cancelled', 'email', 'failed', err.message
+      );
     }
 
     if (recipient.phone) {
       const smsBody = buildCancellationSMS({ ...data, recipientName: recipient.name });
       try {
         await sendSMS(recipient.phone, smsBody);
-        await logNotification(data.appointmentId, recipient.email, recipient.name, 'appointment_cancelled', 'sms', 'sent');
+        await logNotification(
+          data.appointmentId, recipient.email, recipient.name,
+          'appointment_cancelled', 'sms', 'sent'
+        );
       } catch (err) {
-        await logNotification(data.appointmentId, recipient.email, recipient.name, 'appointment_cancelled', 'sms', 'failed', err.message);
+        await logNotification(
+          data.appointmentId, recipient.email, recipient.name,
+          'appointment_cancelled', 'sms', 'failed', err.message
+        );
       }
     }
   }
@@ -104,18 +142,28 @@ const handleAppointmentCancelled = async (data) => {
  */
 const handleAppointmentUpdated = async (data) => {
   const recipients = [
-    { name: data.patientName, email: data.patientEmail },
-    { name: data.doctorName, email: data.doctorEmail },
+    { name: data.patientName, email: data.patientEmail, phone: data.patientPhone || null },
+    { name: data.doctorName,  email: data.doctorEmail,  phone: data.doctorPhone  || null },
   ];
 
   for (const recipient of recipients) {
-    const emailPayload = buildUpdateEmail({ ...data, recipientName: recipient.name });
+    if (!recipient.email) continue;
+
+    const emailPayload = data.confirmed
+      ? buildConfirmationEmail({ ...data, recipientName: recipient.name })
+      : buildUpdateEmail({ ...data, recipientName: recipient.name });
 
     try {
       await sendEmail(recipient.email, emailPayload.subject, emailPayload.html);
-      await logNotification(data.appointmentId, recipient.email, recipient.name, 'appointment_updated', 'email', 'sent');
+      await logNotification(
+        data.appointmentId, recipient.email, recipient.name,
+        'appointment_updated', 'email', 'sent'
+      );
     } catch (err) {
-      await logNotification(data.appointmentId, recipient.email, recipient.name, 'appointment_updated', 'email', 'failed', err.message);
+      await logNotification(
+        data.appointmentId, recipient.email, recipient.name,
+        'appointment_updated', 'email', 'failed', err.message
+      );
     }
   }
 };
@@ -126,14 +174,14 @@ const handleAppointmentUpdated = async (data) => {
 const startConsumer = async () => {
   try {
     const connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://localhost:5672');
-    const channel = await connection.createChannel();
+    const channel    = await connection.createChannel();
 
     await channel.assertExchange('appointment_events', 'topic', { durable: true });
 
     const queues = [
-      { name: 'appointment.booked', handler: handleAppointmentBooked },
+      { name: 'appointment.booked',    handler: handleAppointmentBooked    },
       { name: 'appointment.cancelled', handler: handleAppointmentCancelled },
-      { name: 'appointment.updated', handler: handleAppointmentUpdated },
+      { name: 'appointment.updated',   handler: handleAppointmentUpdated   },
     ];
 
     for (const q of queues) {
@@ -149,7 +197,7 @@ const startConsumer = async () => {
           channel.ack(msg);
         } catch (err) {
           console.error(`Error processing [${q.name}]:`, err.message);
-          // Nack and don't requeue to avoid infinite loops on bad messages
+          // Nack and don't requeue — avoids infinite loops on malformed messages
           channel.nack(msg, false, false);
         }
       });
@@ -172,4 +220,4 @@ const startConsumer = async () => {
   }
 };
 
-module.exports = { startConsumer };
+export { startConsumer };

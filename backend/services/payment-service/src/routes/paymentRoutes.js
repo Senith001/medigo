@@ -1,7 +1,7 @@
-const express = require("express");
+import express from "express";
 const router = express.Router();
 
-const {
+import {
   createPayment,
   createBankTransferPayment,
   handlePaymentSuccess,
@@ -12,20 +12,20 @@ const {
   approveBankTransferPayment,
   rejectBankTransferPayment,
   refundPayment,
-} = require("../controllers/paymentController");
+} from "../controllers/paymentController.js";
 
-const { protect, authorize } = require("../middleware/auth");
-const validate = require("../middleware/validate");
-const validateObjectId = require("../middleware/validateObjectId");
-const upload = require("../middleware/upload");
+import { protect, authorize } from "../middleware/auth.js";
+import validate from "../middleware/validate.js";
+import validateObjectId from "../middleware/validateObjectId.js";
+import upload from "../middleware/upload.js";
 
-const {
+import {
   createPaymentValidation,
   createBankTransferValidation,
   paymentIdValidation,
   rejectPaymentValidation,
   refundPaymentValidation,
-} = require("../validators/paymentValidators");
+} from "../validators/paymentValidators.js";
 
 // Patient creates a Stripe payment session.
 router.post(
@@ -112,4 +112,4 @@ router.get(
   getPaymentById
 );
 
-module.exports = router;
+export default router;

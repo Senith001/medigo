@@ -9,117 +9,131 @@ const TIME_SLOTS = [
   '14:00 - 14:30','14:30 - 15:00','15:00 - 15:30','15:30 - 16:00',
   '16:00 - 16:30','16:30 - 17:00',
 ]
-const getDates = () => Array.from({ length: 14 }, (_, i) => addDays(startOfToday(), i + 1))
-const MOCK = { _id:'a1', doctorId:'d1', doctorName:'Dr. Kamal Perera', specialty:'Cardiology', hospital:'Colombo General', appointmentDate: new Date(Date.now()+86400000*3).toISOString(), timeSlot:'09:00 - 09:30', fee:2500 }
 
 export default function RescheduleAppointment() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [appt, setAppt] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [selectedDate, setSelectedDate] = useState(null)
-  const [selectedSlot, setSelectedSlot] = useState(null)
-  const [bookedSlots, setBookedSlots] = useState([])
-  const [slotsLoading, setSlotsLoading] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
-  const dates = getDates()
+  const [apt, setApt]             = useState(null)
+  const [selectedDate, setDate]   = useState(null)
+  const [selectedSlot, setSlot]   = useState(null)
+  const [bookedSlots, setBooked]  = useState([])
+  const [reason, setReason]       = useState('')
+  const [loading, setLoading]     = useState(true)
+  const [sloading, setSloading]   = useState(false)
+  const [saving, setSaving]       = useState(false)
+  const [error, setError]         = useState('')
+  const [success, setSuccess]     = useState(false)
+  const dates = Array.from({ length: 14 }, (_, i) => addDays(startOfToday(), i + 1))
 
   useEffect(() => {
-    appointmentAPI.getById(id).then(r => setAppt(r.data)).catch(() => setAppt(MOCK)).finally(() => setLoading(false))
+    appointmentAPI.getById(id)
+      .then(r => setApt(r.data))
+      .finally(() => setLoading(false))
   }, [id])
 
   useEffect(() => {
-    if (!selectedDate || !appt) return
-    setSlotsLoading(true); setSelectedSlot(null)
-    appointmentAPI.getAvailability(appt.doctorId, format(selectedDate,'yyyy-MM-dd'))
-      .then(r => setBookedSlots(r.data.bookedSlots || [])).catch(() => setBookedSlots([]))
-      .finally(() => setSlotsLoading(false))
-  }, [selectedDate, appt?.doctorId])
+    if (!selectedDate || !apt) return
+    setSloading(true); setSlot(null)
+    appointmentAPI.getAvailability(apt.doctorId, format(selectedDate, 'yyyy-MM-dd'))
+      .then(r => setBooked(r.data.bookedSlots || []))
+      .catch(() => setBooked([]))
+      .finally(() => setSloading(false))
+  }, [selectedDate, apt?.doctorId])
 
-  const handleSubmit = async () => {
-    if (!selectedDate || !selectedSlot) { setError('Please select new date and time.'); return }
-    setError(''); setSubmitting(true)
+  const handleSave = async () => {
+    if (!selectedDate && !selectedSlot) { setError('Select a date or time slot.'); return }
+    setError(''); setSaving(true)
     try {
-      await appointmentAPI.modify(id, { appointmentDate: format(selectedDate,'yyyy-MM-dd'), timeSlot: selectedSlot })
-      setSuccess(true); setTimeout(() => navigate('/appointments'), 2000)
-    } catch (err) { setError(err.response?.data?.message || 'Failed to reschedule.') }
-    finally { setSubmitting(false) }
+      await appointmentAPI.modify(id, {
+        appointmentDate: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined,
+        timeSlot: selectedSlot || undefined,
+        reason,
+      })
+      setSuccess(true)
+      setTimeout(() => navigate('/appointments'), 2000)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Reschedule failed.')
+    } finally { setSaving(false) }
   }
 
-  if (loading) return <div style={{ textAlign:'center', padding:60 }}><span className="spinner spinner-dark" style={{ width:32, height:32 }}/></div>
+  if (loading) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="w-10 h-10 rounded-full border-4 border-teal-100 border-t-teal-500 animate-spin" />
+    </div>
+  )
 
   if (success) return (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh', padding:24 }}>
-      <div className="card fade-up" style={{ padding:'48px 40px', textAlign:'center', maxWidth:400 }}>
-        <div style={{ width:72, height:72, borderRadius:'50%', background:'var(--green-100)', color:'var(--green-500)', fontSize:32, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px' }}>✓</div>
-        <h2 style={{ marginBottom:10 }}>Rescheduled!</h2>
-        <p style={{ color:'var(--gray-500)', marginBottom:24 }}>
-          Moved to <strong>{selectedDate && format(selectedDate,'MMM d, yyyy')}</strong> at <strong>{selectedSlot}</strong>
-        </p>
-        <button className="btn btn-teal" style={{ width:'100%', justifyContent:'center' }} onClick={() => navigate('/appointments')}>Back to Appointments</button>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="card p-10 text-center max-w-sm w-full animate-fade-up">
+        <div className="w-16 h-16 rounded-full bg-green-100 text-green-500 text-3xl flex items-center justify-center mx-auto mb-5">✓</div>
+        <h2 className="font-display font-black text-gray-900 text-2xl mb-2">Rescheduled!</h2>
+        <p className="text-gray-500 text-sm">Your appointment has been updated. Redirecting…</p>
       </div>
     </div>
   )
 
   return (
-    <div style={{ padding:'28px 0 60px' }}>
-      <div className="container" style={{ maxWidth:760 }}>
-        {/* Current */}
-        <div className="card" style={{ padding:'18px 24px', marginBottom:20, display:'flex', alignItems:'center', gap:14 }}>
-          <div style={{ width:44, height:44, borderRadius:10, background:'var(--amber-100)', color:'#92400e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>📅</div>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:14, fontWeight:700, marginBottom:2 }}>{appt?.doctorName}</div>
-            <div style={{ fontSize:13, color:'var(--gray-400)' }}>
-              Current: {appt && format(new Date(appt.appointmentDate),'EEE MMM d, yyyy')} · {appt?.timeSlot}
-            </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-gradient-to-r from-navy-700 to-navy-800 py-8">
+        <div className="max-w-3xl mx-auto px-6 flex items-center gap-4">
+          <button onClick={() => navigate('/appointments')} className="text-white/60 hover:text-white transition-colors">← Back</button>
+          <div>
+            <h1 className="font-display text-2xl font-black text-white">Reschedule Appointment</h1>
+            <p className="text-white/50 text-sm mt-0.5">with {apt?.doctorName}</p>
           </div>
-          <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Back</button>
+        </div>
+      </div>
+
+      <div className="max-w-3xl mx-auto px-6 py-8 space-y-5">
+        {/* Current details */}
+        <div className="card p-5 bg-amber-50 border-amber-200">
+          <p className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-2">Current Appointment</p>
+          <div className="flex flex-wrap gap-4 text-sm text-amber-800">
+            <span>📅 {new Date(apt?.appointmentDate).toDateString()}</span>
+            <span>🕐 {apt?.timeSlot}</span>
+            <span>{apt?.type === 'telemedicine' ? '📹 Video' : '🏥 In-Person'}</span>
+          </div>
         </div>
 
-        {/* Date */}
-        <div className="card" style={{ padding:20, marginBottom:14 }}>
-          <div className="form-label" style={{ marginBottom:12 }}>Select New Date</div>
-          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+        {/* Select New Date */}
+        <div className="card p-5">
+          <p className="form-label mb-3">Select New Date</p>
+          <div className="flex gap-2 flex-wrap">
             {dates.map(d => {
               const active = selectedDate?.toDateString() === d.toDateString()
               return (
-                <button key={d.toISOString()} onClick={() => setSelectedDate(d)} style={{
-                  display:'flex', flexDirection:'column', alignItems:'center',
-                  padding:'9px 11px', borderRadius:10, minWidth:52,
-                  border:`1.5px solid ${active ? 'var(--teal-400)' : 'var(--gray-200)'}`,
-                  background: active ? 'var(--teal-500)' : '#fff',
-                  cursor:'pointer', fontFamily:'var(--font-body)', transition:'all .15s',
-                }}>
-                  <span style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', color: active ? 'rgba(255,255,255,.7)' : 'var(--gray-400)' }}>{format(d,'EEE')}</span>
-                  <span style={{ fontSize:20, fontWeight:800, fontFamily:'var(--font-display)', color: active ? '#fff' : 'var(--gray-800)', lineHeight:1.1 }}>{format(d,'d')}</span>
-                  <span style={{ fontSize:10, color: active ? 'rgba(255,255,255,.6)' : 'var(--gray-400)' }}>{format(d,'MMM')}</span>
+                <button key={d.toISOString()} onClick={() => setDate(d)}
+                  className={`flex flex-col items-center px-3 py-2 rounded-xl border transition-all min-w-[52px] ${
+                    active ? 'bg-teal-500 border-teal-500 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-teal-300'
+                  }`}>
+                  <span className="text-[10px] font-bold uppercase opacity-70">{format(d,'EEE')}</span>
+                  <span className="text-xl font-black font-display leading-tight">{format(d,'d')}</span>
+                  <span className="text-[10px] opacity-70">{format(d,'MMM')}</span>
                 </button>
               )
             })}
           </div>
         </div>
 
-        {/* Slots */}
+        {/* Select Time Slot */}
         {selectedDate && (
-          <div className="card fade-up" style={{ padding:20, marginBottom:14 }}>
-            <div className="form-label" style={{ marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
-              New Time Slot {slotsLoading && <span className="spinner spinner-dark" style={{ width:14, height:14 }}/>}
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(130px,1fr))', gap:8 }}>
+          <div className="card p-5 animate-fade-up">
+            <p className="form-label mb-3 flex items-center gap-2">
+              Select New Time Slot
+              {sloading && <span className="w-3 h-3 rounded-full border-2 border-teal-200 border-t-teal-500 animate-spin" />}
+            </p>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {TIME_SLOTS.map(slot => {
                 const booked = bookedSlots.includes(slot), active = selectedSlot === slot
                 return (
-                  <button key={slot} disabled={booked} onClick={() => !booked && setSelectedSlot(slot)} style={{
-                    padding:'9px', borderRadius:8, fontSize:13, fontWeight:600,
-                    border:`1.5px solid ${active ? 'var(--teal-400)' : booked ? 'var(--gray-100)' : 'var(--gray-200)'}`,
-                    background: active ? 'var(--teal-500)' : booked ? 'var(--gray-50)' : '#fff',
-                    color: active ? '#fff' : booked ? 'var(--gray-300)' : 'var(--gray-700)',
-                    cursor: booked ? 'not-allowed' : 'pointer',
-                    fontFamily:'var(--font-body)', transition:'all .15s', textAlign:'center',
-                  }}>
-                    {slot}{booked && <div style={{ fontSize:10, color:'var(--gray-400)' }}>Booked</div>}
+                  <button key={slot} disabled={booked} onClick={() => setSlot(slot)}
+                    className={`py-2 px-1 rounded-xl text-xs font-semibold border transition-all text-center ${
+                      active  ? 'bg-teal-500 border-teal-500 text-white' :
+                      booked  ? 'bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed' :
+                                'bg-white border-gray-200 text-gray-700 hover:border-teal-300'
+                    }`}>
+                    {slot}
+                    {booked && <div className="text-[9px] text-gray-300">Booked</div>}
                   </button>
                 )
               })}
@@ -127,10 +141,19 @@ export default function RescheduleAppointment() {
           </div>
         )}
 
-        {error && <div className="alert alert-error" style={{ marginBottom:14 }}>⚠️ {error}</div>}
+        {/* Notes */}
+        <div className="card p-5">
+          <label className="form-label">Notes (optional)</label>
+          <textarea rows={3} value={reason} onChange={e => setReason(e.target.value)}
+            placeholder="Reason for rescheduling…"
+            className="form-input mt-1.5 resize-none" />
+        </div>
 
-        <button className="btn btn-teal btn-lg" style={{ width:'100%', justifyContent:'center' }} disabled={submitting || !selectedDate || !selectedSlot} onClick={handleSubmit}>
-          {submitting ? <><span className="spinner"/> Saving…</> : 'Confirm Reschedule'}
+        {error && <div className="alert alert-error">{error}</div>}
+
+        <button onClick={handleSave} disabled={saving || (!selectedDate && !selectedSlot)}
+          className="w-full btn btn-teal btn-lg justify-center disabled:opacity-50">
+          {saving ? <><span className="spinner" /> Saving…</> : 'Confirm Reschedule →'}
         </button>
       </div>
     </div>

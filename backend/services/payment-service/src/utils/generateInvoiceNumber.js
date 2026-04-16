@@ -10,4 +10,4 @@ const generateInvoiceNumber = () => {
   return `INV-${yyyy}${mm}${dd}-${random}`;
 };
 
-module.exports = generateInvoiceNumber;
+export default generateInvoiceNumber;

@@ -1,4 +1,4 @@
-const twilio = require('twilio');
+import twilio from 'twilio';
 
 let twilioClient = null;
 
@@ -16,7 +16,7 @@ const getClient = () => {
 
 /**
  * Send an SMS notification.
- * @param {string} to - Recipient phone number (e.g. +94771234567)
+ * @param {string} to   - Recipient phone number (e.g. +94771234567)
  * @param {string} body - SMS message body
  */
 const sendSMS = async (to, body) => {
@@ -42,13 +42,18 @@ const sendSMS = async (to, body) => {
 
 // ── SMS Message Builders ───────────────────────────────────────
 
+const safeDate = (d) => (d ? new Date(d).toDateString() : 'N/A');
+
 const buildBookingSMS = (data) =>
-  `Healthcare Platform: Hi ${data.recipientName}, your appointment with ${data.doctorName} on ${new Date(data.appointmentDate).toDateString()} at ${data.timeSlot} is confirmed. ID: ${data.appointmentId}`;
+  `MEDIGO: Hi ${data.recipientName}, your appointment with ${data.doctorName || 'your doctor'} on ${safeDate(data.appointmentDate)} at ${data.timeSlot || 'N/A'} is received. ID: ${data.appointmentId || 'N/A'}`;
 
 const buildCancellationSMS = (data) =>
-  `Healthcare Platform: Hi ${data.recipientName}, your appointment on ${new Date(data.appointmentDate).toDateString()} at ${data.timeSlot} has been cancelled. Reason: ${data.cancellationReason}`;
+  `MEDIGO: Hi ${data.recipientName}, your appointment on ${safeDate(data.appointmentDate)} at ${data.timeSlot || 'N/A'} has been cancelled. Reason: ${data.cancellationReason || 'N/A'}`;
 
 const buildUpdateSMS = (data) =>
-  `Healthcare Platform: Hi ${data.recipientName}, your appointment has been rescheduled to ${new Date(data.appointmentDate).toDateString()} at ${data.timeSlot}.`;
+  `MEDIGO: Hi ${data.recipientName}, your appointment has been rescheduled to ${safeDate(data.appointmentDate)} at ${data.timeSlot || 'N/A'}.`;
 
-module.exports = { sendSMS, buildBookingSMS, buildCancellationSMS, buildUpdateSMS };
+const buildPaymentSMS = (data) =>
+  `MEDIGO: Hi ${data.patientName || 'Patient'}, your payment of ${data.currency || 'LKR'} ${data.amount || 0} is confirmed. Appointment with ${data.doctorName || 'your doctor'} on ${safeDate(data.appointmentDate)} at ${data.timeSlot || 'N/A'}. Invoice: ${data.invoiceNumber || 'N/A'}`;
+
+export { sendSMS, buildBookingSMS, buildCancellationSMS, buildUpdateSMS, buildPaymentSMS };

@@ -1,5 +1,25 @@
 import Doctor from "../models/Doctor.js";
 
+// @desc    Get all pending doctors
+// @route   GET /api/doctors/pending
+export const getPendingDoctors = async (req, res) => {
+  try {
+    const doctors = await Doctor.find({ status: "pending" }).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: doctors.length,
+      data: doctors
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch pending doctors",
+      error: error.message
+    });
+  }
+};
+
 // @desc    Create new doctor
 // @route   POST /api/doctors
 export const createDoctor = async (req, res) => {
@@ -14,7 +34,9 @@ export const createDoctor = async (req, res) => {
       clinicLocation,
       consultationFee,
       bio,
-      status
+      status,
+      authUserId,
+      userId
     } = req.body;
 
     const existingDoctor = await Doctor.findOne({ email });
@@ -36,7 +58,9 @@ export const createDoctor = async (req, res) => {
       clinicLocation,
       consultationFee,
       bio,
-      status
+      status,
+      authUserId,
+      userId
     });
 
     res.status(201).json({

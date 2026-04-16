@@ -2,6 +2,14 @@ import mongoose from "mongoose";
 
 const doctorSchema = new mongoose.Schema(
   {
+    authUserId: {
+      type: String, // Identity ID from Auth Service
+      default: null
+    },
+    userId: {
+      type: String, // Serial ID (e.g. D001) from Auth Service
+      default: null
+    },
     fullName: {
       type: String,
       required: true,

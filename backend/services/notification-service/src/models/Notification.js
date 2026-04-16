@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const notificationSchema = new mongoose.Schema(
   {
@@ -17,7 +17,17 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['appointment_booked', 'appointment_cancelled', 'appointment_updated'],
+      // Extended to cover payment notification types too
+      enum: [
+        'appointment_booked',
+        'appointment_cancelled',
+        'appointment_updated',
+        'payment_success',
+        'payment_pending',
+        'payment_rejected',
+        'payment_confirmed',
+        'payment_notification',
+      ],
       required: true,
     },
     channel: {
@@ -44,4 +54,6 @@ const notificationSchema = new mongoose.Schema(
 notificationSchema.index({ appointmentId: 1 });
 notificationSchema.index({ recipientEmail: 1 });
 
-module.exports = mongoose.model('Notification', notificationSchema);
+const Notification = mongoose.model('Notification', notificationSchema);
+
+export default Notification;

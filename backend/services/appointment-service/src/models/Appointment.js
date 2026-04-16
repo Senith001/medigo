@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const appointmentSchema = new mongoose.Schema(
   {
@@ -13,6 +13,10 @@ const appointmentSchema = new mongoose.Schema(
     patientEmail: {
       type: String,
       required: [true, 'Patient email is required'],
+    },
+    patientPhone: {
+      type: String,
+      default: null,
     },
     doctorId: {
       type: String,
@@ -30,12 +34,10 @@ const appointmentSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Specialty is required'],
     },
-    
     hospital: {
       type: String,
       default: null,
     },
-  
     appointmentDate: {
       type: Date,
       required: [true, 'Appointment date is required'],
@@ -77,7 +79,7 @@ const appointmentSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ['unpaid', 'paid', 'refunded'],
+      enum: ['unpaid', 'processing', 'paid', 'refunded'],
       default: 'unpaid',
     },
     meetingLink: {
@@ -93,6 +95,11 @@ const appointmentSchema = new mongoose.Schema(
 appointmentSchema.index({ patientId: 1, appointmentDate: -1 });
 appointmentSchema.index({ doctorId: 1, appointmentDate: 1 });
 appointmentSchema.index({ status: 1 });
-appointmentSchema.index({ appointmentDate: 1, doctorId: 1, timeSlot: 1 }, { unique: true });
+appointmentSchema.index(
+  { appointmentDate: 1, doctorId: 1, timeSlot: 1 },
+  { unique: true, partialFilterExpression: { status: { $in: ['pending', 'confirmed'] } } }
+);
 
-module.exports = mongoose.model('Appointment', appointmentSchema);
+const Appointment = mongoose.model('Appointment', appointmentSchema);
+
+export default Appointment;

@@ -1,52 +1,47 @@
-const { body, param } = require("express-validator");
+import { body, param } from "express-validator";
 
-// Rules for creating a new telemedicine session.
 const createSessionValidation = [
   body("appointmentId").notEmpty().withMessage("Appointment ID is required"),
   body("patientId").notEmpty().withMessage("Patient ID is required"),
   body("patientName").notEmpty().withMessage("Patient name is required"),
   body("doctorId").notEmpty().withMessage("Doctor ID is required"),
   body("doctorName").notEmpty().withMessage("Doctor name is required"),
-  body("type")
-    .equals("telemedicine")
-    .withMessage("Only telemedicine appointments can create a session"),
   body("scheduledAt")
-    .optional({ values: "falsy" })
+    .optional({ checkFalsy: true })
     .isISO8601()
-    .withMessage("scheduledAt must be a valid date"),
+    .withMessage("scheduledAt must be a valid ISO8601 date."),
 ];
 
-// Rules for routes that use a session MongoDB id.
 const sessionIdValidation = [
   param("id").notEmpty().withMessage("Session ID is required"),
 ];
 
-// Rules for updating editable session fields.
 const updateSessionValidation = [
   param("id").notEmpty().withMessage("Session ID is required"),
   body("patientName")
     .optional()
-    .isString()
-    .withMessage("Patient name must be a string"),
+    .notEmpty()
+    .withMessage("Patient name cannot be empty."),
   body("doctorName")
     .optional()
-    .isString()
-    .withMessage("Doctor name must be a string"),
+    .notEmpty()
+    .withMessage("Doctor name cannot be empty."),
   body("scheduledAt")
-    .optional({ values: "falsy" })
+    .optional({ checkFalsy: true })
     .isISO8601()
-    .withMessage("scheduledAt must be a valid date"),
+    .withMessage("scheduledAt must be a valid ISO8601 date."),
 ];
 
-// Rules for changing the session lifecycle status.
 const updateSessionStatusValidation = [
   param("id").notEmpty().withMessage("Session ID is required"),
   body("status")
+    .notEmpty()
+    .withMessage("Status is required.")
     .isIn(["scheduled", "waiting", "active", "ended", "cancelled"])
-    .withMessage("Invalid status"),
+    .withMessage("Invalid status value."),
 ];
 
-module.exports = {
+export {
   createSessionValidation,
   sessionIdValidation,
   updateSessionValidation,

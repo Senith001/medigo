@@ -1,38 +1,25 @@
-const TelemedicineSession = require("../models/TelemedicineSession");
-const generateRoomName = require("../utils/generateRoomName");
-const { generateJitsiMeetingLink } = require("../services/jitsiService");
+import TelemedicineSession from "../models/TelemedicineSession.js";
+import generateRoomName from "../utils/generateRoomName.js";
+import { generateJitsiMeetingLink } from "../services/jitsiService.js";
 
-// Check whether the current user is allowed to view or join this session.
-const canAccessSession = (session, user) => {
-  return (
-    user.role === "admin" ||
-    session.patientId === user.userId ||
-    session.doctorId === user.userId
-  );
-};
-
-// Only sessions that have not started yet can be updated or deleted.
-const isUpcomingSession = (session) => {
-  const allowedStatuses = ["scheduled", "waiting"];
-
-  if (!allowedStatuses.includes(session.status)) {
-    return false;
-  }
-
-  if (session.scheduledAt && new Date(session.scheduledAt) <= new Date()) {
-    return false;
-  }
-
-  return true;
-};
-
-// Define which status changes are allowed from each current status.
+// Helper: keep track of valid state jumps to avoid logic errors.
 const allowedStatusTransitions = {
-  scheduled: ["waiting", "active", "cancelled"],
-  waiting: ["active", "ended", "cancelled"],
+  scheduled: ["waiting", "cancelled"],
+  waiting: ["active", "cancelled"],
   active: ["ended"],
   ended: [],
   cancelled: [],
+};
+
+// Helper: only allow interaction if the session has not started its end-of-life status.
+const isUpcomingSession = (session) => {
+  return ["scheduled", "waiting"].includes(session.status);
+};
+
+// Helper: check record ownership based on ID and role.
+const canAccessSession = (session, user) => {
+  if (user.role === "admin") return true;
+  return session.patientId === user.userId || session.doctorId === user.userId;
 };
 
 const createSession = async (req, res) => {
@@ -43,41 +30,20 @@ const createSession = async (req, res) => {
       patientName,
       doctorId,
       doctorName,
-      type,
       scheduledAt,
     } = req.body;
 
-    if (
-      !appointmentId ||
-      !patientId ||
-      !patientName ||
-      !doctorId ||
-      !doctorName ||
-      !type
-    ) {
-      return res.status(400).json({
-        message: "All required session fields must be provided.",
-      });
-    }
-
-    // For now, telemedicine-service only creates sessions for telemedicine appointments.
-    if (type !== "telemedicine") {
-      return res.status(400).json({
-        message: "Only telemedicine appointments can create a session.",
-      });
-    }
-
-    // Prevent duplicate sessions for the same appointment.
-    const existingSession = await TelemedicineSession.findOne({ appointmentId });
+    const existingSession = await TelemedicineSession.findOne({
+      appointmentId,
+    });
 
     if (existingSession) {
-      return res.status(200).json({
-        message: "Session already exists for this appointment.",
+      return res.status(409).json({
+        message: "A session already exists for this appointment.",
         session: existingSession,
       });
     }
 
-    // Build the room name first, then generate the Jitsi link from it.
     const roomName = generateRoomName(appointmentId, doctorId, patientId);
     const meetingLink = generateJitsiMeetingLink(roomName);
 
@@ -89,7 +55,6 @@ const createSession = async (req, res) => {
       doctorName,
       roomName,
       meetingLink,
-      status: "scheduled",
       scheduledAt: scheduledAt || null,
     });
 
@@ -118,7 +83,6 @@ const getSessionById = async (req, res) => {
       return res.status(403).json({ message: "Access denied." });
     }
 
-    // Return the full session if the current user belongs to it.
     return res.status(200).json(session);
   } catch (error) {
     console.error("getSessionById error:", error.message);
@@ -129,15 +93,14 @@ const getSessionById = async (req, res) => {
 
 const getSessionByAppointmentId = async (req, res) => {
   try {
-    // This is useful when the frontend only knows the appointment id.
     const session = await TelemedicineSession.findOne({
       appointmentId: req.params.appointmentId,
     });
 
     if (!session) {
-      return res.status(404).json({
-        message: "Session not found for appointment.",
-      });
+      return res
+        .status(404)
+        .json({ message: "No session found for this appointment." });
     }
 
     if (!canAccessSession(session, req.user)) {
@@ -353,7 +316,7 @@ const deleteSession = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
   createSession,
   getSessionById,
   getSessionByAppointmentId,

@@ -1,4 +1,4 @@
-const jwt = require("jsonwebtoken");
+import jwt from "jsonwebtoken";
 
 // Check the user and attach their data to req.user.
 const protect = (req, res, next) => {
@@ -48,7 +48,7 @@ const authorize = (...roles) => {
   };
 };
 
-module.exports = {
+export {
   protect,
   authorize,
 };

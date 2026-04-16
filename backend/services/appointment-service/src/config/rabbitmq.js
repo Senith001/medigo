@@ -1,4 +1,4 @@
-const amqp = require('amqplib');
+import amqp from 'amqplib';
 
 let channel = null;
 
@@ -7,16 +7,16 @@ const connectRabbitMQ = async () => {
     const connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://localhost:5672');
     channel = await connection.createChannel();
 
-    // Declare exchanges and queues
+    // Declare exchange and queues
     await channel.assertExchange('appointment_events', 'topic', { durable: true });
-    await channel.assertQueue('appointment.booked', { durable: true });
+    await channel.assertQueue('appointment.booked',    { durable: true });
     await channel.assertQueue('appointment.cancelled', { durable: true });
-    await channel.assertQueue('appointment.updated', { durable: true });
+    await channel.assertQueue('appointment.updated',   { durable: true });
 
     // Bind queues to exchange
-    await channel.bindQueue('appointment.booked', 'appointment_events', 'appointment.booked');
+    await channel.bindQueue('appointment.booked',    'appointment_events', 'appointment.booked');
     await channel.bindQueue('appointment.cancelled', 'appointment_events', 'appointment.cancelled');
-    await channel.bindQueue('appointment.updated', 'appointment_events', 'appointment.updated');
+    await channel.bindQueue('appointment.updated',   'appointment_events', 'appointment.updated');
 
     console.log('RabbitMQ connected and queues ready');
 
@@ -46,4 +46,4 @@ const publishEvent = async (routingKey, payload) => {
   }
 };
 
-module.exports = { connectRabbitMQ, publishEvent };
+export { connectRabbitMQ, publishEvent };

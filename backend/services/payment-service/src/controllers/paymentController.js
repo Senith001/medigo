@@ -1,12 +1,11 @@
-const Payment = require("../models/Payment");
-const axios = require("axios");
-const generateInvoiceNumber = require("../utils/generateInvoiceNumber");
-const {
+import Payment from "../models/Payment.js";
+import axios from "axios";
+import generateInvoiceNumber from "../utils/generateInvoiceNumber.js";
+import {
   createCheckoutSession,
   retrieveCheckoutSession,
   createRefund,
-} = require("../services/stripeService");
-
+} from "../services/stripeService.js";
 
 // Helper: sync appointment paymentStatus to appointment-service
 const syncAppointmentPayment = async (appointmentId, paymentStatus) => {
@@ -548,7 +547,7 @@ const refundPayment = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
   createPayment,
   createBankTransferPayment,
   handlePaymentSuccess,

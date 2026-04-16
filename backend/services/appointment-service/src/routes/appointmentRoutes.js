@@ -1,27 +1,45 @@
-const express = require('express');
-const router = express.Router();
-const { body, param, query } = require('express-validator');
-const { authenticate, authorize } = require('../middleware/auth');
-const validate = require('../middleware/validate');
-const {
+import express from 'express';
+import { body, param, query } from 'express-validator';
+import { authenticate, authorize } from '../middleware/auth.js';
+import validate from '../middleware/validate.js';
+import {
   bookAppointment,
   getMyAppointments,
   getAppointmentById,
   modifyAppointment,
   cancelAppointment,
   updateAppointmentStatus,
+  updatePaymentStatus,
   getDoctorAvailability,
+  getDoctorSchedule,
   searchDoctorsBySpecialty,
   getAllAppointments,
-} = require('../controllers/appointmentController');
+  getInternalAppointmentDetails,
+} from '../controllers/appointmentController.js';
 
-// Search doctors by specialty
+const router = express.Router();
+
+// ── Internal (service-to-service only) ───────────────────────
+const verifyInternalService = (req, res, next) => {
+  const secret = req.headers['x-service-secret'];
+  if (!secret || secret !== process.env.SERVICE_SECRET) {
+    return res.status(403).json({ message: 'Unauthorized internal service call.' });
+  }
+  next();
+};
+
+router.put('/internal/payment-status', verifyInternalService, updatePaymentStatus);
+router.get('/internal/:id', verifyInternalService, getInternalAppointmentDetails);
+
+// Search doctors by specialty (proxied through appointment-service)
 router.get('/search', authenticate, searchDoctorsBySpecialty);
+
+// Admin: get all appointments
+router.get('/admin/all', authenticate, authorize('admin'), getAllAppointments);
 
 // Get doctor's booked slots for a date
 router.get(
   '/doctor/:doctorId/availability',
-  authenticate,
   [
     param('doctorId').notEmpty().withMessage('Doctor ID is required'),
     query('date').notEmpty().isISO8601().withMessage('Valid date is required'),
@@ -30,8 +48,19 @@ router.get(
   getDoctorAvailability
 );
 
+// Get merged schedule: doctor-service availability + booked appointments
+router.get(
+  '/doctor/:doctorId/schedule',
+  [
+    param('doctorId').notEmpty().withMessage('Doctor ID is required'),
+    query('date').notEmpty().isISO8601().withMessage('Valid date is required'),
+  ],
+  validate,
+  getDoctorSchedule
+);
+
 // Book an appointment (patient only)
-// doctorName, doctorEmail, specialty auto-fetched from doctor-service
+// doctorName, doctorEmail, specialty, hospital, fee auto-fetched from doctor-service
 router.post(
   '/',
   authenticate,
@@ -48,9 +77,6 @@ router.post(
 
 // Get all appointments for the current user
 router.get('/', authenticate, getMyAppointments);
-
-// Admin: get all appointments
-router.get('/admin/all', authenticate, authorize('admin'), getAllAppointments);
 
 // Get a specific appointment
 router.get('/:id', authenticate, getAppointmentById);
@@ -90,4 +116,4 @@ router.put(
   updateAppointmentStatus
 );
 
-module.exports = router;
+export default router;

@@ -1,11 +1,11 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const connectDB = require('./config/db');
-const appointmentRoutes = require('./routes/appointmentRoutes');
-const { connectRabbitMQ } = require('./config/rabbitmq');
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import connectDB from './config/db.js';
+import { connectRabbitMQ } from './config/rabbitmq.js';
+import appointmentRoutes from './routes/appointmentRoutes.js';
 
 const app = express();
 
@@ -36,7 +36,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 3003;
+const PORT = process.env.PORT || 5003;
 
 const start = async () => {
   await connectDB();
@@ -47,5 +47,3 @@ const start = async () => {
 };
 
 start();
-
-module.exports = app;

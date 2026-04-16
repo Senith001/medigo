@@ -1,11 +1,12 @@
 {
   "name": "payment-service",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "src/server.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node src/server.js",
-    "dev": "node src/server.js"
+    "dev": "nodemon src/server.js"
   },
   "keywords": [],
   "author": "",
@@ -21,6 +22,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.3.3",
     "multer": "^2.0.2",
+    "multer-gridfs-storage": "^5.0.2",
     "stripe": "^21.0.0"
   }
 }
