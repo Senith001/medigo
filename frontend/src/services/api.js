@@ -1,5 +1,15 @@
 import axios from 'axios'
 
+// Service URLs (Local Dev Environment)
+const AUTH_URL     = 'http://localhost:5001'
+const PATIENT_URL  = 'http://localhost:5002'
+const ADMIN_URL    = 'http://localhost:5003'
+const DOCTOR_URL   = 'http://localhost:5004'
+const APPT_URL     = 'http://localhost:5005'
+const REPORT_URL   = 'http://localhost:5006'
+const PAYMENT_URL  = 'http://localhost:5007'
+const TELE_URL     = 'http://localhost:5008'
+
 const api = axios.create({ baseURL: '/api', headers: { 'Content-Type': 'application/json' } })
 
 api.interceptors.request.use((config) => {
@@ -13,104 +23,89 @@ api.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401) { 
       localStorage.removeItem('token'); 
-      
       const currentPath = window.location.pathname;
-      
-      // FIX 2: Don't redirect if they are already on ANY login page
       if (currentPath !== '/login' && currentPath !== '/admin-login') {
-        
-        // If they were in the admin section, boot them to admin-login
-        if (currentPath.startsWith('/admin')) {
-          window.location.href = '/admin-login';
-        } else {
-          // Otherwise, boot them to the regular patient login
-          window.location.href = '/login'; 
-        }
+        window.location.href = currentPath.startsWith('/admin') ? '/admin-login' : '/login';
       }
     }
     return Promise.reject(err);
   }
 );
 
-//===============================================================================
-//                    Auth Service APIs (Port 5001)
-//===============================================================================
+// ── Auth Service ──────────────────────────────────────────────
 export const authAPI = {
-  login:            (data) => api.post('http://localhost:5001/api/auth/login', data),
-  register:         (data) => api.post('http://localhost:5001/api/auth/register/patient', data),
-  verifyOtp:        (data) => api.post('http://localhost:5001/api/auth/verify-otp', data),
-  getMe:            () => api.get('http://localhost:5001/api/auth/me'),
-  changePassword:   (data) => api.put('http://localhost:5001/api/auth/change-password', data),
-  requestDeleteOtp: () => api.post('http://localhost:5001/api/auth/me/request-delete-otp'),
-  deleteMyAccount:  (data) => api.delete('http://localhost:5001/api/auth/me', { data }),
-  setupAdminPassword: (data) => api.post('http://localhost:5001/api/auth/setup-password', data),
+  login:            (data) => api.post(`${AUTH_URL}/api/auth/login`, data),
+  register:         (data) => api.post(`${AUTH_URL}/api/auth/register/patient`, data),
+  verifyOtp:        (data) => api.post(`${AUTH_URL}/api/auth/verify-otp`, data),
+  getMe:            () => api.get(`${AUTH_URL}/api/auth/me`),
+  changePassword:   (data) => api.put(`${AUTH_URL}/api/auth/change-password`, data),
+  requestDeleteOtp: () => api.post(`${AUTH_URL}/api/auth/me/request-delete-otp`),
+  deleteMyAccount:  (data) => api.delete(`${AUTH_URL}/api/auth/me`, { data }),
+  setupAdminPassword: (data) => api.post(`${AUTH_URL}/api/auth/setup-password`, data),
 }
 
-//===============================================================================
-//                    Appointment Service APIs (Port 5005)
-//===============================================================================
-export const appointmentAPI = {
-  book:            (data)       => api.post(`${APPT_URL}/appointments`, data),
-  getAll:          (params)     => api.get(`${APPT_URL}/appointments`, { params }),
-  getById:         (id)         => api.get(`${APPT_URL}/appointments/${id}`),
-  modify:          (id, data)   => api.put(`${APPT_URL}/appointments/${id}`, data),
-  cancel:          (id, reason) => api.put(`${APPT_URL}/appointments/${id}/cancel`, { reason }),
-  updateStatus:    (id, data)   => api.put(`${APPT_URL}/appointments/${id}/status`, data),
-  getAvailability: (doctorId, date) => api.get(`${APPT_URL}/appointments/doctor/${doctorId}/availability`, { params: { date } }),
-  searchDoctors:   (specialty)  => api.get(`${APPT_URL}/appointments/search`, { params: { specialty } }),
-}
-
-//===============================================================================
-//                    Admin Service APIs (Port 5003)
-//===============================================================================
+// ── Admin Service ─────────────────────────────────────────────
 export const adminAPI = {
-  getPatients: () => api.get('http://localhost:5003/api/admin/patients'),
-  getPatientById: (id) => api.get(`http://localhost:5003/api/admin/patients/${id}`),
-  deletePatient: (id) => api.delete(`http://localhost:5003/api/admin/patients/${id}`),
-  getDoctors: () => api.get('http://localhost:5003/api/admin/doctors'),
-  updateDoctorStatus: (id, status) => api.patch(`http://localhost:5003/api/admin/doctors/${id}/status`, { status }),
-  getAdminsList: () => api.get('http://localhost:5003/api/admin/list'),
-  createAdmin: (data) => api.post('http://localhost:5003/api/admin/create', data),
-  toggleAdminStatus: (id) => api.patch(`http://localhost:5003/api/admin/admins/${id}/status`),
-  resendInvitation: (id) => api.post(`http://localhost:5003/api/admin/admins/${id}/resend-invitation`),
-  adminLogin: (data) => api.post('http://localhost:5003/api/admin/login', data),
-  bootstrapSuperAdmin: (data, superKey) => api.post('http://localhost:5003/api/admin/bootstrap-superadmin', data, {
+  getPatients: () => api.get(`${ADMIN_URL}/api/admin/patients`),
+  getPatientById: (id) => api.get(`${ADMIN_URL}/api/admin/patients/${id}`),
+  deletePatient: (id) => api.delete(`${ADMIN_URL}/api/admin/patients/${id}`),
+  getDoctors: () => api.get(`${ADMIN_URL}/api/admin/doctors`),
+  updateDoctorStatus: (id, status) => api.patch(`${ADMIN_URL}/api/admin/doctors/${id}/status`, { status }),
+  getAdminsList: () => api.get(`${ADMIN_URL}/api/admin/list`),
+  createAdmin: (data) => api.post(`${ADMIN_URL}/api/admin/create`, data),
+  toggleAdminStatus: (id) => api.patch(`${ADMIN_URL}/api/admin/admins/${id}/status`),
+  resendInvitation: (id) => api.post(`${ADMIN_URL}/api/admin/admins/${id}/resend-invitation`),
+  adminLogin: (data) => api.post(`${ADMIN_URL}/api/admin/login`, data),
+  bootstrapSuperAdmin: (data, superKey) => api.post(`${ADMIN_URL}/api/admin/bootstrap-superadmin`, data, {
     headers: { 'x-admin-super-key': superKey }
   }),
 }
 
-//===============================================================================
-//                    Patient Service APIs (Port 5002)
-//===============================================================================
+// ── Patient Service ───────────────────────────────────────────
 export const patientAPI = {
-  getMyProfile: () => api.get('http://localhost:5002/api/patients/me'),
-  updateMyProfile: (data) => api.put('http://localhost:5002/api/patients/me', data),
+  getMyProfile: () => api.get(`${PATIENT_URL}/api/patients/me`),
+  updateMyProfile: (data) => api.put(`${PATIENT_URL}/api/patients/me`, data),
 }
-//===============================================================================
-//                    Doctor Service APIs (Port 5004)
-//===============================================================================
 
+// ── Appointment Service ───────────────────────────────────────
+export const appointmentAPI = {
+  book:            (data)       => api.post(`${APPT_URL}/api/appointments`, data),
+  getAll:          (params)     => api.get(`${APPT_URL}/api/appointments`, { params }),
+  getById:         (id)         => api.get(`${APPT_URL}/api/appointments/${id}`),
+  modify:          (id, data)   => api.put(`${APPT_URL}/api/appointments/${id}`, data),
+  cancel:          (id, reason) => api.put(`${APPT_URL}/api/appointments/${id}/cancel`, { reason }),
+  updateStatus:    (id, data)   => api.put(`${APPT_URL}/api/appointments/${id}/status`, data),
+  getAvailability: (doctorId, date) => api.get(`${APPT_URL}/api/appointments/doctor/${doctorId}/availability`, { params: { date } }),
+  searchDoctors:   (specialty)  => api.get(`${APPT_URL}/api/appointments/search`, { params: { specialty } }),
+}
 
+// ── Doctor Service ──────────────────────────────────────────── (Re-Integrated)
+export const doctorAPI = {
+  register:    (data) => api.post(`${DOCTOR_URL}/api/doctors`, data),
+  getProfiles: (params) => api.get(`${DOCTOR_URL}/api/doctors`, { params }),
+  getById:     (id)     => api.get(`${DOCTOR_URL}/api/doctors/${id}`),
+}
 
+// ── Payment Service ─────────────────────────────────────────── (Re-Integrated)
+export const paymentAPI = {
+  createSession: (data) => api.post(`${PAYMENT_URL}/api/payments`, data),
+  bankTransfer:  (data) => api.post(`${PAYMENT_URL}/api/payments/bank-transfer`, data, { 
+    headers: { 'Content-Type': 'multipart/form-data' } 
+  }),
+}
 
+// ── Telemedicine Service ────────────────────────────────────── (Re-Integrated)
+export const telemedicineAPI = {
+  create:       (data) => api.post(`${TELE_URL}/api/telemedicine`, data),
+  getByAppt:    (apptId) => api.get(`${TELE_URL}/api/telemedicine/appointment/${apptId}`),
+  join:         (id) => api.put(`${TELE_URL}/api/telemedicine/${id}/join`),
+  updateStatus: (id, status) => api.put(`${TELE_URL}/api/telemedicine/${id}/status`, { status }),
+}
 
-//===============================================================================
-//                    Report Service APIs (Port 5006)
-//===============================================================================
-
-
-
-
-
-//===============================================================================
-//                    Payement Service APIs (Port 5007)
-//===============================================================================
-
-
-
-
-//===============================================================================
-//                    Telemedicine Service APIs (Port 5008)
-//===============================================================================
+// ── Report Service ──────────────────────────────────────────── (Re-Integrated)
+export const reportAPI = {
+  upload:       (data) => api.post(`${REPORT_URL}/api/reports`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  getByPatient: (patientId) => api.get(`${REPORT_URL}/api/reports/patient/${patientId}`),
+}
 
 export default api
