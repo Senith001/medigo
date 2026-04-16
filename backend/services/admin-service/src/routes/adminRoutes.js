@@ -8,6 +8,7 @@ import {
   getPatientById,
   deleteAdminAccount,
   deletePatientAccount,
+  deleteDoctorAccount,
   getDoctors,
   updateDoctorStatus,
   toggleAdminStatus,
@@ -39,5 +40,6 @@ router.delete("/patients/:id", protect, authorize("admin", "superadmin"), delete
 // Doctor Management
 router.get("/doctors", protect, authorize("admin", "superadmin"), getDoctors);
 router.patch("/doctors/:id/status", protect, authorize("admin", "superadmin"), updateDoctorStatus);
+router.delete("/doctors/:id", protect, authorize("admin", "superadmin"), deleteDoctorAccount);
 
-export default router;
+export default router;

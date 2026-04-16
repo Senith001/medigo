@@ -51,6 +51,7 @@ export const adminAPI = {
   deletePatient: (id) => api.delete(`${ADMIN_URL}/api/admin/patients/${id}`),
   getDoctors: () => api.get(`${ADMIN_URL}/api/admin/doctors`),
   updateDoctorStatus: (id, status) => api.patch(`${ADMIN_URL}/api/admin/doctors/${id}/status`, { status }),
+  deleteDoctor: (id) => api.delete(`${ADMIN_URL}/api/admin/doctors/${id}`),
   getAdminsList: () => api.get(`${ADMIN_URL}/api/admin/list`),
   createAdmin: (data) => api.post(`${ADMIN_URL}/api/admin/create`, data),
   toggleAdminStatus: (id) => api.patch(`${ADMIN_URL}/api/admin/admins/${id}/status`),
@@ -84,6 +85,9 @@ export const doctorAPI = {
   register:    (data) => api.post(`${DOCTOR_URL}/api/doctors`, data),
   getProfiles: (params) => api.get(`${DOCTOR_URL}/api/doctors`, { params }),
   getById:     (id)     => api.get(`${DOCTOR_URL}/api/doctors/${id}`),
+  getAvailability: (doctorId) => api.get(`${DOCTOR_URL}/api/doctors/${doctorId}/availability`),
+  addAvailability: (doctorId, data) => api.post(`${DOCTOR_URL}/api/doctors/${doctorId}/availability`, data),
+  deleteAvailability: (id) => api.delete(`${DOCTOR_URL}/api/doctors/availability/${id}`),
 }
 
 // ── Payment Service ─────────────────────────────────────────── (Re-Integrated)

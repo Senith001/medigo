@@ -1,11 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { 
+  Users, Stethoscope, Landmark, TrendingUp, 
+  ChevronRight, MoreVertical, Search, ExternalLink,
+  ShieldCheck, AlertCircle, CheckCircle2, XCircle,
+  Calendar, ArrowUpRight, ArrowDownRight
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { adminAPI } from '../../services/api';
+import DashboardLayout from '../../components/DashboardLayout';
+import Button from '../../components/ui/Button';
 
 const STATUS_STYLES = {
-  pending:  { bg: '#fff7ed', color: '#c2410c', activeBg: '#ea580c', label: 'Pending' },
-  verified: { bg: '#f0fdf4', color: '#15803d', activeBg: '#16a34a', label: 'Verified' },
-  rejected: { bg: '#fef2f2', color: '#b91c1c', activeBg: '#dc2626', label: 'Rejected' },
+  pending:  { 
+    bg: 'bg-amber-50', 
+    text: 'text-amber-700', 
+    border: 'border-amber-100',
+    activeBg: 'bg-amber-600', 
+    label: 'Pending Approval' 
+  },
+  verified: { 
+    bg: 'bg-emerald-50', 
+    text: 'text-emerald-700', 
+    border: 'border-emerald-100',
+    activeBg: 'bg-emerald-600', 
+    label: 'Verified Member' 
+  },
+  rejected: { 
+    bg: 'bg-red-50', 
+    text: 'text-red-700', 
+    border: 'border-red-100',
+    activeBg: 'bg-red-600', 
+    label: 'Rejected' 
+  },
 };
 
 export default function AdminDashboard() {
@@ -13,19 +40,23 @@ export default function AdminDashboard() {
   const [pendingDoctors, setPendingDoctors] = useState([]);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    adminAPI.getPatients()
-      .then(res => { if (res.data.success) setPatientCount(res.data.data.length); })
-      .catch(err => console.error('Failed to fetch patient count', err));
-
-    adminAPI.getDoctors()
-      .then(res => {
-        if (res.data.success) {
-          setPendingDoctors(res.data.data.filter(d => d.status === 'pending'));
-        }
-      })
-      .catch(err => console.error('Failed to fetch doctors', err));
+    setLoading(true);
+    Promise.all([
+      adminAPI.getPatients(),
+      adminAPI.getDoctors()
+    ]).then(([patientRes, doctorRes]) => {
+      if (patientRes.data.success) setPatientCount(patientRes.data.data.length);
+      if (doctorRes.data.success) {
+        setPendingDoctors(doctorRes.data.data.filter(d => d.status === 'pending'));
+      }
+    }).catch(err => {
+      console.error('Admin Dashboard Sync Error:', err);
+    }).finally(() => {
+      setLoading(false);
+    });
   }, []);
 
   const handleStatusChange = async (id, newStatus) => {
@@ -33,7 +64,6 @@ export default function AdminDashboard() {
     try {
       const res = await adminAPI.updateDoctorStatus(id, newStatus);
       if (res.data.success) {
-        // If we changed away from pending, remove from pending list
         if (newStatus !== 'pending') {
           setPendingDoctors(prev => prev.filter(d => d._id !== id));
           setSelectedDoctor(null);
@@ -42,283 +72,289 @@ export default function AdminDashboard() {
         }
       }
     } catch (err) {
-      alert('Failed to update status: ' + (err.response?.data?.message || err.message));
+      alert('Verification Error: ' + (err.response?.data?.message || err.message));
     } finally {
       setUpdatingId(null);
     }
   };
 
+  const stats = [
+    { label: 'Active Patients', val: patientCount || '0', icon: Users, color: 'text-blue-600', trend: '+12%', up: true },
+    { label: 'New Revenue', val: 'Rs. 42k', icon: Landmark, color: 'text-emerald-600', trend: '+5.4', up: true },
+    { label: 'Platform Growth', val: '18%', icon: TrendingUp, color: 'text-indigo-600', trend: '-2%', up: false },
+  ];
+
   return (
-    <div style={{ display: 'flex', gap: '20px' }}>
-      
-      {/* Left Column */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        
-        {/* Stat Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
-          
-          {/* Card 1 - Patient Count */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#efecff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6366f1', fontSize: '1.2rem' }}>
-                  👥
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1rem', color: '#1e293b' }}>Patient Count</h3>
-                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#94a3b8' }}>Track total patients</p>
-                </div>
+    <DashboardLayout isAdmin={true}>
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-7xl mx-auto space-y-8"
+      >
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+           <div className="space-y-1">
+              <h1 className="text-3xl font-black text-medigo-navy tracking-tight italic">Platform Command</h1>
+              <p className="text-slate-500 font-medium">Monitoring MediGo health network operations and verifications.</p>
+           </div>
+           
+           <div className="flex items-center gap-3">
+              <div className="px-4 py-2 bg-white border border-slate-100 rounded-xl shadow-sm flex items-center gap-2">
+                 <ShieldCheck size={16} className="text-medigo-mint" />
+                 <span className="text-xs font-black text-medigo-navy uppercase tracking-widest">Admin Secure Mode</span>
               </div>
-              <Link to="/admin/patients" style={{ color: '#4f46e5', textDecoration: 'none', fontSize: '1.2rem', lineHeight: 1, cursor: 'pointer' }} title="View all patients">↗</Link>
-            </div>
-            <h2 style={{ margin: 0, fontSize: '2rem', color: '#1e293b' }}>{patientCount === null ? '...' : patientCount}</h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem' }}>
-              <span style={{ backgroundColor: '#e0e7ff', color: '#4f46e5', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold' }}>Total Registered</span>
-              <span style={{ color: '#64748b' }}>Active system patients</span>
-            </div>
-          </div>
-
-          {/* Card 2 - Monthly Revenue */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0ea5e9', fontSize: '1.2rem' }}>
-                  💼
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1rem', color: '#1e293b' }}>Monthly Revenue</h3>
-                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#94a3b8' }}>Monitor revenue</p>
-                </div>
-              </div>
-              <div style={{ color: '#94a3b8', cursor: 'pointer' }}>↗</div>
-            </div>
-            <h2 style={{ margin: 0, fontSize: '2rem', color: '#1e293b' }}>$10,653</h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem' }}>
-              <span style={{ backgroundColor: '#fef2f2', color: '#ef4444', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold' }}>↓ 22%</span>
-              <span style={{ color: '#64748b' }}>Down from last month</span>
-            </div>
-          </div>
-
-          {/* Card 3 - Appointments */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', fontSize: '1.2rem' }}>
-                  📅
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1rem', color: '#1e293b' }}>Appointments</h3>
-                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#94a3b8' }}>Total appointments</p>
-                </div>
-              </div>
-              <div style={{ color: '#94a3b8', cursor: 'pointer' }}>↗</div>
-            </div>
-            <h2 style={{ margin: 0, fontSize: '2rem', color: '#1e293b' }}>672</h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem' }}>
-              <span style={{ backgroundColor: '#e0e7ff', color: '#4f46e5', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold' }}>↑ 10%</span>
-              <span style={{ color: '#64748b' }}>Up from last month</span>
-            </div>
-          </div>
-
+           </div>
         </div>
 
-        {/* New Doctors — live pending data */}
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              New Doctors{' '}
-              <span style={{ backgroundColor: '#1e293b', color: 'white', borderRadius: '50%', width: '22px', height: '22px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {pendingDoctors.length}
-              </span>
-            </h3>
-            <Link to="/admin/doctors" style={{ color: '#3b82f6', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none' }}>View all &gt;</Link>
-          </div>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+           {stats.map((stat, i) => (
+             <motion.div 
+               key={stat.label}
+               whileHover={{ y: -5 }}
+               className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between group overflow-hidden relative"
+             >
+                <div className="flex items-center gap-5">
+                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border shadow-sm transition-colors group-hover:bg-slate-50 ${stat.color} border-slate-100`}>
+                      <stat.icon size={26} />
+                   </div>
+                   <div>
+                      <p className="text-3xl font-black text-medigo-navy leading-none tracking-tight">{stat.val}</p>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.15em] mt-2">{stat.label}</p>
+                   </div>
+                </div>
+                
+                <div className={`flex items-center gap-1 text-[11px] font-black px-2 py-1 rounded-lg ${stat.up ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                   {stat.up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                   {stat.trend}
+                </div>
+                
+                <stat.icon size={100} className={`absolute -bottom-6 -right-6 opacity-[0.03] rotate-12 transition-transform group-hover:scale-110 ${stat.color}`} />
+             </motion.div>
+           ))}
+        </div>
 
-          {pendingDoctors.length === 0 ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px dashed #e2e8f0', fontSize: '0.9rem' }}>
-              No pending doctor registrations 🎉
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-              {pendingDoctors.slice(0, 4).map(doctor => (
-                <div key={doctor._id} style={{ border: '1px solid #f1f5f9', borderRadius: '12px', padding: '16px', position: 'relative' }}>
-                  <span style={{ position: 'absolute', top: '16px', right: '16px', backgroundColor: '#fff7ed', color: '#c2410c', padding: '4px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: '600' }}>
-                    Pending
-                  </span>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '12px' }}>
-                    <div style={{ width: '60px', height: '60px', borderRadius: '50%', backgroundColor: '#e0e7ff', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.6rem', marginBottom: '8px' }}>
-                      {doctor.fullName?.[0]?.toUpperCase()}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+           {/* Verification Queue - 8 columns */}
+           <div className="lg:col-span-8 space-y-6">
+              <div className="bg-white rounded-[2.5rem] shadow-premium border border-slate-100 overflow-hidden">
+                 <div className="p-6 sm:p-8 border-b border-slate-50 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                       <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl">
+                          <Stethoscope size={22} />
+                       </div>
+                       <h2 className="text-xl font-extrabold text-medigo-navy tracking-tight">Practitioner Verifications</h2>
                     </div>
-                    <div style={{ fontWeight: 'bold', color: '#1e293b', textAlign: 'center' }}>{doctor.fullName}</div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{doctor.specialty}</div>
-                  </div>
-                  <p style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', margin: '0 0 16px 0', minHeight: '32px' }}>
-                    {doctor.experienceYears} years experience · ${doctor.consultationFee} fee
-                  </p>
-                  <button
-                    onClick={() => setSelectedDoctor(doctor)}
-                    style={{ width: '100%', backgroundColor: '#4f46e5', color: 'white', border: 'none', borderRadius: '24px', padding: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '0.9rem' }}
-                  >
-                    View Details
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                    
+                    <Link to="/admin/doctors" className="text-xs font-black text-medigo-blue uppercase tracking-widest hover:underline">
+                       Manage All
+                    </Link>
+                 </div>
 
-        {/* Patients by Age Graph block */}
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <div>
-              <h3 style={{ margin: '0 0 8px 0', color: '#1e293b' }}>Patients by Age</h3>
-              <div style={{ display: 'flex', gap: '16px', fontSize: '0.8rem', color: '#64748b' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#3b82f6' }}></div> Male</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#f97316' }}></div> Female</span>
+                 <div className="p-6">
+                    {loading ? (
+                      <div className="space-y-4 animate-pulse">
+                         {[1,2,3].map(i => <div key={i} className="h-20 bg-slate-50 rounded-2xl w-full" />)}
+                      </div>
+                    ) : pendingDoctors.length === 0 ? (
+                      <div className="py-20 text-center space-y-4 border-2 border-dashed border-slate-100 rounded-[2rem]">
+                         <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto">
+                            <CheckCircle2 size={32} className="text-slate-300" />
+                         </div>
+                         <p className="text-sm font-bold text-slate-400">Zero pending verifications</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         {pendingDoctors.map(doctor => (
+                           <div key={doctor._id} className="bg-slate-50/50 hover:bg-white p-5 rounded-3xl border border-transparent hover:border-slate-100 hover:shadow-lg transition-all group">
+                              <div className="flex items-center gap-4 mb-4">
+                                 <div className="w-12 h-12 rounded-xl bg-medigo-blue/10 text-medigo-blue flex items-center justify-center font-black shadow-sm group-hover:scale-110 transition-transform">
+                                    {doctor.fullName?.[0]}
+                                 </div>
+                                 <div className="flex-1 overflow-hidden">
+                                    <h4 className="text-sm font-black text-medigo-navy truncate leading-none uppercase tracking-tight">{doctor.fullName}</h4>
+                                    <p className="text-xs text-slate-400 font-bold mt-1.5">{doctor.specialty}</p>
+                                 </div>
+                                 <span className="px-2 py-0.5 bg-amber-100/50 text-amber-600 text-[9px] font-black uppercase tracking-wider rounded-md">NEW</span>
+                              </div>
+                              
+                              <div className="bg-white/50 p-3 rounded-2xl mb-5 space-y-1">
+                                 <div className="flex justify-between text-[10px] font-bold">
+                                    <span className="text-slate-400 uppercase tracking-widest leading-none">Experience</span>
+                                    <span className="text-medigo-navy">{doctor.experienceYears} Years</span>
+                                 </div>
+                                 <div className="flex justify-between text-[10px] font-bold">
+                                    <span className="text-slate-400 uppercase tracking-widest leading-none">Education</span>
+                                    <span className="text-medigo-navy truncate ml-4">MD / Specialized</span>
+                                 </div>
+                              </div>
+                              
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="w-full h-10 border-slate-200 text-xs shadow-none group-hover:border-medigo-blue group-hover:text-medigo-blue"
+                                onClick={() => setSelectedDoctor(doctor)}
+                              >
+                                Review Credentials <ExternalLink size={12} className="ml-2" />
+                              </Button>
+                           </div>
+                         ))}
+                      </div>
+                    )}
+                 </div>
               </div>
-            </div>
-            <select style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', color: '#64748b', outline: 'none' }}>
-              <option>Months</option>
-            </select>
-          </div>
+           </div>
 
-          <div style={{ height: '200px', width: '100%', position: 'relative' }}>
-            <svg viewBox="0 0 800 200" style={{ width: '100%', height: '100%' }}>
-              <path d="M 0 150 Q 100 150 200 100 T 400 100 T 600 50 T 800 150" fill="none" stroke="#e2e8f0" strokeWidth="2" strokeDasharray="5,5" />
-              <path d="M 0 170 C 100 200, 150 180, 200 120 S 300 100, 400 110 S 550 50, 600 80 S 700 90, 800 50" fill="none" stroke="#3b82f6" strokeWidth="3" />
-              <circle cx="400" cy="110" r="5" fill="#3b82f6" />
-              <circle cx="400" cy="98" r="4" fill="#f97316" />
-            </svg>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '0.8rem', color: '#94a3b8' }}>
-              <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>July</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span><span>Dec</span>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Right Column — Appointments */}
-      <div style={{ width: '320px', backgroundColor: '#ffffff', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h3 style={{ margin: 0, color: '#1e293b' }}>Appointment</h3>
-          <span style={{ backgroundColor: '#f1f5f9', color: '#4f46e5', padding: '4px 12px', borderRadius: '16px', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer' }}>Today &gt;</span>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto' }}>
-          {[
-            { img: 'https://i.pravatar.cc/150?u=hay', name: 'Haylie Philips',   time: '10:00 AM - 10:30 AM' },
-            { img: 'https://i.pravatar.cc/150?u=dar', name: 'Darrell Steward',  time: '11:00 AM - 11:30 AM' },
-            { img: 'https://i.pravatar.cc/150?u=ali', name: 'Alia Rivera',      time: '12:00 PM - 12:30 PM' },
-            { img: 'https://i.pravatar.cc/150?u=mar', name: 'Martha Smith',     time: '1:00 PM - 1:30 PM'  },
-            { img: 'https://i.pravatar.cc/150?u=alb', name: 'Albert Flores',    time: '2:00 PM - 2:30 PM'  },
-            { img: 'https://i.pravatar.cc/150?u=bes', name: 'Bessie Cooper',    time: '3:00 PM - 3:30 PM'  },
-            { img: 'https://i.pravatar.cc/150?u=cou', name: 'Courtney Henry',   time: '4:00 PM - 4:30 PM'  },
-            { img: 'https://i.pravatar.cc/150?u=emi', name: 'Emily Smith',      time: '5:00 PM - 5:30 PM'  },
-          ].map((apt, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <img src={apt.img} alt={apt.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-                <div>
-                  <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '0.9rem' }}>{apt.name}</div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{apt.time}</div>
-                </div>
+           {/* Quick Actions / Recent Activty - 4 columns */}
+           <div className="lg:col-span-4 space-y-8">
+              <div className="bg-gradient-to-br from-medigo-navy to-slate-900 p-8 rounded-[2.5rem] text-white shadow-xl relative overflow-hidden">
+                 <div className="absolute top-0 right-0 w-32 h-32 bg-medigo-blue/20 blur-3xl rounded-full" />
+                 <div className="relative z-10 space-y-6">
+                    <h3 className="text-lg font-black tracking-tight leading-none italic">Admin Quick Settings</h3>
+                    <div className="space-y-2">
+                       <button className="w-full flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors group">
+                          <span className="text-xs font-bold tracking-widest uppercase">Manage Administrators</span>
+                          <ChevronRight size={14} className="text-white/40 group-hover:text-white" />
+                       </button>
+                       <button className="w-full flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors group text-medigo-blue">
+                          <span className="text-xs font-bold tracking-widest uppercase">System Audit Logs</span>
+                          <ChevronRight size={14} className="text-white/40 group-hover:text-medigo-blue" />
+                       </button>
+                       <button className="w-full flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors group">
+                          <span className="text-xs font-bold tracking-widest uppercase">Maintenance Mode</span>
+                          <div className="w-8 h-4 bg-white/10 rounded-full relative">
+                             <div className="absolute left-1 top-1 w-2 h-2 bg-white/40 rounded-full" />
+                          </div>
+                       </button>
+                    </div>
+                 </div>
               </div>
-              <button style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}>⋮</button>
-            </div>
-          ))}
-        </div>
-      </div>
 
-      {/* Doctor Detail Modal */}
-      {selectedDoctor && (
-        <div
-          onClick={() => setSelectedDoctor(null)}
-          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{ backgroundColor: '#ffffff', borderRadius: '20px', width: '100%', maxWidth: '620px', maxHeight: '90vh', overflowY: 'auto', padding: '32px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)' }}
-          >
-            {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: '#4f46e5', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', fontWeight: 'bold', flexShrink: 0 }}>
-                  {selectedDoctor.fullName?.[0]?.toUpperCase()}
-                </div>
-                <div>
-                  <h3 style={{ margin: '0 0 4px 0', color: '#0f172a', fontSize: '1.3rem' }}>{selectedDoctor.fullName}</h3>
-                  <div style={{ color: '#64748b', fontSize: '0.9rem' }}>{selectedDoctor.specialty}</div>
-                  <span style={{
-                    display: 'inline-block', marginTop: '6px',
-                    backgroundColor: STATUS_STYLES[selectedDoctor.status]?.bg,
-                    color: STATUS_STYLES[selectedDoctor.status]?.color,
-                    padding: '3px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '700'
-                  }}>
-                    {STATUS_STYLES[selectedDoctor.status]?.label}
-                  </span>
-                </div>
+              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
+                 <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-black text-medigo-navy uppercase tracking-widest leading-none">Recent Activity</h3>
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                 </div>
+                 
+                 <div className="space-y-6">
+                    {[
+                      { type: 'Doctor Verified', desc: 'Dr. Emily Watson was approved', time: '12m ago' },
+                      { type: 'Support Request', desc: 'Patient #4421 reported issue', time: '1h ago' },
+                      { type: 'New Registration', desc: 'Dr. Ken Ryu submitted docs', time: '3h ago' },
+                    ].map((act, i) => (
+                      <div key={i} className="flex gap-4 relative">
+                         <div className="shrink-0 w-0.5 bg-slate-100 absolute left-[7px] top-4 bottom-[-16px]" />
+                         <div className="w-4 h-4 rounded-full bg-blue-50 border-2 border-medigo-blue shrink-0 z-10 mt-1" />
+                         <div>
+                            <p className="text-[12px] font-black text-medigo-navy leading-none uppercase tracking-tight">{act.type}</p>
+                            <p className="text-[11px] text-slate-400 font-medium mt-1.5">{act.desc}</p>
+                            <span className="text-[10px] text-slate-300 font-bold mt-2 block">{act.time}</span>
+                         </div>
+                      </div>
+                    ))}
+                 </div>
               </div>
-              <button onClick={() => setSelectedDoctor(null)} style={{ background: 'none', border: 'none', fontSize: '1.6rem', color: '#94a3b8', cursor: 'pointer', lineHeight: 1 }}>&times;</button>
-            </div>
-
-            {/* Detail Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-              <ModalField label="Email"            value={selectedDoctor.email} />
-              <ModalField label="Phone"            value={selectedDoctor.phone} />
-              <ModalField label="Qualifications"   value={selectedDoctor.qualifications} />
-              <ModalField label="Experience"       value={`${selectedDoctor.experienceYears} years`} />
-              <ModalField label="Consultation Fee" value={`$${selectedDoctor.consultationFee}`} />
-              <ModalField label="Clinic Location"  value={selectedDoctor.clinicLocation} />
-              {selectedDoctor.bio && (
-                <div style={{ gridColumn: 'span 2' }}>
-                  <ModalField label="Bio" value={selectedDoctor.bio} />
-                </div>
-              )}
-              <ModalField label="Registered"   value={new Date(selectedDoctor.createdAt).toLocaleDateString()} />
-              <ModalField label="Last Updated" value={new Date(selectedDoctor.updatedAt).toLocaleDateString()} />
-            </div>
-
-            {/* Status Toggle */}
-            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
-              <p style={{ margin: '0 0 12px 0', fontSize: '0.85rem', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Change Verification Status</p>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                {Object.entries(STATUS_STYLES).map(([key, st]) => {
-                  const isActive = selectedDoctor.status === key;
-                  const isUpdating = updatingId === selectedDoctor._id;
-                  return (
-                    <button
-                      key={key}
-                      disabled={isActive || isUpdating}
-                      onClick={() => handleStatusChange(selectedDoctor._id, key)}
-                      style={{
-                        flex: 1, padding: '10px', borderRadius: '10px',
-                        border: `2px solid ${isActive ? st.activeBg : 'transparent'}`,
-                        cursor: isActive || isUpdating ? 'not-allowed' : 'pointer',
-                        fontWeight: '700', fontSize: '0.9rem',
-                        backgroundColor: isActive ? st.activeBg : st.bg,
-                        color: isActive ? '#ffffff' : st.color,
-                        opacity: !isActive && isUpdating ? 0.5 : 1,
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      {isUpdating && !isActive ? '...' : st.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+           </div>
         </div>
-      )}
-    </div>
+      </motion.div>
+
+      {/* Doctor Review Sidebar Modal */}
+      <AnimatePresence>
+        {selectedDoctor && (
+          <>
+            <motion.div 
+               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+               className="fixed inset-0 bg-medigo-navy/60 backdrop-blur-md z-[100]" 
+               onClick={() => setSelectedDoctor(null)}
+            />
+            <motion.div 
+              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 bottom-0 w-full max-w-xl bg-white shadow-2xl z-[101] overflow-y-auto font-inter"
+            >
+              <div className="p-8 space-y-10">
+                 {/* Modal Header */}
+                 <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-6">
+                       <div className="w-20 h-20 bg-gradient-to-tr from-medigo-blue to-medigo-teal text-white rounded-[2rem] flex items-center justify-center text-3xl font-black shadow-xl">
+                          {selectedDoctor.fullName?.[0].toUpperCase()}
+                       </div>
+                       <div>
+                          <h2 className="text-2xl font-black text-medigo-navy leading-none tracking-tight uppercase italic">{selectedDoctor.fullName}</h2>
+                          <div className="flex items-center gap-2 mt-3">
+                             <div className="px-3 py-1 bg-blue-50 text-medigo-blue border border-blue-100 rounded-full text-[10px] font-black uppercase tracking-widest">{selectedDoctor.specialty}</div>
+                             <div className={`px-3 py-1 ${STATUS_STYLES[selectedDoctor.status].bg} ${STATUS_STYLES[selectedDoctor.status].text} border ${STATUS_STYLES[selectedDoctor.status].border} rounded-full text-[10px] font-black uppercase tracking-widest`}>{selectedDoctor.status}</div>
+                          </div>
+                       </div>
+                    </div>
+                    <button onClick={() => setSelectedDoctor(null)} className="p-2 text-slate-300 hover:text-slate-600 transition-colors"><XCircle size={24} /></button>
+                 </div>
+
+                 {/* Information Grid */}
+                 <div className="space-y-8">
+                    <div className="grid grid-cols-2 gap-8">
+                       <ModalDetail label="Contact Email" value={selectedDoctor.email} icon={Mail} />
+                       <ModalDetail label="Phone" value={selectedDoctor.phone} icon={Phone} />
+                       <ModalDetail label="Registered" value={new Date(selectedDoctor.createdAt).toDateString()} icon={Calendar} />
+                       <ModalDetail label="Experience" value={`${selectedDoctor.experienceYears} Years Clinical Practice`} icon={TrendingUp} />
+                    </div>
+                    
+                    <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 space-y-6">
+                       <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Medical Credentials</h3>
+                       <div className="space-y-4">
+                          <ModalDetail label="Degrees & Qualifications" value={selectedDoctor.qualifications} icon={CheckCircle2} fullWidth />
+                          <ModalDetail label="Primary Affiliation" value={selectedDoctor.clinicLocation} icon={MapPin} fullWidth />
+                          <ModalDetail label="Professional Bio" value={selectedDoctor.bio} icon={FileText} fullWidth />
+                       </div>
+                    </div>
+                 </div>
+
+                 {/* Action Panel */}
+                 <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl shadow-indigo-500/10">
+                    <div className="flex items-center gap-3 mb-6">
+                       <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white"><ShieldCheck size={16} /></div>
+                       <h3 className="text-sm font-black uppercase tracking-widest">Final Decision</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                       <Button 
+                          className="h-14 font-black shadow-none bg-emerald-500 hover:bg-emerald-600" 
+                          onClick={() => handleStatusChange(selectedDoctor._id, 'verified')}
+                          loading={updatingId === selectedDoctor._id}
+                       >
+                          Verify Doctor
+                       </Button>
+                       <Button 
+                          variant="outline"
+                          className="h-14 font-black border-red-500/30 text-red-400 bg-white/5 hover:bg-red-500/10 hover:border-red-500/50" 
+                          onClick={() => handleStatusChange(selectedDoctor._id, 'rejected')}
+                          loading={updatingId === selectedDoctor._id}
+                       >
+                          Reject Application
+                       </Button>
+                    </div>
+                    <p className="mt-6 text-center text-[10px] text-white/30 font-bold uppercase tracking-[0.2em]">Medical Board Authority Action Required</p>
+                 </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </DashboardLayout>
   );
 }
 
-function ModalField({ label, value }) {
+function ModalDetail({ label, value, icon: Icon, fullWidth }) {
   return (
-    <div>
-      <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: '700', letterSpacing: '0.5px' }}>{label}</p>
-      <p style={{ margin: 0, color: '#1e293b', fontWeight: '500', fontSize: '0.9rem' }}>{value || <span style={{ color: '#cbd5e1' }}>Not provided</span>}</p>
+    <div className={fullWidth ? 'w-full' : ''}>
+      <div className="flex items-center gap-2 mb-2">
+         {Icon && <Icon size={12} className="text-medigo-blue" />}
+         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
+      </div>
+      <p className="text-[14px] font-bold text-medigo-navy leading-snug">{value || 'N/A'}</p>
     </div>
   );
 }
+
+function Mail({ size, ...p }) { return <svg {...p} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/><rect width="20" height="16" x="2" y="4" rx="2"/></svg> }
+function Phone({ size, ...p }) { return <svg {...p} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg> }
+function FileText({ size, ...p }) { return <svg {...p} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg> }

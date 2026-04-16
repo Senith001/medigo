@@ -4,42 +4,44 @@ import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'
 
 // --- Public Imports ---
-import LandingPage          from './pages/LandingPage'
+import LandingPage from './pages/LandingPage'
 
 // --- Auth Imports ---
-import LoginPage              from './pages/Auth/LoginPage'
-import RegisterPage           from './pages/Auth/RegisterPage'
-import VerifyOTPPage          from './pages/Auth/VerifyOTPPage'
-import AdminLogin             from './pages/Auth/AdminLogin'
-import DoctorRegistration     from './pages/Auth/DoctorRegistration'
+import LoginPage from './pages/Auth/LoginPage'
+import RegisterPage from './pages/Auth/RegisterPage'
+import VerifyOTPPage from './pages/Auth/VerifyOTPPage'
+import AdminLogin from './pages/Auth/AdminLogin'
+import DoctorRegistration from './pages/Auth/DoctorRegistration'
 
 // --- Dashboard Imports ---
-import PatientDashboard       from './pages/Patient/PatientDashboard'
-import PatientProfile         from './pages/Patient/PatientProfile'
-import DoctorDashboard        from './pages/Doctor/DoctorDashboard'
-import AdminLayout            from './pages/Admin/AdminLayout'
-import AdminDashboard         from './pages/Admin/AdminDashboard'
-import PatientManagement      from './pages/Admin/PatientManagement'
-import DoctorManagement       from './pages/Admin/DoctorManagement'
-import AdminManagement        from './pages/Admin/AdminManagement'
-import AdminProfile           from './pages/Admin/AdminProfile'
-import AdminSetup             from './pages/Admin/AdminSetup'
-import SuperAdminBootstrap    from './pages/Admin/SuperAdminBootstrap'
+import ManageAvailability from './pages/Doctor/ManageAvailability'
+import PatientDashboard from './pages/Patient/PatientDashboard'
+import PatientProfile from './pages/Patient/PatientProfile'
+import DoctorDashboard from './pages/Doctor/DoctorDashboard'
+import AdminLayout from './pages/Admin/AdminLayout'
+import AdminDashboard from './pages/Admin/AdminDashboard'
+import PatientManagement from './pages/Admin/PatientManagement'
+import DoctorManagement from './pages/Admin/DoctorManagement'
+import AdminManagement from './pages/Admin/AdminManagement'
+import AdminProfile from './pages/Admin/AdminProfile'
+import AdminSetup from './pages/Admin/AdminSetup'
+import SuperAdminBootstrap from './pages/Admin/SuperAdminBootstrap'
 
 // --- Common Features ---
-import SearchDoctors          from './pages/SearchDoctors'
-import { BookAppointment }    from './pages/BookAppointment'
-import MyAppointments         from './pages/MyAppointments'
-import RescheduleAppointment  from './pages/RescheduleAppointment'
+import SearchDoctors from './pages/Appointment/SearchDoctors'
+import DoctorSessions from './pages/Appointment/DoctorSessions'
+import MyAppointments from './pages/Appointment/MyAppointments'
+import RescheduleAppointment from './pages/Appointment/RescheduleAppointment'
 
 // --- Module Imports (Integrated) ---
-import PaymentSelector        from './pages/Payment/PaymentSelector'
-import BankTransferForm       from './pages/Payment/BankTransferForm'
-import StripeCallback         from './pages/Payment/StripeCallback'
-import AdminPayments          from './pages/Payment/AdminPayments'
-import Lobby                  from './pages/Telemedicine/Lobby'
-import VideoRoom              from './pages/Telemedicine/VideoRoom'
-import ReportCenter           from './pages/Report/ReportCenter'
+import PaymentSelector from './pages/Payment/PaymentSelector'
+import Checkout from './pages/Payment/Checkout'
+import BankTransferForm from './pages/Payment/BankTransferForm'
+import StripeCallback from './pages/Payment/StripeCallback'
+import AdminPayments from './pages/Payment/AdminPayments'
+import Lobby from './pages/Telemedicine/Lobby'
+import VideoRoom from './pages/Telemedicine/VideoRoom'
+import ReportCenter from './pages/Report/ReportCenter'
 
 function Layout() {
   const { token, user } = useAuth()
@@ -57,7 +59,7 @@ function Layout() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/doctor-register" element={<DoctorRegistration />} />
         <Route path="/verify-otp" element={<VerifyOTPPage />} />
-        
+
         {/* --- Admin Auth Routes --- */}
         <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/admin/setup" element={<AdminSetup />} />
@@ -75,18 +77,21 @@ function Layout() {
 
         {/* --- Protected Doctor Routes --- */}
         <Route path="/doctor" element={<ProtectedRoute roles={['doctor']}><DoctorDashboard /></ProtectedRoute>} />
+        <Route path="/doctor/dashboard" element={<ProtectedRoute roles={['doctor']}><DoctorDashboard /></ProtectedRoute>} />
+        <Route path="/doctor/availability" element={<ProtectedRoute roles={['doctor']}><ManageAvailability /></ProtectedRoute>} />
 
         {/* --- Protected Patient Routes --- */}
         <Route path="/dashboard" element={<ProtectedRoute roles={['patient']}><PatientDashboard /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute roles={['patient']}><PatientProfile /></ProtectedRoute>} />
         <Route path="/search" element={<ProtectedRoute roles={['patient']}><SearchDoctors /></ProtectedRoute>} />
-        <Route path="/book" element={<ProtectedRoute roles={['patient']}><BookAppointment /></ProtectedRoute>} />
+        <Route path="/doctor/:doctorId/sessions" element={<ProtectedRoute roles={['patient']}><DoctorSessions /></ProtectedRoute>} />
+        <Route path="/checkout/:sessionId" element={<ProtectedRoute roles={['patient']}><Checkout /></ProtectedRoute>} />
         <Route path="/appointments" element={<ProtectedRoute roles={['patient']}><MyAppointments /></ProtectedRoute>} />
-        <Route path="/appointments/:id/reschedule" element={<ProtectedRoute roles={['patient','admin']}><RescheduleAppointment /></ProtectedRoute>} />
-        
+        <Route path="/appointments/:id/reschedule" element={<ProtectedRoute roles={['patient', 'admin']}><RescheduleAppointment /></ProtectedRoute>} />
+
         {/* --- Integrated Module Routes --- */}
         <Route path="/reports" element={<ProtectedRoute roles={['patient']}><ReportCenter /></ProtectedRoute>} />
-        
+
         <Route path="/payment/:appointmentId" element={<ProtectedRoute roles={['patient']}><PaymentSelector /></ProtectedRoute>} />
         <Route path="/payment/bank-transfer/:appointmentId" element={<ProtectedRoute roles={['patient']}><BankTransferForm /></ProtectedRoute>} />
         <Route path="/payment/success" element={<StripeCallback status="success" />} />
@@ -97,9 +102,9 @@ function Layout() {
 
         {/* --- Fallback Redirect --- */}
         <Route path="*" element={<Navigate to={
-          token 
-            ? (['admin','superadmin'].includes(user?.role) ? '/admin' 
-            : (user?.role === 'doctor' ? '/doctor' : '/dashboard')) 
+          token
+            ? (['admin', 'superadmin'].includes(user?.role) ? '/admin'
+              : (user?.role === 'doctor' ? '/doctor' : '/dashboard'))
             : '/login'
         } replace />} />
       </Routes>

@@ -13,27 +13,35 @@ import {
   Loader2,
   FileIcon,
   CheckCircle2,
-  Clock
+  Clock,
+  ShieldCheck,
+  BrainCircuit,
+  Share2,
+  ArrowRight,
+  Info
 } from "lucide-react";
 import { reportAPI } from "../../services/api";
+import DashboardLayout from "../../components/DashboardLayout";
+import Button from "../../components/ui/Button";
+import Input from "../../components/ui/Input";
 
-const ReportCenter = () => {
+export default function ReportCenter() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
-  const [user, setUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem("user") || "{}");
-    setUser(userData);
+    setCurrentUser(userData);
     
     const fetchReports = async () => {
       try {
         const { data } = await reportAPI.getByPatient(userData.userId || userData._id);
         setReports(data.reports || []);
       } catch (err) {
-        console.error("Failed to fetch reports");
+        console.error("Report Sync Error:", err);
       } finally {
         setLoading(false);
       }
@@ -47,127 +55,169 @@ const ReportCenter = () => {
     (filter === "all" || r.status === filter)
   );
 
-  if (loading) return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin text-teal-600 w-12 h-12" /></div>;
-
   return (
-    <div className="min-h-screen bg-slate-50 pt-8 pb-20 px-4 md:px-8">
-      <div className="max-w-7xl mx-auto">
-        <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div>
-            <motion.h1 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="text-4xl font-extrabold text-slate-900 tracking-tight"
-            >
-              Medical Reports
-            </motion.h1>
-            <p className="text-slate-500 mt-2 text-lg">Access and manage your complete health records</p>
-          </div>
-          <button className="flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold hover:bg-slate-800 transition shadow-lg shadow-slate-200">
-            <Plus className="w-5 h-5" />
-            Upload New Record
-          </button>
-        </header>
-
-        {/* Filters & Search */}
-        <div className="bg-white p-4 rounded-[32px] shadow-sm border border-slate-100 flex flex-col md:flex-row gap-4 mb-8">
-          <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-            <input 
-              type="text" 
-              placeholder="Search by doctor or type..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500/20 transition-all text-slate-900"
-            />
-          </div>
-          <div className="flex gap-2 p-1 bg-slate-50 rounded-2xl">
-            {["all", "ready", "pending"].map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-6 py-2 rounded-xl text-sm font-bold capitalize transition-all ${
-                  filter === f ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
+    <DashboardLayout isPatient={true}>
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-6xl mx-auto space-y-8 pb-24 font-inter"
+      >
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+           <div className="space-y-1">
+              <h1 className="text-3xl font-black text-medigo-navy tracking-tight uppercase italic font-display">Health Repository</h1>
+              <p className="text-slate-500 font-medium">Manage and review your secure medical clinical records.</p>
+           </div>
+           
+           <div className="flex items-center gap-3">
+              <Button size="sm" variant="outline" className="hidden sm:flex border-slate-200">
+                 <ShieldCheck size={16} className="mr-2 text-medigo-mint" /> Encrypted Drive
+              </Button>
+              <Button size="sm" className="shadow-lg shadow-blue-500/10">
+                 <Plus size={18} className="mr-2" /> Upload Records
+              </Button>
+           </div>
         </div>
 
-        {/* Reports Grid */}
+        {/* Toolbar Section */}
+        <section className="bg-white p-4 sm:p-6 rounded-[2.5rem] shadow-premium border border-slate-100 flex flex-col md:flex-row gap-4 items-center">
+           <div className="relative flex-1 w-full group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-medigo-blue transition-colors" size={18} />
+              <input 
+                 type="text" 
+                 placeholder="Search by diagnosis, doctor or hospital..."
+                 value={search}
+                 onChange={(e) => setSearch(e.target.value)}
+                 className="w-full h-14 pl-12 pr-6 bg-slate-50 border border-slate-50 rounded-2xl focus:bg-white focus:border-medigo-blue focus:ring-4 focus:ring-blue-500/5 outline-none transition-all font-bold text-medigo-navy placeholder:text-slate-300"
+              />
+           </div>
+           
+           <div className="flex p-1.5 bg-slate-50 rounded-2xl shrink-0">
+             {["all", "ready", "pending"].map((f) => (
+               <button
+                 key={f}
+                 onClick={() => setFilter(f)}
+                 className={`px-6 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-[0.15em] transition-all ${
+                   filter === f 
+                     ? "bg-white text-medigo-blue shadow-md" 
+                     : "text-slate-400 hover:text-slate-600"
+                 }`}
+               >
+                 {f}
+               </button>
+             ))}
+           </div>
+        </section>
+
+        {/* Dynamic Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <AnimatePresence mode="popLayout">
-            {filteredReports.map((report, idx) => (
-              <motion.div
-                key={report._id}
-                layout
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                className="bg-white rounded-[40px] p-6 shadow-xl shadow-slate-200/50 border border-slate-100 group hover:border-teal-100 transition-all"
-              >
-                <div className="flex items-start justify-between mb-6">
-                  <div className="w-14 h-14 bg-teal-50 text-teal-600 rounded-3xl flex items-center justify-center group-hover:bg-teal-600 group-hover:text-white transition-colors duration-500">
-                    <FileIcon className="w-7 h-7" />
-                  </div>
-                  <div className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider flex items-center gap-1.5 ${
-                    report.status === 'ready' ? 'bg-teal-50 text-teal-600' : 'bg-amber-50 text-amber-600'
-                  }`}>
-                    {report.status === 'ready' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                    {report.status}
-                  </div>
+           <AnimatePresence mode="popLayout">
+              {loading ? (
+                [1,2,3].map(i => <div key={i} className="h-64 bg-white rounded-[3rem] border border-slate-100 animate-pulse" />)
+              ) : filteredReports.length === 0 ? (
+                <div className="col-span-full py-24 text-center space-y-6 bg-white rounded-[3rem] border-2 border-dashed border-slate-100 shadow-sm">
+                   <div className="w-24 h-24 bg-slate-50 text-slate-200 rounded-full flex items-center justify-center mx-auto">
+                      <FileIcon size={48} />
+                   </div>
+                   <div className="space-y-2 px-4">
+                      <h3 className="text-xl font-black text-medigo-navy uppercase tracking-tight italic">No Records Found</h3>
+                      <p className="text-slate-400 font-medium max-w-sm mx-auto tracking-wide">Your medical vault is empty. Reports shared by your doctors will appear here instantly.</p>
+                   </div>
                 </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-xl font-bold text-slate-900 leading-tight mb-1">{report.reportType || "General Report"}</h3>
-                    <p className="text-slate-400 text-sm flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5" />
-                      Dr. {report.doctorName}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-4 text-xs font-semibold text-slate-500 bg-slate-50 p-3 rounded-2xl">
-                    <div className="flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {new Date(report.createdAt).toLocaleDateString()}
-                    </div>
-                    <div className="w-1 h-1 bg-slate-300 rounded-full" />
-                    <div className="uppercase tracking-widest">{report.fileFormat || "PDF"}</div>
-                  </div>
-
-                  <div className="pt-4 flex gap-2">
-                    <button 
-                      className="flex-1 bg-slate-900 text-white p-3 rounded-2xl text-sm font-bold hover:bg-slate-800 transition flex items-center justify-center gap-2"
-                      onClick={() => window.open(`http://localhost:5006${report.fileUrl}`, '_blank')}
-                    >
-                      <Download className="w-4 h-4" />
-                      Download
-                    </button>
-                    <button className="p-3 bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-200 transition">
-                      <ExternalLink className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
+              ) : (
+                filteredReports.map((report, idx) => (
+                  <ReportCard key={report._id} report={report} index={idx} />
+                ))
+              )}
+           </AnimatePresence>
         </div>
 
-        {filteredReports.length === 0 && (
-          <div className="text-center py-32 bg-white rounded-[40px] border-2 border-dashed border-slate-100">
-            <div className="w-20 h-20 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FileIcon className="w-10 h-10" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900">No Reports Found</h3>
-            <p className="text-slate-500 mt-2">We couldn't find any medical reports matching your search.</p>
-          </div>
-        )}
-      </div>
-    </div>
+        {/* Security Tip */}
+        <div className="flex justify-center pt-8">
+           <div className="inline-flex items-center gap-3 px-6 py-4 bg-indigo-50/50 border border-indigo-100/50 rounded-3xl text-[11px] font-bold text-slate-500 shadow-sm group hover:border-indigo-200 transition-all">
+              <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-medigo-blue shadow-inner group-hover:scale-110 transition-transform">
+                 <ShieldCheck size={16} />
+              </div>
+              <div className="space-y-0.5">
+                 <p className="text-medigo-navy">Advanced Health Encryption Active</p>
+                 <p className="opacity-60 text-[9px] uppercase tracking-widest">Compliant with International Medical Standards (ISO 27001)</p>
+              </div>
+           </div>
+        </div>
+      </motion.div>
+    </DashboardLayout>
   );
-};
+}
 
-export default ReportCenter;
+function ReportCard({ report, index }) {
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: index * 0.05 }}
+      whileHover={{ y: -5 }}
+      className="bg-white rounded-[2.5rem] p-8 mt-2 shadow-sm border border-slate-100 group hover:border-blue-100 hover:shadow-premium transition-all duration-300 relative overflow-hidden"
+    >
+      <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50/10 blur-3xl rounded-full" />
+      
+      <div className="flex items-start justify-between mb-8 relative z-10">
+        <div className="w-16 h-16 bg-gradient-to-tr from-blue-50 to-indigo-50 text-medigo-blue rounded-[1.5rem] flex items-center justify-center border border-indigo-50 shadow-inner group-hover:bg-medigo-navy group-hover:text-white transition-all duration-500">
+          <FileText size={32} />
+        </div>
+        <div className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 border shadow-sm ${
+          report.status === 'ready' 
+            ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+            : 'bg-amber-50 text-amber-600 border-amber-100'
+        }`}>
+          {report.status === 'ready' ? <CheckCircle2 size={12} /> : <Clock size={12} />}
+          {report.status}
+        </div>
+      </div>
+
+      <div className="space-y-6 relative z-10">
+        <div>
+          <h3 className="text-xl font-black text-medigo-navy leading-none tracking-tight uppercase italic mb-2 group-hover:text-medigo-blue transition-colors">
+             {report.reportType || "Clinical Analysis"}
+          </h3>
+          <div className="flex items-center gap-1.5">
+             <div className="w-6 h-6 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400">
+                <User size={12} />
+             </div>
+             <p className="text-[12px] font-bold text-slate-400">Dr. {report.doctorName}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-50">
+           <div className="flex items-center gap-2">
+              <Calendar size={14} className="text-medigo-blue/40" />
+              <span className="text-xs font-bold text-slate-500">{new Date(report.createdAt).toLocaleDateString()}</span>
+           </div>
+           <div className="w-px h-3 bg-slate-200" />
+           <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
+              Format: <span className="text-medigo-navy">{report.fileFormat || "PDF"}</span>
+           </div>
+        </div>
+
+        {report.aiAnalyzed && (
+           <div className="flex items-center gap-2 text-indigo-600 bg-indigo-50/50 border border-indigo-100 px-4 py-2 rounded-2xl w-fit">
+              <BrainCircuit size={14} className="animate-pulse" />
+              <span className="text-[11px] font-black uppercase tracking-widest">AI Insights Ready</span>
+           </div>
+        )}
+
+        <div className="pt-2 flex gap-3">
+          <Button 
+            className="flex-1 h-12 shadow-sm"
+            onClick={() => window.open(`http://localhost:5006${report.fileUrl}`, '_blank')}
+          >
+            <Download size={16} className="mr-2" /> Download
+          </Button>
+          <button className="w-12 h-12 flex items-center justify-center bg-slate-50 border border-slate-100 text-slate-400 rounded-2xl hover:bg-white hover:border-medigo-blue hover:text-medigo-blue transition-all">
+            <Share2 size={18} />
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
