@@ -11,6 +11,7 @@ import AdminLogin             from './pages/Auth/AdminLogin'
 
 // --- Dashboard Imports ---
 import PatientDashboard       from './pages/Patient/PatientDashboard'
+import PatientProfile         from './pages/Patient/PatientProfile'
 import AdminDashboard         from './pages/Admin/AdminDashboard'
 
 // --- Teammate's Existing Imports ---
@@ -43,6 +44,7 @@ function Layout() {
 
         {/* --- Protected Patient Routes --- */}
         <Route path="/dashboard" element={<ProtectedRoute roles={['patient']}><PatientDashboard /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute roles={['patient']}><PatientProfile /></ProtectedRoute>} />
         <Route path="/search" element={<ProtectedRoute roles={['patient']}><SearchDoctors /></ProtectedRoute>} />
         <Route path="/book" element={<ProtectedRoute roles={['patient']}><BookAppointment /></ProtectedRoute>} />
         <Route path="/appointments" element={<ProtectedRoute roles={['patient']}><MyAppointments /></ProtectedRoute>} />

@@ -62,7 +62,13 @@ export const appointmentAPI = {
 
 
 
-
+//===============================================================================
+//                    Patient Service APIs (Port 5002)
+//===============================================================================
+export const patientAPI = {
+  getMyProfile: () => api.get('http://localhost:5002/api/patients/me'),
+  updateMyProfile: (data) => api.put('http://localhost:5002/api/patients/me', data),
+}
 //===============================================================================
 //                    Doctor Service APIs (Port 5004)
 //===============================================================================
