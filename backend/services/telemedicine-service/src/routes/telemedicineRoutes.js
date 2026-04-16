@@ -3,23 +3,58 @@ import validate from "../middleware/validate.js";
 import validateObjectId from "../middleware/validateObjectId.js";
 import {
   createSessionValidation,
+  createSessionFromAppointmentValidation,
   sessionIdValidation,
+  syncAppointmentUpdateValidation,
   updateSessionValidation,
   updateSessionStatusValidation,
 } from "../validators/telemedicineValidators.js";
 
 import {
   createSession,
+  createSessionFromAppointment,
+  getAllSessions,
   getSessionById,
   getSessionByAppointmentId,
   joinSession,
   updateSession,
   updateSessionStatus,
   deleteSession,
+  syncAppointmentUpdate,
 } from "../controllers/telemedicineController.js";
 import { protect, authorize } from "../middleware/auth.js";
 
 const router = express.Router();
+
+const verifyInternalService = (req, res, next) => {
+  const secret = req.headers["x-service-secret"];
+
+  if (!secret || secret !== process.env.SERVICE_SECRET) {
+    return res.status(403).json({
+      message: "Unauthorized internal service call.",
+    });
+  }
+
+  return next();
+};
+
+// Appointment-service can call this when a telemedicine appointment changes.
+router.put(
+  "/internal/appointment-updated",
+  verifyInternalService,
+  syncAppointmentUpdateValidation,
+  validate,
+  syncAppointmentUpdate
+);
+
+// Appointment-service can call this when a paid telemedicine appointment is confirmed.
+router.post(
+  "/internal/from-appointment",
+  verifyInternalService,
+  createSessionFromAppointmentValidation,
+  validate,
+  createSessionFromAppointment
+);
 
 // Create a new telemedicine session for an appointment.
 router.post(
@@ -29,6 +64,14 @@ router.post(
   createSessionValidation,
   validate,
   createSession
+);
+
+// Admin gets all telemedicine sessions.
+router.get(
+  "/admin/all",
+  protect,
+  authorize("admin"),
+  getAllSessions
 );
 
 // Check whether a session exists for a given appointment.

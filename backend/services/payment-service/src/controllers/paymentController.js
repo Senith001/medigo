@@ -52,6 +52,24 @@ const sendNotification = async (payment, type) => {
   }
 };
 
+const getUserIdentity = (user) => user.id || user.userId;
+
+const fetchAppointmentDetails = async (appointmentId) => {
+  const appointmentServiceUrl =
+    process.env.APPOINTMENT_SERVICE_URL || "http://localhost:5005";
+
+  const response = await axios.get(
+    `${appointmentServiceUrl}/api/appointments/internal/${appointmentId}`,
+    {
+      headers: {
+        "x-service-secret": process.env.SERVICE_SECRET,
+      },
+    }
+  );
+
+  return response.data.appointment || response.data;
+};
+
 const findBlockingPayment = async (appointmentId, patientId, paymentMethod) => {
   const blockingStatuses = ["pending", "paid", "verification_pending"];
 
@@ -66,32 +84,43 @@ const findBlockingPayment = async (appointmentId, patientId, paymentMethod) => {
 // Create a Stripe payment and save its details in the database.
 const createPayment = async (req, res) => {
   try {
-    const {
-      appointmentId,
-      patientId,
-      patientName,
-      patientEmail,
-      doctorId,
-      doctorName,
-      amount,
-    } = req.body;
+    const { appointmentId } = req.body;
 
-    if (
-      !appointmentId ||
-      !patientId ||
-      !patientName ||
-      !patientEmail ||
-      !doctorId ||
-      !doctorName ||
-      !amount
-    ) {
+    if (!appointmentId) {
       return res.status(400).json({
-        message: "All required payment fields must be provided.",
+        message: "Appointment ID is required.",
       });
     }
 
-    // Patient can only create payment for themselves
-    if (req.user.role === "patient" && req.user.userId !== patientId) {
+    const appointment = await fetchAppointmentDetails(appointmentId);
+
+    const patientId = appointment.patientId;
+    const patientName = appointment.patientName;
+    const patientEmail = appointment.patientEmail;
+    const doctorId = appointment.doctorId;
+    const doctorName = appointment.doctorName;
+    const amount = appointment.fee;
+
+    if (!["pending", "confirmed"].includes(appointment.status)) {
+      return res.status(400).json({
+        message: "Payment can only be created for pending or confirmed appointments.",
+      });
+    }
+
+    if (!patientId || !patientName || !patientEmail || !doctorId || !doctorName) {
+      return res.status(400).json({
+        message: "Appointment details are incomplete for payment creation.",
+      });
+    }
+
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({
+        message: "Appointment fee must be available before creating payment.",
+      });
+    }
+
+    // Patient can only create payment for their own appointment.
+    if (req.user.role === "patient" && getUserIdentity(req.user) !== patientId) {
       return res.status(403).json({
         message: "Access denied. You can only create payments for your own appointments.",
       });
@@ -142,6 +171,8 @@ const createPayment = async (req, res) => {
       stripeSessionId: stripeSession.id,
     });
 
+    await syncAppointmentPayment(appointmentId, "processing");
+
     res.status(201).json({
       message: "Payment session created successfully.",
       payment,
@@ -158,33 +189,43 @@ const createPayment = async (req, res) => {
 
 const createBankTransferPayment = async (req, res) => {
   try {
-    const {
-      appointmentId,
-      patientId,
-      patientName,
-      patientEmail,
-      doctorId,
-      doctorName,
-      amount,
-      transferReference,
-    } = req.body;
+    const { appointmentId, transferReference } = req.body;
 
-    if (
-      !appointmentId ||
-      !patientId ||
-      !patientName ||
-      !patientEmail ||
-      !doctorId ||
-      !doctorName ||
-      !amount
-    ) {
+    if (!appointmentId) {
       return res.status(400).json({
-        message: "All required bank transfer payment fields must be provided.",
+        message: "Appointment ID is required.",
       });
     }
 
-    // Patient can only create payment for themselves
-    if (req.user.role === "patient" && req.user.userId !== patientId) {
+    const appointment = await fetchAppointmentDetails(appointmentId);
+
+    const patientId = appointment.patientId;
+    const patientName = appointment.patientName;
+    const patientEmail = appointment.patientEmail;
+    const doctorId = appointment.doctorId;
+    const doctorName = appointment.doctorName;
+    const amount = appointment.fee;
+
+    if (!["pending", "confirmed"].includes(appointment.status)) {
+      return res.status(400).json({
+        message: "Payment can only be submitted for pending or confirmed appointments.",
+      });
+    }
+
+    if (!patientId || !patientName || !patientEmail || !doctorId || !doctorName) {
+      return res.status(400).json({
+        message: "Appointment details are incomplete for bank transfer payment.",
+      });
+    }
+
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({
+        message: "Appointment fee must be available before submitting payment.",
+      });
+    }
+
+    // Patient can only create payment for their own appointment.
+    if (req.user.role === "patient" && getUserIdentity(req.user) !== patientId) {
       return res.status(403).json({
         message: "Access denied. You can only submit payments for your own appointments.",
       });
@@ -228,6 +269,8 @@ const createBankTransferPayment = async (req, res) => {
       paymentSlipUrl,
       transferReference: transferReference || null,
     });
+
+    await syncAppointmentPayment(appointmentId, "processing");
 
     // Notify notification-service that bank transfer is awaiting verification
     await sendNotification(payment, "verification_pending");
@@ -342,7 +385,7 @@ const getPaymentById = async (req, res) => {
     // Patient can only access their own payment
     if (
       req.user.role !== "admin" &&
-      payment.patientId !== req.user.userId
+      payment.patientId !== getUserIdentity(req.user)
     ) {
       return res.status(403).json({ message: "Access denied." });
     }
@@ -362,7 +405,7 @@ const getPaymentsByPatient = async (req, res) => {
     // Patient can only access their own billing history
     if (
       req.user.role !== "admin" &&
-      req.user.userId !== patientId
+      getUserIdentity(req.user) !== patientId
     ) {
       return res.status(403).json({ message: "Access denied." });
     }
@@ -424,7 +467,7 @@ const approveBankTransferPayment = async (req, res) => {
 
     // Mark the verified bank transfer as paid.
     payment.status = "paid";
-    payment.verifiedBy = req.user.userId;
+    payment.verifiedBy = getUserIdentity(req.user);
     payment.verifiedAt = new Date();
     payment.paidAt = new Date();
     payment.rejectionReason = null;
@@ -473,7 +516,7 @@ const rejectBankTransferPayment = async (req, res) => {
     }
 
     payment.status = "rejected";
-    payment.verifiedBy = req.user.userId;
+    payment.verifiedBy = getUserIdentity(req.user);
     payment.verifiedAt = new Date();
     payment.rejectionReason = rejectionReason || "Payment verification rejected by admin.";
 

@@ -3,17 +3,29 @@ import { body, param } from "express-validator";
 // Rules for creating a new telemedicine session.
 const createSessionValidation = [
   body("appointmentId").notEmpty().withMessage("Appointment ID is required"),
-  body("patientId").notEmpty().withMessage("Patient ID is required"),
-  body("patientName").notEmpty().withMessage("Patient name is required"),
-  body("doctorId").notEmpty().withMessage("Doctor ID is required"),
-  body("doctorName").notEmpty().withMessage("Doctor name is required"),
-  body("type")
-    .equals("telemedicine")
-    .withMessage("Only telemedicine appointments can create a session"),
-  body("scheduledAt")
-    .optional({ values: "falsy" })
+];
+
+// Rules for appointment-service creating a session internally.
+const createSessionFromAppointmentValidation = [
+  body("appointmentId").notEmpty().withMessage("Appointment ID is required"),
+];
+
+// Rules for syncing appointment date/time/status changes into an existing session.
+const syncAppointmentUpdateValidation = [
+  body("appointmentId").notEmpty().withMessage("Appointment ID is required"),
+  body("appointmentDate")
+    .optional()
     .isISO8601()
-    .withMessage("scheduledAt must be a valid date"),
+    .withMessage("Appointment date must be a valid date"),
+  body("timeSlot")
+    .optional()
+    .isString()
+    .notEmpty()
+    .withMessage("Time slot must be a valid string"),
+  body("status")
+    .optional()
+    .isIn(["confirmed", "cancelled", "completed", "no-show"])
+    .withMessage("Invalid appointment status"),
 ];
 
 // Rules for routes that use a session MongoDB id.
@@ -48,7 +60,9 @@ const updateSessionStatusValidation = [
 
 export {
   createSessionValidation,
+  createSessionFromAppointmentValidation,
   sessionIdValidation,
+  syncAppointmentUpdateValidation,
   updateSessionValidation,
   updateSessionStatusValidation,
 };

@@ -5,3 +5,4 @@ metadata:
 data:
   PORT: "5008"
   JITSI_BASE_URL: "https://meet.jit.si"
+  APPOINTMENT_SERVICE_URL: "http://appointment-service-network:5005"
