@@ -331,11 +331,32 @@ export const updateDoctorStatus = async (req, res) => {
     if (!['pending', 'verified', 'rejected'].includes(status)) {
       return res.status(400).json({ success: false, message: "Invalid status value. Must be pending, verified, or rejected." });
     }
-    const response = await httpClient.patch(
+
+    // Step 1: Update the doctor's status in doctor-service
+    const doctorResponse = await httpClient.patch(
       `${process.env.DOCTOR_SERVICE_URL}/api/doctors/${req.params.id}/status`,
-      { status }
+      { status },
+      internalHeaders  // service secret — doctor-service uses verifyInternalService for this route
     );
-    res.status(200).json(response.data);
+
+    const doctor = doctorResponse.data?.data;
+
+    // Step 2: Sync isVerified in auth-service and fire email
+    // Only act on terminal states — not when reverting to "pending"
+    if (status === 'verified' || status === 'rejected') {
+      try {
+        await httpClient.patch(
+          `${process.env.AUTH_SERVICE_URL}/api/auth/internal/doctors/${doctor?.authUserId || req.params.id}/verify`,
+          { approve: status === 'verified' },
+          internalHeaders
+        );
+      } catch (authErr) {
+        console.error("Failed to sync doctor verification in auth-service:", authErr.message);
+        // Non-fatal — status is updated in doctor-service, admin can retry
+      }
+    }
+
+    res.status(200).json(doctorResponse.data);
   } catch (error) {
     res.status(error.response?.status || 500).json({
       success: false,
@@ -445,33 +466,3 @@ export const deletePatientAccount = async (req, res) => {
     });
   }
 };
-
-export const deleteDoctorAccount = async (req, res) => {
-  try {
-    const targetId = req.params.id;
-
-    // 1. Fetch doctor to get authUserId
-    const doctorRes = await httpClient.get(`${process.env.DOCTOR_SERVICE_URL}/api/doctors/${targetId}`);
-    const doctor = doctorRes.data.data;
-
-    // 2. Delete from Auth Service
-    await httpClient.delete(
-      `${process.env.AUTH_SERVICE_URL}/api/auth/internal/identities/${doctor.authUserId}`,
-      internalHeaders
-    );
-
-    // 3. Delete from Doctor Service
-    await httpClient.delete(`${process.env.DOCTOR_SERVICE_URL}/api/doctors/${targetId}`);
-
-    res.status(200).json({
-      success: true,
-      message: "Doctor account fully deleted"
-    });
-  } catch (error) {
-    console.error("Delete Doctor Error:", error.message);
-    res.status(500).json({
-      success: false,
-      message: error.response?.data?.message || "Failed to delete doctor account"
-    });
-  }
-};

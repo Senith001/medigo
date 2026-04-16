@@ -7,25 +7,27 @@ import ProtectedRoute from './components/ProtectedRoute'
 import LandingPage from './pages/LandingPage'
 
 // --- Auth Imports ---
-import LoginPage from './pages/Auth/LoginPage'
-import RegisterPage from './pages/Auth/RegisterPage'
-import VerifyOTPPage from './pages/Auth/VerifyOTPPage'
-import AdminLogin from './pages/Auth/AdminLogin'
-import DoctorRegistration from './pages/Auth/DoctorRegistration'
+import LoginPage              from './pages/Auth/LoginPage'
+import RegisterPage           from './pages/Auth/RegisterPage'
+import VerifyOTPPage          from './pages/Auth/VerifyOTPPage'
+import AdminLogin             from './pages/Auth/AdminLogin'
+import DoctorLogin            from './pages/Admin/DoctorLogin'
+import DoctorRegistration     from './pages/Auth/DoctorRegistration'
 
 // --- Dashboard Imports ---
-import ManageAvailability from './pages/Doctor/ManageAvailability'
-import PatientDashboard from './pages/Patient/PatientDashboard'
-import PatientProfile from './pages/Patient/PatientProfile'
-import DoctorDashboard from './pages/Doctor/DoctorDashboard'
-import AdminLayout from './pages/Admin/AdminLayout'
-import AdminDashboard from './pages/Admin/AdminDashboard'
-import PatientManagement from './pages/Admin/PatientManagement'
-import DoctorManagement from './pages/Admin/DoctorManagement'
-import AdminManagement from './pages/Admin/AdminManagement'
-import AdminProfile from './pages/Admin/AdminProfile'
-import AdminSetup from './pages/Admin/AdminSetup'
-import SuperAdminBootstrap from './pages/Admin/SuperAdminBootstrap'
+import ManageAvailability     from './pages/Doctor/ManageAvailability'
+import PatientDashboard       from './pages/Patient/PatientDashboard'
+import PatientProfile         from './pages/Patient/PatientProfile'
+import DoctorDashboard        from './pages/Doctor/DoctorDashboard'
+import DoctorProfile          from './pages/Doctor/DoctorProfile'
+import AdminLayout            from './pages/Admin/AdminLayout'
+import AdminDashboard         from './pages/Admin/AdminDashboard'
+import PatientManagement      from './pages/Admin/PatientManagement'
+import DoctorManagement       from './pages/Admin/DoctorManagement'
+import AdminManagement        from './pages/Admin/AdminManagement'
+import AdminProfile           from './pages/Admin/AdminProfile'
+import AdminSetup             from './pages/Admin/AdminSetup'
+import SuperAdminBootstrap    from './pages/Admin/SuperAdminBootstrap'
 
 // --- Common Features ---
 import SearchDoctors from './pages/Appointment/SearchDoctors'
@@ -62,6 +64,7 @@ function Layout() {
 
         {/* --- Admin Auth Routes --- */}
         <Route path="/admin-login" element={<AdminLogin />} />
+        <Route path="/doctor-login" element={<DoctorLogin />} />
         <Route path="/admin/setup" element={<AdminSetup />} />
         <Route path="/admin/bootstrap" element={<SuperAdminBootstrap />} />
 
@@ -79,6 +82,7 @@ function Layout() {
         <Route path="/doctor" element={<ProtectedRoute roles={['doctor']}><DoctorDashboard /></ProtectedRoute>} />
         <Route path="/doctor/dashboard" element={<ProtectedRoute roles={['doctor']}><DoctorDashboard /></ProtectedRoute>} />
         <Route path="/doctor/availability" element={<ProtectedRoute roles={['doctor']}><ManageAvailability /></ProtectedRoute>} />
+        <Route path="/doctor/profile" element={<ProtectedRoute roles={['doctor']}><DoctorProfile /></ProtectedRoute>} />
 
         {/* --- Protected Patient Routes --- */}
         <Route path="/dashboard" element={<ProtectedRoute roles={['patient']}><PatientDashboard /></ProtectedRoute>} />

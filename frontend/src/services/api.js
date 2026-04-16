@@ -84,6 +84,7 @@ export const appointmentAPI = {
 export const doctorAPI = {
   register:    (data) => api.post(`${DOCTOR_URL}/api/doctors`, data),
   getProfiles: (params) => api.get(`${DOCTOR_URL}/api/doctors`, { params }),
+  getMyProfile: ()       => api.get(`${DOCTOR_URL}/api/doctors/me`),
   getById:     (id)     => api.get(`${DOCTOR_URL}/api/doctors/${id}`),
   getProfileByEmail: (email) => api.get(`${DOCTOR_URL}/api/doctors/profile/${email}`),
   getAvailability: (doctorId) => api.get(`${DOCTOR_URL}/api/doctors/${doctorId}/availability`),
