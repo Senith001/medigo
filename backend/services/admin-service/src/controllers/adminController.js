@@ -26,6 +26,22 @@ export const loginAdmin = async (req, res) => {
       });
     }
 
+    const adminCheck = await Admin.findOne({ email: email.toLowerCase() });
+    
+    if (!adminCheck) {
+      return res.status(403).json({
+        success: false,
+        message: "Admin profile not found in Admin Service."
+      });
+    }
+
+    if (!adminCheck.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: "Account disabled. Please contact the super admin."
+      });
+    }
+
     res.status(200).json(response.data);
   } catch (error) {
     res.status(error.response?.status || 500).json({
@@ -82,7 +98,7 @@ export const bootstrapSuperAdmin = async (req, res) => {
 
 export const createAdmin = async (req, res) => {
   try {
-    const { fullName, email, password, phone } = req.body;
+    const { fullName, email, phone } = req.body;
 
     const existingAdmin = await Admin.findOne({ email: email.toLowerCase() });
     if (existingAdmin) {
@@ -96,7 +112,7 @@ export const createAdmin = async (req, res) => {
     try {
       const authResponse = await httpClient.post(
         `${process.env.AUTH_SERVICE_URL}/api/auth/internal/users`,
-        { fullName, email, password, phone, role: "admin" },
+        { fullName, email, phone, role: "admin" },
         internalHeaders
       );
       authUser = authResponse.data.data;
@@ -113,12 +129,13 @@ export const createAdmin = async (req, res) => {
       fullName: authUser.fullName,
       email: authUser.email,
       phone: authUser.phone,
-      role: "admin"
+      role: "admin",
+      isActive: false  // Stays inactive until they set their password
     });
 
     res.status(201).json({
       success: true,
-      message: "Admin created successfully",
+      message: "Admin invitation sent. They will receive an email to set up their account.",
       data: admin
     });
   } catch (error) {
@@ -140,7 +157,9 @@ export const createAdmin = async (req, res) => {
 
 export const getAdmins = async (req, res) => {
   try {
-    const admins = await Admin.find();
+    // Added the filter to only match documents where role is "admin"
+    const admins = await Admin.find({ role: "admin" });
+    
     res.status(200).json({
       success: true,
       count: admins.length,
@@ -149,6 +168,104 @@ export const getAdmins = async (req, res) => {
   } catch (error) {
     res.status(500);
     throw new Error("Failed to fetch admins");
+  }
+};
+
+// Called internally by auth-service after a new admin completes password setup
+export const activateAdmin = async (req, res) => {
+  try {
+    const isMongoId = /^[0-9a-fA-F]{24}$/.test(req.params.id);
+    const query = isMongoId ? { authUserId: req.params.id } : { userId: req.params.id };
+
+    const admin = await Admin.findOne(query);
+
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Admin profile not found." });
+    }
+
+    admin.isActive = true;
+    await admin.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Admin ${admin.fullName} has been activated.`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to activate admin." });
+  }
+};
+
+export const resendAdminInvitation = async (req, res) => {
+  try {
+    const { adminId } = req.params;
+
+    // First fetch the admin profile to get their email
+    const isMongoId = /^[0-9a-fA-F]{24}$/.test(adminId);
+    const query = isMongoId ? { _id: adminId } : { userId: adminId };
+    const admin = await Admin.findOne(query);
+
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Admin not found." });
+    }
+
+    if (admin.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot resend invitation to an already active admin."
+      });
+    }
+
+    // Proxy to auth-service which handles token generation and email
+    await httpClient.post(
+      `${process.env.AUTH_SERVICE_URL}/api/auth/internal/resend-admin-invitation`,
+      { email: admin.email },
+      internalHeaders
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Invitation resent to ${admin.email}.`
+    });
+  } catch (error) {
+    const msg = error.response?.data?.message || "Failed to resend invitation.";
+    res.status(error.response?.status || 500).json({ success: false, message: msg });
+  }
+};
+
+export const toggleAdminStatus = async (req, res) => {
+  try {
+    if (req.user.role !== "superadmin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only superadmins can toggle admin status."
+      });
+    }
+
+    if (req.user.userId === req.params.id || req.user._id.toString() === req.params.id) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot change your own status."
+      });
+    }
+
+    const isMongoId = /^[0-9a-fA-F]{24}$/.test(req.params.id);
+    const query = isMongoId ? { _id: req.params.id } : { userId: req.params.id };
+
+    const admin = await Admin.findOne(query);
+
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Admin not found." });
+    }
+
+    admin.isActive = !admin.isActive;
+    await admin.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Admin ${admin.fullName} has been ${admin.isActive ? 'enabled' : 'disabled'}.`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to update admin status." });
   }
 };
 
@@ -163,6 +280,67 @@ export const getPatients = async (req, res) => {
   } catch (error) {
     res.status(500);
     throw new Error("Failed to fetch patients");
+  }
+};
+
+// ============================================
+// GET PATIENT BY ID - CALL PATIENT CONTROLLER
+// ============================================
+
+export const getPatientById = async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const response = await httpClient.get(
+      `${process.env.PATIENT_SERVICE_URL}/api/patients/${targetId}`,
+      {
+        headers: {
+          Authorization: req.headers.authorization
+        }
+      }
+    );
+    res.status(200).json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({
+      success: false,
+      message: error.response?.data?.message || "Failed to fetch patient details"
+    });
+  }
+};
+
+// ==========================================
+// DOCTOR MANAGEMENT
+// ==========================================
+
+export const getDoctors = async (req, res) => {
+  try {
+    const response = await httpClient.get(
+      `${process.env.DOCTOR_SERVICE_URL}/api/doctors`
+    );
+    res.status(200).json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({
+      success: false,
+      message: error.response?.data?.message || "Failed to fetch doctors"
+    });
+  }
+};
+
+export const updateDoctorStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['pending', 'verified', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: "Invalid status value. Must be pending, verified, or rejected." });
+    }
+    const response = await httpClient.patch(
+      `${process.env.DOCTOR_SERVICE_URL}/api/doctors/${req.params.id}/status`,
+      { status }
+    );
+    res.status(200).json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({
+      success: false,
+      message: error.response?.data?.message || "Failed to update doctor status"
+    });
   }
 };
 

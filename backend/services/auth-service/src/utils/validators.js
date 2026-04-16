@@ -1,13 +1,13 @@
 export const validatePatientRegistration = (data) => {
   const errors = {};
 
-  // 1. Full Name: English letters only, exactly one space, max 20 chars
+  // 1. Full Name: Required, max 30 chars, no special chars/digits, spaces allowed
   if (!data.fullName) {
-    errors.fullName = "Full name is required";
-  } else if (data.fullName.length > 20) {
-    errors.fullName = "Full name cannot exceed 20 characters";
-  } else if (!/^[A-Za-z]+ [A-Za-z]+$/.test(data.fullName)) {
-    errors.fullName = "Full name must contain only English letters and exactly one space separating two names";
+    errors.fullName = "Name is required";
+  } else if (data.fullName.length > 30) {
+    errors.fullName = "Name must not exceed 30 characters";
+  } else if (!/^[A-Za-z ]+$/.test(data.fullName)) {
+    errors.fullName = "Name cannot contain special characters or digits";
   }
 
   // 2. Email: Valid format
@@ -17,11 +17,11 @@ export const validatePatientRegistration = (data) => {
     errors.email = "Invalid email format";
   }
 
-  // 3. Phone: 07XXXXXXXX format
-  if (!data.phone) {
-    errors.phone = "Phone number is required";
-  } else if (!/^07\d{8}$/.test(data.phone)) {
-    errors.phone = "Phone number must be in 07XXXXXXXX format";
+  // 3. Phone: .trim(), notEmpty, regex for mobile number
+  if (!data.phone || typeof data.phone !== 'string' || data.phone.trim() === '') {
+    errors.phone = "Mobile number is required";
+  } else if (!/^(0[0-9]{9}|(77|76|74|78|75|71|70)[0-9]{7})$/.test(data.phone.trim())) {
+    errors.phone = "Invalid mobile number";
   }
 
   // 4. Password: >8 chars (min 9), 1 uppercase, 1 lowercase, 1 number, 1 special char
@@ -46,19 +46,29 @@ export const validatePatientRegistration = (data) => {
     errors.bloodGroup = "Blood group cannot be empty";
   }
 
-  // 8. Address: Ensure it's not empty if provided
-  if (data.address && data.address.trim() === "") {
-    errors.address = "Address cannot be empty";
+  // 8. Address: (optional) .trim(), regex, max 100 chars
+  if (data.address && typeof data.address === 'string' && data.address.trim() !== '') {
+    if (!/^[A-Za-z0-9/\-, ]+$/.test(data.address.trim())) {
+      errors.address = "Address can only contain letters, numbers, '/', and '-'";
+    } else if (data.address.trim().length > 100) {
+      errors.address = "Address must not exceed 100 characters";
+    }
   }
 
-  // 9. Emergency Contact Name: Ensure it's not empty if provided
-  if (data.emergencyContactName && data.emergencyContactName.trim() === "") {
-    errors.emergencyContactName = "Emergency contact name cannot be empty";
+  // 9. Emergency Contact Name: (optional) max 30 chars, no special chars/digits, spaces allowed
+  if (data.emergencyContactName && typeof data.emergencyContactName === 'string' && data.emergencyContactName.trim() !== '') {
+    if (data.emergencyContactName.length > 30) {
+      errors.emergencyContactName = "Name must not exceed 30 characters";
+    } else if (!/^[A-Za-z ]+$/.test(data.emergencyContactName)) {
+      errors.emergencyContactName = "Name cannot contain special characters or digits";
+    }
   }
 
-  // 10. Emergency Contact Phone: 07XXXXXXXX format
-  if (data.emergencyContactPhone && !/^07\d{8}$/.test(data.emergencyContactPhone)) {
-    errors.emergencyContactPhone = "Emergency contact phone must be in 07XXXXXXXX format";
+  // 10. Emergency Contact Phone: (optional) Use same as phone field
+  if (data.emergencyContactPhone && typeof data.emergencyContactPhone === 'string' && data.emergencyContactPhone.trim() !== '') {
+    if (!/^(0[0-9]{9}|(77|76|74|78|75|71|70)[0-9]{7})$/.test(data.emergencyContactPhone.trim())) {
+      errors.emergencyContactPhone = "Invalid mobile number";
+    }
   }
 
   return {

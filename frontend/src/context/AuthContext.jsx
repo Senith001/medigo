@@ -2,18 +2,33 @@ import { createContext, useContext, useState, useEffect } from 'react'
 const AuthContext = createContext(null)
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)
   const [token, setToken] = useState(() => localStorage.getItem('token'))
+  const [user, setUser] = useState(() => {
+    const storedToken = localStorage.getItem('token');
+    if (storedToken) {
+      try {
+        const p = JSON.parse(atob(storedToken.split('.')[1]));
+        if (p.exp * 1000 >= Date.now()) {
+          return { id: p.id, userId: p.userId, name: p.fullName || p.name || p.email?.split('@')[0], email: p.email, role: p.role };
+        } else {
+          localStorage.removeItem('token');
+        }
+      } catch {
+        localStorage.removeItem('token');
+      }
+    }
+    return null;
+  });
 
   useEffect(() => {
-    if (token) {
+    if (token && !user) {
       try {
         const p = JSON.parse(atob(token.split('.')[1]))
         if (p.exp * 1000 < Date.now()) { logout(); return }
         setUser({ id: p.id, userId: p.userId, name: p.fullName || p.name || p.email?.split('@')[0], email: p.email, role: p.role })
       } catch { logout() }
     }
-  }, [token])
+  }, [token, user])
 
   const login = (newToken, userData = null) => {
     localStorage.setItem('token', newToken)

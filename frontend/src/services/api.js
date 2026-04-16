@@ -36,9 +36,14 @@ api.interceptors.response.use(
 //                    Auth Service APIs (Port 5001)
 //===============================================================================
 export const authAPI = {
-  login:     (data) => api.post('http://localhost:5001/api/auth/login', data),
-  register:  (data) => api.post('http://localhost:5001/api/auth/register/patient', data),
-  verifyOtp: (data) => api.post('http://localhost:5001/api/auth/verify-otp', data),
+  login:            (data) => api.post('http://localhost:5001/api/auth/login', data),
+  register:         (data) => api.post('http://localhost:5001/api/auth/register/patient', data),
+  verifyOtp:        (data) => api.post('http://localhost:5001/api/auth/verify-otp', data),
+  getMe:            () => api.get('http://localhost:5001/api/auth/me'),
+  changePassword:   (data) => api.put('http://localhost:5001/api/auth/change-password', data),
+  requestDeleteOtp: () => api.post('http://localhost:5001/api/auth/me/request-delete-otp'),
+  deleteMyAccount:  (data) => api.delete('http://localhost:5001/api/auth/me', { data }),
+  setupAdminPassword: (data) => api.post('http://localhost:5001/api/auth/setup-password', data),
 }
 
 //===============================================================================
@@ -58,9 +63,21 @@ export const appointmentAPI = {
 //===============================================================================
 //                    Admin Service APIs (Port 5003)
 //===============================================================================
-
-
-
+export const adminAPI = {
+  getPatients: () => api.get('http://localhost:5003/api/admin/patients'),
+  getPatientById: (id) => api.get(`http://localhost:5003/api/admin/patients/${id}`),
+  deletePatient: (id) => api.delete(`http://localhost:5003/api/admin/patients/${id}`),
+  getDoctors: () => api.get('http://localhost:5003/api/admin/doctors'),
+  updateDoctorStatus: (id, status) => api.patch(`http://localhost:5003/api/admin/doctors/${id}/status`, { status }),
+  getAdminsList: () => api.get('http://localhost:5003/api/admin/list'),
+  createAdmin: (data) => api.post('http://localhost:5003/api/admin/create', data),
+  toggleAdminStatus: (id) => api.patch(`http://localhost:5003/api/admin/admins/${id}/status`),
+  resendInvitation: (id) => api.post(`http://localhost:5003/api/admin/admins/${id}/resend-invitation`),
+  adminLogin: (data) => api.post('http://localhost:5003/api/admin/login', data),
+  bootstrapSuperAdmin: (data, superKey) => api.post('http://localhost:5003/api/admin/bootstrap-superadmin', data, {
+    headers: { 'x-admin-super-key': superKey }
+  }),
+}
 
 //===============================================================================
 //                    Patient Service APIs (Port 5002)

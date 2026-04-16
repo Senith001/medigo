@@ -12,7 +12,14 @@ import AdminLogin             from './pages/Auth/AdminLogin'
 // --- Dashboard Imports ---
 import PatientDashboard       from './pages/Patient/PatientDashboard'
 import PatientProfile         from './pages/Patient/PatientProfile'
+import AdminLayout            from './pages/Admin/AdminLayout'
 import AdminDashboard         from './pages/Admin/AdminDashboard'
+import PatientManagement      from './pages/Admin/PatientManagement'
+import DoctorManagement       from './pages/Admin/DoctorManagement'
+import AdminManagement        from './pages/Admin/AdminManagement'
+import AdminProfile           from './pages/Admin/AdminProfile'
+import AdminSetup             from './pages/Admin/AdminSetup'
+import SuperAdminBootstrap    from './pages/Admin/SuperAdminBootstrap'
 
 // --- Teammate's Existing Imports ---
 import SearchDoctors          from './pages/SearchDoctors'
@@ -25,7 +32,7 @@ function Layout() {
 
   // Only show the standard patient/public navbar if it's NOT an admin.
   // Admins usually have their own sidebar/navbar layout.
-  const showStandardNavbar = token && user?.role !== 'admin'
+  const showStandardNavbar = token && !['admin', 'superadmin'].includes(user?.role)
 
   return (
     <>
@@ -38,9 +45,17 @@ function Layout() {
         
         {/* --- Admin Auth Routes --- */}
         <Route path="/admin-login" element={<AdminLogin />} />
+        <Route path="/admin/setup" element={<AdminSetup />} />
+        <Route path="/admin/bootstrap" element={<SuperAdminBootstrap />} />
 
         {/* --- Protected Admin Routes --- */}
-        <Route path="/admin" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute roles={['admin', 'superadmin']}><AdminLayout /></ProtectedRoute>}>
+          <Route index element={<AdminDashboard />} />
+          <Route path="admins" element={<AdminManagement />} />
+          <Route path="patients" element={<PatientManagement />} />
+          <Route path="doctors" element={<DoctorManagement />} />
+          <Route path="profile" element={<AdminProfile />} />
+        </Route>
 
         {/* --- Protected Patient Routes --- */}
         <Route path="/dashboard" element={<ProtectedRoute roles={['patient']}><PatientDashboard /></ProtectedRoute>} />
@@ -52,7 +67,7 @@ function Layout() {
         
         {/* --- Fallback Redirect --- */}
         {/* If logged in as admin, default to /admin. If patient, default to /dashboard. Otherwise /login */}
-        <Route path="*" element={<Navigate to={token ? (user?.role === 'admin' ? '/admin' : '/dashboard') : '/login'} replace />} />
+        <Route path="*" element={<Navigate to={token ? (['admin','superadmin'].includes(user?.role) ? '/admin' : '/dashboard') : '/login'} replace />} />
       </Routes>
     </>
   )
