@@ -2,12 +2,38 @@ import mongoose from "mongoose";
 
 const doctorSchema = new mongoose.Schema(
   {
+    authUserId: {
+      type: String,
+      required: true,
+      unique: true
+    },
+    userId: {
+      type: String,
+      unique: true,
+      sparse: true
+    },
     fullName: {
       type: String,
       required: true,
       trim: true
     },
     email: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true
+    },
+    category: {
+      type: String,
+      required: true
+    },
+    nicNumber: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true
+    },
+    medicalLicenseNumber: {
       type: String,
       required: true,
       unique: true,

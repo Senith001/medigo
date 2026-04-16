@@ -2,10 +2,88 @@ import User from "../models/User.js";
 import Otp from "../models/Otp.js";
 import generateOtp from "../utils/generateOtp.js";
 import generateToken from "../utils/generateToken.js";
-import { sendOtpEmail, sendSimpleEmail, sendAdminInvitationEmail } from "../utils/email.js";
+import { sendOtpEmail, sendSimpleEmail, sendAdminInvitationEmail, sendDoctorApplicationEmail, sendDoctorApprovalEmail, sendDoctorRejectionEmail } from "../utils/email.js";
 import httpClient from "../utils/httpClient.js";
 import { validatePatientRegistration, validatePassword } from "../utils/validators.js";
 import crypto from "crypto";
+
+//============================================
+//           REGISTER DOCTOR
+//============================================
+
+export const registerDoctor = async (req, res) => {
+  try {
+    const { fullName, email, password, phone, category, nicNumber, specialty, qualifications, experienceYears, clinicLocation, consultationFee, bio, medicalLicenseNumber } = req.body;
+
+    if (!validatePassword(password)) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 8 characters and contain at least one uppercase, lowercase, number, and special character."
+      });
+    }
+
+    const existing = await User.findOne({ email: email.toLowerCase() });
+    if (existing) {
+      return res.status(400).json({ success: false, message: "Email already registered." });
+    }
+
+    // Create auth identity — isVerified: false until admin approves
+    const user = await User.create({
+      fullName,
+      email: email.toLowerCase(),
+      password,
+      phone,
+      role: "doctor",
+      isVerified: false
+    });
+
+    // Create doctor profile in doctor-service
+    try {
+      await httpClient.post(
+        `${process.env.DOCTOR_SERVICE_URL}/api/doctors/internal/create-profile`,
+        {
+          authUserId: user._id,
+          userId: user.userId,
+          fullName: user.fullName,
+          email: user.email,
+          phone: user.phone,
+          category,
+          nicNumber,
+          specialty,
+          qualifications,
+          experienceYears,
+          clinicLocation,
+          consultationFee,
+          bio,
+          medicalLicenseNumber
+        },
+        { headers: { "x-service-secret": process.env.SERVICE_SECRET } }
+      );
+    } catch (serviceError) {
+      // Rollback auth user if profile creation fails
+      await user.deleteOne();
+      return res.status(500).json({
+        success: false,
+        message: serviceError.response?.data?.message || "Failed to create doctor profile."
+      });
+    }
+
+    // Send application received email
+    try {
+      await sendDoctorApplicationEmail(user.email, user.fullName);
+    } catch (emailErr) {
+      console.error("Failed to send doctor application email:", emailErr.message);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "Registration received. Your medical credentials will be reviewed by our team. You will be notified by email."
+    });
+  } catch (error) {
+    res.status(500);
+    throw new Error(error.message);
+  }
+};
 
 //============================================
 //           REGISTER PATIENT
@@ -203,10 +281,11 @@ export const login = async (req, res) => {
     }
 
     if (!user.isVerified) {
-      return res.status(403).json({
-        success: false,
-        message: "Please verify your email before login"
-      });
+      // Doctors pending admin approval get a specific message
+      const message = user.role === "doctor"
+        ? "Your account is pending admin verification. You will be notified by email once approved."
+        : "Please verify your email before login";
+      return res.status(403).json({ success: false, message });
     }
 
     const token = generateToken(user);
@@ -528,6 +607,42 @@ export const deleteMyAccount = async (req, res) => {
 // ==========================================
 // INTERNAL SERVICE METHODS
 // ==========================================
+
+// Called by admin-service to approve or reject a doctor
+export const verifyDoctorInternal = async (req, res) => {
+  try {
+    const { approve } = req.body; // boolean: true = approve, false = reject
+    const isMongoId = /^[0-9a-fA-F]{24}$/.test(req.params.id);
+    const query = isMongoId ? { _id: req.params.id } : { userId: req.params.id };
+
+    const user = await User.findOne({ ...query, role: "doctor" });
+    if (!user) {
+      return res.status(404).json({ success: false, message: "Doctor user not found in Auth DB." });
+    }
+
+    user.isVerified = approve === true;
+    await user.save();
+
+    // Fire appropriate email
+    try {
+      if (approve) {
+        await sendDoctorApprovalEmail(user.email, user.fullName);
+      } else {
+        await sendDoctorRejectionEmail(user.email, user.fullName);
+      }
+    } catch (emailErr) {
+      console.error("Failed to send doctor status email:", emailErr.message);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Doctor ${approve ? "approved" : "rejected"} successfully.`
+    });
+  } catch (error) {
+    res.status(500);
+    throw new Error(error.message);
+  }
+};
 
 export const createInternalUser = async (req, res) => {
   try {

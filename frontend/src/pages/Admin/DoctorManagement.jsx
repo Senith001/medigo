@@ -39,7 +39,6 @@ export default function DoctorManagement() {
     try {
       const res = await adminAPI.updateDoctorStatus(id, newStatus);
       if (res.data.success) {
-        const updated = res.data.data;
         setDoctors(prev => prev.map(d => d._id === id ? { ...d, status: newStatus } : d));
         // Also update the modal if it's open for this doctor
         if (selectedDoctor?._id === id) {
@@ -141,31 +140,49 @@ export default function DoctorManagement() {
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{ backgroundColor: '#ffffff', borderRadius: '20px', width: '100%', maxWidth: '620px', maxHeight: '90vh', overflowY: 'auto', padding: '32px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)' }}
+            style={{ backgroundColor: '#ffffff', borderRadius: '20px', width: '100%', maxWidth: '750px', maxHeight: '90vh', overflowY: 'auto', padding: '32px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)' }}
           >
-            {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+            {/* 1. Modal Header & Top Section (Name, ID, Status, Bio) */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
                 <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: '#4f46e5', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', fontWeight: 'bold', flexShrink: 0 }}>
                   {selectedDoctor.fullName?.[0]?.toUpperCase()}
                 </div>
                 <div>
-                  <h3 style={{ margin: '0 0 4px 0', color: '#0f172a', fontSize: '1.3rem' }}>{selectedDoctor.fullName}</h3>
-                  <div style={{ color: '#64748b', fontSize: '0.9rem' }}>{selectedDoctor.specialty}</div>
-                  <span style={{
-                    display: 'inline-block', marginTop: '6px',
-                    backgroundColor: STATUS_STYLES[selectedDoctor.status]?.bg,
-                    color: STATUS_STYLES[selectedDoctor.status]?.color,
-                    padding: '3px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '700'
-                  }}>
-                    {STATUS_STYLES[selectedDoctor.status]?.label}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+                    <h3 style={{ margin: '0', color: '#0f172a', fontSize: '1.3rem' }}>{selectedDoctor.fullName}</h3>
+                    <span style={{
+                      backgroundColor: STATUS_STYLES[selectedDoctor.status]?.bg,
+                      color: STATUS_STYLES[selectedDoctor.status]?.color,
+                      padding: '3px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '700'
+                    }}>
+                      {STATUS_STYLES[selectedDoctor.status]?.label}
+                    </span>
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '6px' }}>
+                    <strong>Doctor ID:</strong> {selectedDoctor.userId || selectedDoctor._id}
+                  </div>
+                  {/* Bio at the bottom of the top section */}
+                  {selectedDoctor.bio && (
+                    <p style={{ margin: '8px 0 0 0', fontSize: '0.9rem', color: '#475569', lineHeight: '1.5', fontStyle: 'italic' }}>
+                      "{selectedDoctor.bio}"
+                    </p>
+                  )}
                 </div>
               </div>
               <button onClick={() => setSelectedDoctor(null)} style={{ background: 'none', border: 'none', fontSize: '1.6rem', color: '#94a3b8', cursor: 'pointer', lineHeight: 1 }}>&times;</button>
             </div>
 
-            {/* Doctor Details Grid */}
+            {/* 2. Inline Copyable Fields Row */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', backgroundColor: '#f8fafc', padding: '16px', borderRadius: '12px', marginBottom: '24px', border: '1px solid #e2e8f0' }}>
+              <CopyableField label="Full Name" value={selectedDoctor.fullName} />
+              <CopyableField label="NIC Number" value={selectedDoctor.nicNumber} />
+              <CopyableField label="SLMC License" value={selectedDoctor.medicalLicenseNumber} />
+              <CopyableField label="Specialty" value={selectedDoctor.specialty} />
+              <CopyableField label="Category" value={selectedDoctor.category} />
+            </div>
+
+            {/* 3. Remaining Standard Fields Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
               <ModalField label="Email" value={selectedDoctor.email} />
               <ModalField label="Phone" value={selectedDoctor.phone} />
@@ -173,47 +190,64 @@ export default function DoctorManagement() {
               <ModalField label="Experience" value={`${selectedDoctor.experienceYears} years`} />
               <ModalField label="Consultation Fee" value={`$${selectedDoctor.consultationFee}`} />
               <ModalField label="Clinic Location" value={selectedDoctor.clinicLocation} />
-              {selectedDoctor.bio && (
-                <div style={{ gridColumn: 'span 2' }}>
-                  <ModalField label="Bio" value={selectedDoctor.bio} />
-                </div>
-              )}
               <ModalField label="Registered" value={new Date(selectedDoctor.createdAt).toLocaleDateString()} />
               <ModalField label="Last Updated" value={new Date(selectedDoctor.updatedAt).toLocaleDateString()} />
             </div>
 
-            {/* Status Toggle Section */}
+            {/* 4. Status Toggle Section & Verification Link */}
             <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
-              <p style={{ margin: '0 0 12px 0', fontSize: '0.85rem', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Change Verification Status</p>
+              
+              {/* Verification Header & Link */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Verification Decision
+                </p>
+                <a 
+                  href="https://slmc.gov.lk/en/public/registers" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#4f46e5', textDecoration: 'none', fontSize: '0.85rem', fontWeight: '600' }}
+                >
+                  Verify via Official SLMC Registry
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line>
+                  </svg>
+                </a>
+              </div>
+
+              {/* Status Buttons (Pending Removed) */}
               <div style={{ display: 'flex', gap: '10px' }}>
-                {Object.entries(STATUS_STYLES).map(([key, st]) => {
-                  const isActive = selectedDoctor.status === key;
-                  const isUpdating = updatingId === selectedDoctor._id;
-                  return (
-                    <button
-                      key={key}
-                      disabled={isActive || isUpdating}
-                      onClick={() => handleStatusChange(selectedDoctor._id, key)}
-                      style={{
-                        flex: 1,
-                        padding: '10px',
-                        borderRadius: '10px',
-                        border: `2px solid ${isActive ? st.activeBg : 'transparent'}`,
-                        cursor: isActive || isUpdating ? 'not-allowed' : 'pointer',
-                        fontWeight: '700',
-                        fontSize: '0.9rem',
-                        backgroundColor: isActive ? st.activeBg : st.bg,
-                        color: isActive ? '#ffffff' : st.color,
-                        opacity: !isActive && isUpdating ? 0.5 : 1,
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      {isUpdating && !isActive ? '...' : st.label}
-                    </button>
-                  );
+                {Object.entries(STATUS_STYLES)
+                  .filter(([key]) => key !== 'pending') // Filter out pending
+                  .map(([key, st]) => {
+                    const isActive = selectedDoctor.status === key;
+                    const isUpdating = updatingId === selectedDoctor._id;
+                    return (
+                      <button
+                        key={key}
+                        disabled={isActive || isUpdating}
+                        onClick={() => handleStatusChange(selectedDoctor._id, key)}
+                        style={{
+                          flex: 1,
+                          padding: '10px',
+                          borderRadius: '10px',
+                          border: `2px solid ${isActive ? st.activeBg : 'transparent'}`,
+                          cursor: isActive || isUpdating ? 'not-allowed' : 'pointer',
+                          fontWeight: '700',
+                          fontSize: '0.9rem',
+                          backgroundColor: isActive ? st.activeBg : st.bg,
+                          color: isActive ? '#ffffff' : st.color,
+                          opacity: !isActive && isUpdating ? 0.5 : 1,
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        {isUpdating && !isActive ? 'Processing...' : st.label}
+                      </button>
+                    );
                 })}
               </div>
             </div>
+
           </div>
         </div>
       )}
@@ -229,6 +263,47 @@ function ModalField({ label, value }) {
     <div>
       <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: '700', letterSpacing: '0.5px' }}>{label}</p>
       <p style={{ margin: 0, color: '#1e293b', fontWeight: '500', fontSize: '0.9rem' }}>{value || <span style={{ color: '#cbd5e1' }}>Not provided</span>}</p>
+    </div>
+  );
+}
+
+// Helper component for fields requiring quick copy-to-clipboard functionality
+function CopyableField({ label, value }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    if (value) {
+      navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div style={{ flex: '1 1 calc(20% - 16px)', minWidth: '120px' }}>
+      <p style={{ margin: '0 0 4px 0', fontSize: '0.70rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: '700', letterSpacing: '0.5px' }}>
+        {label}
+      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <button
+          onClick={handleCopy}
+          title="Copy to clipboard"
+          style={{ 
+            background: 'none', border: 'none', cursor: value ? 'pointer' : 'default', 
+            padding: 0, display: 'flex', alignItems: 'center',
+            color: copied ? '#10b981' : '#cbd5e1', transition: 'color 0.2s ease' 
+          }}
+        >
+          {copied ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          )}
+        </button>
+        <p style={{ margin: 0, color: '#1e293b', fontWeight: '600', fontSize: '0.85rem', wordBreak: 'break-word' }}>
+          {value || <span style={{ color: '#cbd5e1', fontWeight: '500' }}>N/A</span>}
+        </p>
+      </div>
     </div>
   );
 }

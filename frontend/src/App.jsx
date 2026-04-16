@@ -11,12 +11,14 @@ import LoginPage              from './pages/Auth/LoginPage'
 import RegisterPage           from './pages/Auth/RegisterPage'
 import VerifyOTPPage          from './pages/Auth/VerifyOTPPage'
 import AdminLogin             from './pages/Auth/AdminLogin'
+import DoctorLogin            from './pages/Admin/DoctorLogin'
 import DoctorRegistration     from './pages/Auth/DoctorRegistration'
 
 // --- Dashboard Imports ---
 import PatientDashboard       from './pages/Patient/PatientDashboard'
 import PatientProfile         from './pages/Patient/PatientProfile'
 import DoctorDashboard        from './pages/Doctor/DoctorDashboard'
+import DoctorProfile          from './pages/Doctor/DoctorProfile'
 import AdminLayout            from './pages/Admin/AdminLayout'
 import AdminDashboard         from './pages/Admin/AdminDashboard'
 import PatientManagement      from './pages/Admin/PatientManagement'
@@ -60,6 +62,7 @@ function Layout() {
         
         {/* --- Admin Auth Routes --- */}
         <Route path="/admin-login" element={<AdminLogin />} />
+        <Route path="/doctor-login" element={<DoctorLogin />} />
         <Route path="/admin/setup" element={<AdminSetup />} />
         <Route path="/admin/bootstrap" element={<SuperAdminBootstrap />} />
 
@@ -75,6 +78,7 @@ function Layout() {
 
         {/* --- Protected Doctor Routes --- */}
         <Route path="/doctor" element={<ProtectedRoute roles={['doctor']}><DoctorDashboard /></ProtectedRoute>} />
+        <Route path="/doctor/profile" element={<ProtectedRoute roles={['doctor']}><DoctorProfile /></ProtectedRoute>} />
 
         {/* --- Protected Patient Routes --- */}
         <Route path="/dashboard" element={<ProtectedRoute roles={['patient']}><PatientDashboard /></ProtectedRoute>} />

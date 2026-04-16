@@ -331,11 +331,32 @@ export const updateDoctorStatus = async (req, res) => {
     if (!['pending', 'verified', 'rejected'].includes(status)) {
       return res.status(400).json({ success: false, message: "Invalid status value. Must be pending, verified, or rejected." });
     }
-    const response = await httpClient.patch(
+
+    // Step 1: Update the doctor's status in doctor-service
+    const doctorResponse = await httpClient.patch(
       `${process.env.DOCTOR_SERVICE_URL}/api/doctors/${req.params.id}/status`,
-      { status }
+      { status },
+      internalHeaders  // service secret — doctor-service uses verifyInternalService for this route
     );
-    res.status(200).json(response.data);
+
+    const doctor = doctorResponse.data?.data;
+
+    // Step 2: Sync isVerified in auth-service and fire email
+    // Only act on terminal states — not when reverting to "pending"
+    if (status === 'verified' || status === 'rejected') {
+      try {
+        await httpClient.patch(
+          `${process.env.AUTH_SERVICE_URL}/api/auth/internal/doctors/${doctor?.authUserId || req.params.id}/verify`,
+          { approve: status === 'verified' },
+          internalHeaders
+        );
+      } catch (authErr) {
+        console.error("Failed to sync doctor verification in auth-service:", authErr.message);
+        // Non-fatal — status is updated in doctor-service, admin can retry
+      }
+    }
+
+    res.status(200).json(doctorResponse.data);
   } catch (error) {
     res.status(error.response?.status || 500).json({
       success: false,

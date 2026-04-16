@@ -81,6 +81,9 @@ export default function DoctorDashboard() {
                 {n.icon} {n.label}
               </button>
             ))}
+            <button onClick={() => navigate('/doctor/profile')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left transition-all text-white/50 hover:text-white hover:bg-white/10">
+              👤 Profile
+            </button>
           </nav>
 
           <div className="p-4 border-t border-white/10">

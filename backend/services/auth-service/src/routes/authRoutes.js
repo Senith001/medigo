@@ -1,6 +1,7 @@
 import express from "express";
 import {
   registerPatient,
+  registerDoctor,
   verifyRegistrationOtp,
   login,
   forgotPassword,
@@ -15,12 +16,14 @@ import {
   updateInternalUser,
   setupAdminPassword,
   resendAdminInvitation,
+  verifyDoctorInternal,
 } from "../controllers/authController.js";
 import { protect, authorize, verifyInternalService } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
 router.post("/register/patient", registerPatient);
+router.post("/register/doctor", registerDoctor);
 router.post("/verify-otp", verifyRegistrationOtp);
 router.post("/login", login);
 router.post("/forgot-password", forgotPassword);
@@ -33,11 +36,15 @@ router.get("/me", protect, getMe);
 router.post("/me/request-delete-otp", protect, authorize("patient"), requestDeleteOtp);
 router.delete("/me", protect, authorize("patient"), deleteMyAccount);
 
+// Doctor self-account deletion
+router.delete("/me/doctor", protect, authorize("doctor"), deleteMyAccount);
+
 // --- INTERNAL ROUTES (Server-to-Server Only) ---
 router.post("/internal/users", verifyInternalService, createInternalUser);
 router.get("/internal/users", verifyInternalService, getInternalUsersByRole);
 router.delete("/internal/identities/:id", verifyInternalService, deleteInternalIdentity);
 router.put("/internal/users/:id", verifyInternalService, updateInternalUser);
 router.post("/internal/resend-admin-invitation", verifyInternalService, resendAdminInvitation);
+router.patch("/internal/doctors/:id/verify", verifyInternalService, verifyDoctorInternal);
 
 export default router;
