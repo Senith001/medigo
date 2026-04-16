@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 // Check whether a route param is a valid MongoDB ObjectId.
 const validateObjectId = (paramName = "id") => {
@@ -16,4 +16,4 @@ const validateObjectId = (paramName = "id") => {
   };
 };
 
-module.exports = validateObjectId;
+export default validateObjectId;

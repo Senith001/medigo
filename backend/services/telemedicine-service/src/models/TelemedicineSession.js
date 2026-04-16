@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const telemedicineSessionSchema = new mongoose.Schema(
   {
@@ -70,7 +70,4 @@ const telemedicineSessionSchema = new mongoose.Schema(
 telemedicineSessionSchema.index({ doctorId: 1, createdAt: -1 });
 telemedicineSessionSchema.index({ patientId: 1, createdAt: -1 });
 
-module.exports = mongoose.model(
-  "TelemedicineSession",
-  telemedicineSessionSchema
-);
+export default mongoose.model("TelemedicineSession", telemedicineSessionSchema);

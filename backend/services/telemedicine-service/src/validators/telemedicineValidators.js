@@ -1,4 +1,4 @@
-const { body, param } = require("express-validator");
+import { body, param } from "express-validator";
 
 // Rules for creating a new telemedicine session.
 const createSessionValidation = [
@@ -46,7 +46,7 @@ const updateSessionStatusValidation = [
     .withMessage("Invalid status"),
 ];
 
-module.exports = {
+export {
   createSessionValidation,
   sessionIdValidation,
   updateSessionValidation,

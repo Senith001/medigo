@@ -1,4 +1,5 @@
-const Stripe = require("stripe");
+import "dotenv/config";
+import Stripe from "stripe";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -44,8 +45,4 @@ const createRefund = async (paymentIntentId) => {
   });
 };
 
-module.exports = {
-  createCheckoutSession,
-  retrieveCheckoutSession,
-  createRefund,
-};
+export { createCheckoutSession, retrieveCheckoutSession, createRefund };

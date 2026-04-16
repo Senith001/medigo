@@ -1,6 +1,6 @@
-const TelemedicineSession = require("../models/TelemedicineSession");
-const generateRoomName = require("../utils/generateRoomName");
-const { generateJitsiMeetingLink } = require("../services/jitsiService");
+import TelemedicineSession from "../models/TelemedicineSession.js";
+import generateRoomName from "../utils/generateRoomName.js";
+import { generateJitsiMeetingLink } from "../services/jitsiService.js";
 
 // Check whether the current user is allowed to view or join this session.
 const canAccessSession = (session, user) => {
@@ -353,7 +353,7 @@ const deleteSession = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
   createSession,
   getSessionById,
   getSessionByAppointmentId,

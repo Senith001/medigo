@@ -1,14 +1,14 @@
-const express = require("express");
-const validate = require("../middleware/validate");
-const validateObjectId = require("../middleware/validateObjectId");
-const {
+import express from "express";
+import validate from "../middleware/validate.js";
+import validateObjectId from "../middleware/validateObjectId.js";
+import {
   createSessionValidation,
   sessionIdValidation,
   updateSessionValidation,
   updateSessionStatusValidation,
-} = require("../validators/telemedicineValidators");
+} from "../validators/telemedicineValidators.js";
 
-const {
+import {
   createSession,
   getSessionById,
   getSessionByAppointmentId,
@@ -16,8 +16,8 @@ const {
   updateSession,
   updateSessionStatus,
   deleteSession,
-} = require("../controllers/telemedicineController");
-const { protect, authorize } = require("../middleware/auth");
+} from "../controllers/telemedicineController.js";
+import { protect, authorize } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -94,4 +94,4 @@ router.delete(
   deleteSession
 );
 
-module.exports = router;
+export default router;

@@ -1,12 +1,12 @@
-const express = require("express");
-const cors = require("cors");
-const dotenv = require("dotenv");
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
 
 dotenv.config();
 
-const connectDB = require("./config/db");
-const telemedicineRoutes = require("./routes/telemedicineRoutes");
-const { notFound, errorHandler } = require("./middleware/errorHandler");
+import connectDB from "./config/db.js";
+import telemedicineRoutes from "./routes/telemedicineRoutes.js";
+import { notFound, errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
 

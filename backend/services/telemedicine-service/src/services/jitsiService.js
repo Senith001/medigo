@@ -3,6 +3,4 @@ const generateJitsiMeetingLink = (roomName) => {
   return `${baseUrl}/${roomName}`;
 };
 
-module.exports = {
-  generateJitsiMeetingLink,
-};
+export { generateJitsiMeetingLink };
