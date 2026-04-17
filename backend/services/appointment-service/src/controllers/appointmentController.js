@@ -24,23 +24,30 @@ const bookAppointment = async (req, res) => {
         { headers: { Authorization: req.headers.authorization } }
       );
 
-      // Handle different response shapes: { doctor: {...} } or just {...}
       const doctor = doctorRes.data.doctor || doctorRes.data;
 
-      doctorName  = doctor.fullName  || doctor.name;
-      doctorEmail = doctor.email;
-      specialty   = doctor.specialty;
-      hospital    = doctor.hospital  || null;
+      // Use values from service if they exist, otherwise use fallbacks from req.body
+      doctorName  = doctor.fullName  || doctor.name  || req.body.doctorName;
+      doctorEmail = doctor.email || req.body.doctorEmail;
+      specialty   = doctor.specialty || req.body.specialty;
+      hospital    = doctor.hospital  || req.body.hospital || null;
       fee         = doctor.fee       || req.body.fee || 0;
 
     } catch (err) {
-      // Doctor-service unavailable — use request body fields as fallback
       console.warn('Doctor-service unavailable, using request body fallback.');
-      doctorName  = req.body.doctorName  || 'Unknown Doctor';
-      doctorEmail = req.body.doctorEmail || 'unknown@hospital.lk';
-      specialty   = req.body.specialty   || 'General';
+      doctorName  = req.body.doctorName;
+      doctorEmail = req.body.doctorEmail;
+      specialty   = req.body.specialty;
       hospital    = req.body.hospital    || null;
       fee         = req.body.fee         || 0;
+    }
+
+    // ── Validation: No Dummy Data ────────────────────────────
+    if (!doctorName || !doctorEmail || !specialty) {
+      return res.status(400).json({ 
+        message: 'Clinical Authorization Failure: Mandatory specialist metadata (Name, Email, or Specialty) is missing. Real-time data sync required.',
+        required: { doctorName: !!doctorName, doctorEmail: !!doctorEmail, specialty: !!specialty }
+      });
     }
 
     // ── Step 2: Check if slot is already taken ────────────────

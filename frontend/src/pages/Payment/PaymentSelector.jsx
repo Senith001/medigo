@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   CreditCard, 
@@ -8,14 +8,20 @@ import {
   CheckCircle2, 
   ShieldCheck,
   AlertCircle,
-  Loader2
+  Loader2,
+  ChevronLeft,
+  Calendar,
+  Clock,
+  User,
+  Wallet
 } from "lucide-react";
 import { appointmentAPI, paymentAPI } from "../../services/api";
+import DashboardLayout from "../../components/DashboardLayout";
+import Button from "../../components/ui/Button";
 
 const PaymentSelector = () => {
   const { appointmentId } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
   const [appointment, setAppointment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [method, setMethod] = useState("stripe");
@@ -28,7 +34,7 @@ const PaymentSelector = () => {
         const { data } = await appointmentAPI.getById(appointmentId);
         setAppointment(data);
       } catch (err) {
-        setError("Could not find appointment details.");
+        setError("Clinical Context Identification Failed. Please restart the reservation.");
       } finally {
         setLoading(false);
       }
@@ -48,166 +54,186 @@ const PaymentSelector = () => {
           patientEmail: appointment.patientEmail,
           doctorId: appointment.doctorId,
           doctorName: appointment.doctorName,
-          amount: appointment.fee || 2500, // Fixed fee for demo if missing
+          amount: appointment.fee || 2500,
+          currency: 'LKR',
+          successUrl: `${window.location.origin}/payment/success`,
+          cancelUrl: `${window.location.origin}/payment/cancel`
         });
-        window.location.href = data.checkoutUrl;
+        
+        if (data.checkoutUrl) {
+          window.location.href = data.checkoutUrl;
+        } else {
+          throw new Error("Stripe Authority Link not generated.");
+        }
       } else {
         navigate(`/payment/bank-transfer/${appointmentId}`);
       }
     } catch (err) {
-      setError(err.response?.data?.message || "Payment initiation failed.");
+      setError(err.response?.data?.message || err.message || "Payment Protocol Interrupted.");
       setProcessing(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50">
-        <Loader2 className="w-12 h-12 text-teal-600 animate-spin" />
-      </div>
+      <DashboardLayout isPatient={true}>
+        <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
+          <Loader2 className="w-12 h-12 text-medigo-blue animate-spin" />
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Syncing Payment Gateway...</p>
+        </div>
+      </DashboardLayout>
     );
   }
 
   if (!appointment) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-4">
-        <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
-        <h2 className="text-2xl font-bold text-slate-900">Appointment Not Found</h2>
-        <p className="text-slate-600 mt-2">The appointment you are trying to pay for does not exist.</p>
-        <button 
-          onClick={() => navigate("/dashboard")}
-          className="mt-6 px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition"
-        >
-          Go Back to Dashboard
-        </button>
-      </div>
+      <DashboardLayout isPatient={true}>
+        <div className="h-[60vh] flex flex-col items-center justify-center gap-6">
+          <AlertCircle className="w-16 h-16 text-red-500" />
+          <h2 className="text-2xl font-black text-medigo-navy uppercase tracking-tighter italic">Appointment Not Found</h2>
+          <Button onClick={() => navigate("/dashboard")}>Back to Dashboard</Button>
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-10">
-          <motion.h1 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-4xl font-extrabold text-slate-900 tracking-tight"
-          >
-            Complete Your Payment
-          </motion.h1>
-          <p className="text-slate-600 mt-3 text-lg">Securely finalize your appointment with Dr. {appointment.doctorName}</p>
+    <DashboardLayout isPatient={true}>
+      <div className="max-w-6xl mx-auto space-y-12 pb-20 font-inter">
+        {/* Header */}
+        <div className="space-y-4">
+           <button 
+             onClick={() => navigate(-1)}
+             className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] group hover:text-medigo-blue transition-colors"
+           >
+             <ChevronLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
+             Back to Reservation
+           </button>
+           <h1 className="text-4xl font-black text-medigo-navy tracking-tighter italic uppercase leading-none">Choose <span className="text-medigo-blue">Settlement</span> Method</h1>
+           <p className="text-slate-500 font-medium">Verify your clinical authority and complete the transaction.</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
           {/* Summary Card */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-4 space-y-6">
             <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/50 border border-slate-100"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-slate-900 rounded-[3rem] text-white p-10 space-y-8 shadow-3xl shadow-slate-900/40 relative overflow-hidden"
             >
-              <h3 className="text-lg font-bold text-slate-900 mb-4">Summary</h3>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Service</span>
-                  <span className="font-semibold text-slate-900">Consultation</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Date</span>
-                  <span className="font-semibold text-slate-900">{appointment.date}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Time</span>
-                  <span className="font-semibold text-slate-900">{appointment.timeSlot}</span>
-                </div>
-                <div className="border-t border-slate-100 pt-4 flex justify-between items-center text-lg font-bold">
-                  <span className="text-slate-900 text-base">Total Amount</span>
-                  <span className="text-teal-600">LKR {appointment.fee || 2500}.00</span>
-                </div>
-              </div>
+               <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_100%_0%,rgba(37,99,235,0.15),transparent)]" />
+               
+               <div className="relative z-10 flex items-center justify-between">
+                  <h3 className="text-xs font-black uppercase tracking-[0.3em] italic text-medigo-blue">Clinical Summary</h3>
+                  <Wallet size={20} className="text-white/20" />
+               </div>
 
-              <div className="mt-8 p-4 bg-slate-50 rounded-2xl flex items-start gap-3">
-                <ShieldCheck className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Your payment is protected by industry-standard encryption. Medigo never stores your card details.
-                </p>
-              </div>
+               <div className="relative z-10 space-y-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4 pb-4 border-b border-white/5">
+                       <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-medigo-blue">
+                          <User size={20} />
+                       </div>
+                       <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 italic">Specialist</p>
+                          <p className="text-sm font-bold truncate uppercase">{appointment.doctorName}</p>
+                       </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                       <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-medigo-blue">
+                          <Calendar size={20} />
+                       </div>
+                       <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 italic">DateTime</p>
+                          <p className="text-sm font-bold lowercase">{appointment.date} | {appointment.timeSlot}</p>
+                       </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-6 border-t border-white/5">
+                     <p className="text-[10px] font-black text-medigo-blue uppercase tracking-widest italic leading-none mb-1">Authorization Amount</p>
+                     <p className="text-3xl font-black text-white tracking-tighter italic leading-none">LKR <span className="text-medigo-blue">{(appointment.fee || 2500).toLocaleString()}</span></p>
+                  </div>
+               </div>
             </motion.div>
           </div>
 
-          {/* Payment Methods */}
-          <div className="lg:col-span-2">
-            <motion.div 
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="space-y-4"
+          {/* Methods Selection */}
+          <div className="lg:col-span-8 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+               {/* Stripe Card */}
+               <motion.div 
+                 whileHover={{ scale: 1.02 }}
+                 onClick={() => setMethod("stripe")}
+                 className={`p-8 rounded-[2.5rem] border-2 cursor-pointer transition-all relative overflow-hidden ${
+                   method === "stripe" 
+                    ? "bg-white border-medigo-blue shadow-premium" 
+                    : "bg-slate-50 border-slate-100 hover:border-slate-300"
+                 }`}
+               >
+                  <div className="flex justify-between items-start mb-10">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${method === "stripe" ? "bg-medigo-blue text-white shadow-lg shadow-blue-500/30" : "bg-slate-200 text-slate-500"}`}>
+                       <CreditCard size={28} />
+                    </div>
+                    {method === "stripe" && <CheckCircle2 className="text-medigo-blue" size={24} />}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-medigo-navy uppercase tracking-tighter italic leading-none">Instant Checkout</h3>
+                    <p className="text-xs text-slate-500 mt-2 font-medium">Credit / Debit Card Secured by Stripe.</p>
+                  </div>
+               </motion.div>
+
+               {/* Bank Transfer Card */}
+               <motion.div 
+                 whileHover={{ scale: 1.02 }}
+                 onClick={() => setMethod("bank")}
+                 className={`p-8 rounded-[2.5rem] border-2 cursor-pointer transition-all relative overflow-hidden ${
+                   method === "bank" 
+                    ? "bg-white border-medigo-blue shadow-premium" 
+                    : "bg-slate-50 border-slate-100 hover:border-slate-300"
+                 }`}
+               >
+                  <div className="flex justify-between items-start mb-10">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${method === "bank" ? "bg-medigo-blue text-white shadow-lg shadow-blue-500/30" : "bg-slate-200 text-slate-500"}`}>
+                       <Building2 size={28} />
+                    </div>
+                    {method === "bank" && <CheckCircle2 className="text-medigo-blue" size={24} />}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-medigo-navy uppercase tracking-tighter italic leading-none">Bank Transfer</h3>
+                    <p className="text-xs text-slate-500 mt-2 font-medium">Upload SLIP for Manual Verification.</p>
+                  </div>
+               </motion.div>
+            </div>
+
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl text-[11px] font-black uppercase tracking-widest flex items-center gap-3 italic">
+                <AlertCircle className="w-5 h-5 shrink-0" />
+                {error}
+              </div>
+            )}
+
+            <Button
+              loading={processing}
+              onClick={handlePayment}
+              className="w-full h-16 text-lg bg-medigo-navy hover:bg-slate-800 shadow-2xl group"
             >
-              <div 
-                onClick={() => setMethod("stripe")}
-                className={`group relative overflow-hidden bg-white p-6 rounded-3xl border-2 transition-all cursor-pointer ${
-                  method === "stripe" ? "border-teal-600 ring-4 ring-teal-50" : "border-slate-100 hover:border-slate-200 shadow-sm"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-2xl transition-colors ${method === "stripe" ? "bg-teal-600 text-white" : "bg-slate-100 text-slate-500"}`}>
-                      <CreditCard className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900">Stripe Online Payment</h3>
-                      <p className="text-sm text-slate-500">Credit or Debit Card (Immediate Confirmation)</p>
-                    </div>
-                  </div>
-                  {method === "stripe" && <CheckCircle2 className="text-teal-600 w-6 h-6" />}
-                </div>
-              </div>
+              Continue to {method === "stripe" ? "Secure Portal" : "Upload Slip"}
+              <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
+            </Button>
 
-              <div 
-                onClick={() => setMethod("bank")}
-                className={`group relative overflow-hidden bg-white p-6 rounded-3xl border-2 transition-all cursor-pointer ${
-                  method === "bank" ? "border-teal-600 ring-4 ring-teal-50" : "border-slate-100 hover:border-slate-200 shadow-sm"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-2xl transition-colors ${method === "bank" ? "bg-teal-600 text-white" : "bg-slate-100 text-slate-500"}`}>
-                      <Building2 className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900">Manual Bank Transfer</h3>
-                      <p className="text-sm text-slate-500">Upload deposit slip (Manual Verification)</p>
-                    </div>
-                  </div>
-                  {method === "bank" && <CheckCircle2 className="text-teal-600 w-6 h-6" />}
-                </div>
-              </div>
-
-              {error && (
-                <div className="p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl text-sm flex items-center gap-3">
-                  <AlertCircle className="w-5 h-5 shrink-0" />
-                  {error}
-                </div>
-              )}
-
-              <button
-                disabled={processing}
-                onClick={handlePayment}
-                className="w-full mt-6 bg-slate-900 hover:bg-slate-800 text-white py-4 rounded-3xl font-bold flex items-center justify-center gap-2 transition-all shadow-xl shadow-slate-200 disabled:opacity-50"
-              >
-                {processing ? (
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                ) : (
-                  <>
-                    Proceed to {method === "stripe" ? "Secure Checkout" : "Transfer Details"}
-                    <ArrowRight className="w-5 h-5" />
-                  </>
-                )}
-              </button>
-            </motion.div>
+            <div className="flex items-center justify-center gap-8 text-[10px] font-black text-slate-300 uppercase tracking-widest">
+               <div className="flex items-center gap-2">
+                  <ShieldCheck size={14} className="text-medigo-blue" /> PCI DSS Compliant
+               </div>
+               <div className="flex items-center gap-2">
+                  <ShieldCheck size={14} className="text-medigo-blue" /> Secure Handoff
+               </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 };
 
