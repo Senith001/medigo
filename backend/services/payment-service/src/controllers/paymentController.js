@@ -70,6 +70,45 @@ const fetchAppointmentDetails = async (appointmentId) => {
   return response.data.appointment || response.data;
 };
 
+// Convert appointment-service failures into typed errors the shared handler can map.
+const mapAppointmentDependencyError = (error) => {
+  if (!axios.isAxiosError(error)) {
+    return null;
+  }
+
+  const status = error.response?.status;
+
+  if (status === 404) {
+    return {
+      statusCode: 404,
+      message: "Appointment not found.",
+    };
+  }
+
+  if (status === 400) {
+    return {
+      statusCode: 400,
+      message: "Invalid appointment request.",
+    };
+  }
+
+  if (status === 401 || status === 403) {
+    return {
+      statusCode: 502,
+      message: "Unable to validate appointment due to upstream authorization error.",
+    };
+  }
+
+  if (status >= 500 || !error.response) {
+    return {
+      statusCode: 503,
+      message: "Appointment service is temporarily unavailable. Please try again shortly.",
+    };
+  }
+
+  return null;
+};
+
 const findBlockingPayment = async (appointmentId, patientId, paymentMethod) => {
   const blockingStatuses = ["pending", "paid", "verification_pending"];
 
@@ -82,7 +121,7 @@ const findBlockingPayment = async (appointmentId, patientId, paymentMethod) => {
 };
 
 // Create a Stripe payment and save its details in the database.
-const createPayment = async (req, res) => {
+const createPayment = async (req, res, next) => {
   try {
     const { appointmentId } = req.body;
 
@@ -181,13 +220,21 @@ const createPayment = async (req, res) => {
   } catch (error) {
     console.error("createPayment error:", error.message);
 
-    return res.status(500).json({
-      message: "Server error while creating payment session.",
-    });
+    const dependencyError = mapAppointmentDependencyError(error);
+
+    if (dependencyError) {
+      const dependencyException = new Error(dependencyError.message);
+      dependencyException.statusCode = dependencyError.statusCode;
+      return next(dependencyException);
+    }
+
+    const serverError = new Error("Server error while creating payment session.");
+    serverError.statusCode = 500;
+    return next(serverError);
   }
 };
 
-const createBankTransferPayment = async (req, res) => {
+const createBankTransferPayment = async (req, res, next) => {
   try {
     const { appointmentId, transferReference } = req.body;
 
@@ -281,9 +328,18 @@ const createBankTransferPayment = async (req, res) => {
     });
   } catch (error) {
     console.error("createBankTransferPayment error:", error.message);
-    res.status(500).json({
-      message: "Server error while submitting bank transfer payment.",
-    });
+
+    const dependencyError = mapAppointmentDependencyError(error);
+
+    if (dependencyError) {
+      const dependencyException = new Error(dependencyError.message);
+      dependencyException.statusCode = dependencyError.statusCode;
+      return next(dependencyException);
+    }
+
+    const serverError = new Error("Server error while submitting bank transfer payment.");
+    serverError.statusCode = 500;
+    return next(serverError);
   }
 };
 

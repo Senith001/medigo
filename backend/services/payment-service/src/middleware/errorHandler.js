@@ -7,7 +7,8 @@ const notFound = (req, res, next) => {
 
 // Handle application errors in one place.
 const errorHandler = (err, req, res, next) => {
-  let statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+  // Prefer an explicit status set by the controller, otherwise fall back to 500.
+  let statusCode = err.statusCode || (res.statusCode === 200 ? 500 : res.statusCode);
   let message = err.message || "Server Error";
 
   // Invalid MongoDB id
