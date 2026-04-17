@@ -25,18 +25,31 @@ docker build -t medigo-appointment-service:latest backend/services/appointment-s
 echo "Building Admin Service..."
 docker build -t medigo-admin-service:latest backend/services/admin-service
 
+echo "Building Telemedicine Service..."
+docker build -t medigo-telemedicine-service:latest backend/services/telemedicine-service
+
+echo "Building Payment Service..."
+docker build -t medigo-payment-service:latest backend/services/payment-service
+
 # --- DEPLOY PHASE ---
 echo "========================================="
 echo "☸️  PHASE 2: Restarting Kubernetes Pods..."
 echo "========================================="
 
+# 1. Apply any changes made to the YAML files
+echo "Applying Kubernetes manifests..."
+kubectl apply -f k8s/
+
+# 2. Force pods to restart and pull the newly built images
 kubectl rollout restart deployment \
   frontend-deployment \
   auth-service-deployment \
   doctor-service-deployment \
   patient-service-deployment \
   appointment-service-deployment \
-  admin-service-deployment
+  admin-service-deployment \
+  telemedicine-service-deployment \
+  payment-service-deployment
 
 echo "========================================="
 echo "✅ Deployment complete! Run 'kubectl get pods -w' to watch them spin up."
