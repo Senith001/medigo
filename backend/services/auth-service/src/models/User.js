@@ -22,7 +22,6 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: true,
       minlength: 6
     },
     phone: {
@@ -37,6 +36,14 @@ const userSchema = new mongoose.Schema(
     isVerified: {
       type: Boolean,
       default: false
+    },
+    activationToken: {
+      type: String,
+      default: null
+    },
+    activationTokenExpires: {
+      type: Date,
+      default: null
     }
   },
   { timestamps: true }

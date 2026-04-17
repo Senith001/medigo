@@ -51,4 +51,7 @@ const buildCancellationSMS = (data) =>
 const buildUpdateSMS = (data) =>
   `Healthcare Platform: Hi ${data.recipientName}, your appointment has been rescheduled to ${new Date(data.appointmentDate).toDateString()} at ${data.timeSlot}.`;
 
-module.exports = { sendSMS, buildBookingSMS, buildCancellationSMS, buildUpdateSMS };
+const buildPaymentSMS = (data) =>
+  `MEDIGO: Hi ${data.patientName}, your payment of ${data.currency || 'LKR'} ${data.amount} is confirmed. Appointment with ${data.doctorName} on ${data.appointmentDate ? new Date(data.appointmentDate).toDateString() : 'N/A'} at ${data.timeSlot || 'N/A'}. Invoice: ${data.invoiceNumber || 'N/A'}`;
+
+module.exports = { sendSMS, buildBookingSMS, buildCancellationSMS, buildUpdateSMS, buildPaymentSMS };
