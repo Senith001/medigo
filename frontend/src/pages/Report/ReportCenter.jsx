@@ -31,6 +31,16 @@ export default function ReportCenter() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [currentUser, setCurrentUser] = useState(null);
+  const [showUpload, setShowUpload] = useState(false);
+  const [doctors, setDoctors] = useState([]);
+  const [uploadForm, setUploadForm] = useState({
+    title: '',
+    type: 'Laboratory',
+    doctorId: '',
+    description: '',
+    file: null
+  });
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem("user") || "{}");
@@ -39,21 +49,74 @@ export default function ReportCenter() {
     const fetchReports = async () => {
       try {
         const { data } = await reportAPI.getByPatient(userData.userId || userData._id);
-        setReports(data.reports || []);
+        setReports(data.data || []); // Fixed data indexing
       } catch (err) {
         console.error("Report Sync Error:", err);
       } finally {
         setLoading(false);
       }
     };
-    if (userData.userId || userData._id) fetchReports();
+
+    const fetchMyDoctors = async () => {
+      try {
+        // Fetch confirmed appointments to get unique doctors
+        const { data } = await appointmentAPI.getAll({ status: 'confirmed' });
+        if (data.success) {
+          const uniqueDoctors = [];
+          const seen = new Set();
+          data.data.forEach(apt => {
+            if (!seen.has(apt.doctorId)) {
+              seen.add(apt.doctorId);
+              uniqueDoctors.push({ id: apt.doctorId, name: apt.doctorName });
+            }
+          });
+          setDoctors(uniqueDoctors);
+        }
+      } catch (err) {
+        console.error("Failed to fetch doctors:", err);
+      }
+    };
+
+    if (userData.userId || userData._id) {
+      fetchReports();
+      fetchMyDoctors();
+    }
   }, []);
 
   const filteredReports = reports.filter(r => 
-    (r.doctorName?.toLowerCase().includes(search.toLowerCase()) || 
-     r.reportType?.toLowerCase().includes(search.toLowerCase())) &&
+    (r.reportTitle?.toLowerCase().includes(search.toLowerCase()) || 
+     r.reportType?.toLowerCase().includes(search.toLowerCase()) ||
+     r.doctorName?.toLowerCase().includes(search.toLowerCase())) &&
     (filter === "all" || r.status === filter)
   );
+
+  const handleUpload = async (e) => {
+    e.preventDefault();
+    if (!uploadForm.file || !uploadForm.doctorId) return alert("Please select a file and a doctor.");
+    
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('reportFile', uploadForm.file);
+      formData.append('patientId', currentUser.userId || currentUser._id);
+      formData.append('doctorId', uploadForm.doctorId);
+      formData.append('reportTitle', uploadForm.title);
+      formData.append('reportType', uploadForm.type);
+      formData.append('description', uploadForm.description);
+      formData.append('uploadedBy', 'patient');
+
+      const res = await reportAPI.upload(formData);
+      if (res.data.success) {
+        setReports([res.data.data, ...reports]);
+        setShowUpload(false);
+        setUploadForm({ title: '', type: 'Laboratory', doctorId: '', description: '', file: null });
+      }
+    } catch (err) {
+      alert("Upload failed: " + (err.response?.data?.message || err.message));
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <DashboardLayout isPatient={true}>
@@ -73,7 +136,7 @@ export default function ReportCenter() {
               <Button size="sm" variant="outline" className="hidden sm:flex border-slate-200">
                  <ShieldCheck size={16} className="mr-2 text-medigo-mint" /> Encrypted Drive
               </Button>
-              <Button size="sm" className="shadow-lg shadow-blue-500/10">
+              <Button size="sm" onClick={() => setShowUpload(true)} className="shadow-lg shadow-blue-500/10">
                  <Plus size={18} className="mr-2" /> Upload Records
               </Button>
            </div>
@@ -144,6 +207,103 @@ export default function ReportCenter() {
               </div>
            </div>
         </div>
+
+        {/* Upload Modal */}
+        <AnimatePresence>
+          {showUpload && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowUpload(false)}
+                className="absolute inset-0 bg-medigo-navy/40 backdrop-blur-md"
+              />
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                className="relative bg-white w-full max-w-xl rounded-[3rem] p-10 shadow-3xl overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-full h-2 bg-gradient-to-r from-medigo-blue to-medigo-mint" />
+                
+                <h2 className="text-2xl font-black text-medigo-navy uppercase tracking-tighter italic mb-8">Share Clinical Document</h2>
+                
+                <form onSubmit={handleUpload} className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 italic">Report Title</label>
+                    <input 
+                      type="text" 
+                      required
+                      placeholder="e.g. Annual Blood Analysis 2024"
+                      className="w-full h-14 bg-slate-50 border border-slate-100 rounded-2xl px-5 text-sm font-bold outline-none focus:border-medigo-blue transition-all"
+                      value={uploadForm.title}
+                      onChange={e => setUploadForm({...uploadForm, title: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 italic">Category</label>
+                      <select 
+                        className="w-full h-14 bg-slate-50 border border-slate-100 rounded-2xl px-5 text-sm font-bold outline-none focus:border-medigo-blue transition-all"
+                        value={uploadForm.type}
+                        onChange={e => setUploadForm({...uploadForm, type: e.target.value})}
+                      >
+                        <option value="Laboratory">Laboratory</option>
+                        <option value="Radiology">Radiology</option>
+                        <option value="Pharmacy">Pharmacy</option>
+                        <option value="Cardiology">Cardiology</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 italic">Assign to Doctor</label>
+                       <select 
+                         required
+                         className="w-full h-14 bg-slate-50 border border-slate-100 rounded-2xl px-5 text-sm font-bold outline-none focus:border-medigo-blue transition-all"
+                         value={uploadForm.doctorId}
+                         onChange={e => setUploadForm({...uploadForm, doctorId: e.target.value})}
+                       >
+                         <option value="">Select Doctor</option>
+                         {doctors.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                       </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 italic">File Selection (PDF/JPG)</label>
+                    <input 
+                      type="file" 
+                      required
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      className="w-full p-4 bg-slate-50 border-2 border-dashed border-slate-100 rounded-2xl text-[11px] font-bold text-slate-500 cursor-pointer hover:border-medigo-blue/30 transition-all"
+                      onChange={e => setUploadForm({...uploadForm, file: e.target.files[0]})}
+                    />
+                  </div>
+
+                  <div className="flex gap-4 pt-4">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => setShowUpload(false)}
+                      className="flex-1 rounded-2xl h-14"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      loading={uploading}
+                      className="flex-1 rounded-2xl h-14 shadow-lg shadow-blue-500/20"
+                    >
+                      Process Upload <ArrowRight size={18} className="ml-2" />
+                    </Button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </DashboardLayout>
   );

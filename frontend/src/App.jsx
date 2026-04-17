@@ -35,11 +35,12 @@ import AdminPayments from './pages/Payment/AdminPayments'
 import Lobby from './pages/Telemedicine/Lobby'
 import VideoRoom from './pages/Telemedicine/VideoRoom'
 import Telemedicine from './pages/Telemedicine/Telemedicine'
+import PatientRecords from './pages/Doctor/PatientRecords'
 import ReportCenter from './pages/Report/ReportCenter'
 
 function Layout() {
   const { token, user } = useAuth()
-  const showStandardNavbar = token && !['admin', 'superadmin'].includes(user?.role)
+  const showStandardNavbar = token && user?.role === 'patient'
 
   return (
     <>
@@ -73,6 +74,7 @@ function Layout() {
         <Route path="/doctor/dashboard" element={<ProtectedRoute roles={['doctor']}><DoctorDashboard /></ProtectedRoute>} />
         <Route path="/doctor/availability" element={<ProtectedRoute roles={['doctor']}><ManageAvailability /></ProtectedRoute>} />
         <Route path="/doctor/profile" element={<ProtectedRoute roles={['doctor']}><DoctorProfile /></ProtectedRoute>} />
+        <Route path="/doctor/records" element={<ProtectedRoute roles={['doctor']}><PatientRecords /></ProtectedRoute>} />
 
         {/* Patient Protected */}
         <Route path="/dashboard" element={<ProtectedRoute roles={['patient']}><PatientDashboard /></ProtectedRoute>} />

@@ -26,10 +26,12 @@ const syncAppointmentPayment = async (appointmentId, paymentStatus) => {
 };
 
 // Helper: trigger notification-service for payment-related messages
+// paymentController.js — sendNotification helper
 const sendNotification = async (payment, type) => {
   try {
     await axios.post(
-      `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/internal/payment-status`,
+      // ✅ FIX: /payment-status → /payment-confirmed
+      `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/internal/payment-confirmed`,
       {
         appointmentId: payment.appointmentId,
         patientName: payment.patientName,
@@ -42,9 +44,7 @@ const sendNotification = async (payment, type) => {
         type,
       },
       {
-        headers: {
-          "x-service-secret": process.env.SERVICE_SECRET,
-        },
+        headers: { 'x-service-secret': process.env.SERVICE_SECRET },
       }
     );
   } catch (err) {

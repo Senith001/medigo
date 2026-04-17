@@ -6,81 +6,117 @@ import {
    ChevronLeft, ArrowRight, CheckCircle2,
    Activity, ShieldCheck, CreditCard,
    Stethoscope, AlertCircle, Sparkles,
-   Loader2  // ✅ FIXED: missing import added
+   Loader2, Users, Hash
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { appointmentAPI } from '../../services/api'
+import { appointmentAPI, doctorAPI } from '../../services/api'
 import DashboardLayout from '../../components/DashboardLayout'
 import Button from '../../components/ui/Button'
 
-const TIME_SLOTS = [
-   '08:00 - 08:30', '08:30 - 09:00', '09:00 - 09:30', '09:30 - 10:00',
-   '10:00 - 10:30', '10:30 - 11:00', '11:00 - 11:30', '11:30 - 12:00',
-   '14:00 - 14:30', '14:30 - 15:00', '15:00 - 15:30', '15:30 - 16:00',
-   '16:00 - 16:30', '16:30 - 17:00',
-]
 const getDates = () => Array.from({ length: 14 }, (_, i) => addDays(startOfToday(), i + 1))
 
 export function BookAppointment() {
    const { state } = useLocation()
    const navigate = useNavigate()
    const doctor = state?.doctor || null
+
    const [selectedDate, setSelectedDate] = useState(null)
-   const [selectedSlot, setSelectedSlot] = useState(null)
-   const [bookedSlots, setBookedSlots] = useState([])
+   const [selectedSession, setSelectedSession] = useState(null)
+   const [sessions, setSessions] = useState([])
+   const [sessionsLoading, setSessionsLoading] = useState(false)
    const [type, setType] = useState('telemedicine')
    const [reason, setReason] = useState('')
    const [loading, setLoading] = useState(false)
-   const [slotsLoading, setSlotsLoading] = useState(false)
    const [error, setError] = useState('')
-   const [success, setSuccess] = useState(false)
    const dates = getDates()
 
+   // ── Fetch doctor sessions for selected date ─────────────────
    useEffect(() => {
-      if (!selectedDate || !doctor) return
-      setSlotsLoading(true)
-      setSelectedSlot(null)
-      appointmentAPI.getAvailability(doctor._id, format(selectedDate, 'yyyy-MM-dd'))
-         .then(r => setBookedSlots(r.data.bookedSlots || []))
-         .catch(() => setBookedSlots([]))
-         .finally(() => setSlotsLoading(false))
+      if (!selectedDate || !doctor?._id) return
+      setSessionsLoading(true)
+      setSelectedSession(null)
+      setSessions([])
+
+      doctorAPI.getAvailability(doctor._id)
+         .then(res => {
+            if (res.data.success) {
+               const dayName = format(selectedDate, 'EEEE') // Monday, Tuesday...
+               const dateStr = format(selectedDate, 'yyyy-MM-dd')
+
+               // Filter sessions matching selected day or specific date
+               const matched = res.data.data.filter(s => {
+                  if (s.date) return s.date === dateStr
+                  return s.day === dayName
+               })
+               setSessions(matched)
+            }
+         })
+         .catch(() => setSessions([]))
+         .finally(() => setSessionsLoading(false))
    }, [selectedDate, doctor?._id])
 
    const handleSubmit = async () => {
-      if (!selectedDate || !selectedSlot) {
-         setError('Please select a date and time slot.')
+      if (!selectedDate || !selectedSession) {
+         setError('Please select a date and session.')
          return
       }
+      if (!doctor._id || !doctor.email || !doctor.specialty) {
+         setError('Doctor information is incomplete. Please go back and try again.')
+         return
+      }
+
       setError('')
       setLoading(true)
+
       try {
-         await appointmentAPI.book({
+         const res = await appointmentAPI.book({
             doctorId: doctor._id,
-            doctorName: doctor.fullName || doctor.name || 'Unknown Doctor',
-            doctorEmail: doctor.email || 'doctor@medigo.lk',
-            specialty: doctor.specialty || 'General Consultation',
-            hospital: doctor.hospital || 'MediGo Central',
+            doctorName: doctor.fullName || doctor.name,
+            doctorEmail: doctor.email,
+            specialty: doctor.specialty,
+            hospital: selectedSession.hospital || doctor.hospital || null,
             appointmentDate: format(selectedDate, 'yyyy-MM-dd'),
-            timeSlot: selectedSlot,
+            // ✅ timeSlot = session time range (not patient-selected)
+            timeSlot: `${selectedSession.startTime} - ${selectedSession.endTime}`,
+            sessionId: selectedSession._id,
             type,
-            reason,
-            fee: doctor.fee || 0,
+            reason: reason.trim() || null,
+            fee: selectedSession.fee || doctor.fee || 0,
          })
-         setSuccess(true)
-         setTimeout(() => navigate('/appointments'), 4000)
+
+         if (res.status === 201) {
+            navigate(`/payment/${res.data.appointment._id}`)
+         } else if (res.status === 200) {
+            const appt = res.data.appointment
+            if (appt.paymentStatus === 'unpaid') {
+               navigate(`/payment/${appt._id}`)
+            } else if (appt.paymentStatus === 'processing') {
+               setError('You already have a pending bank transfer for this session. Please wait for admin verification.')
+               setSelectedSession(null)
+            } else if (appt.paymentStatus === 'paid') {
+               navigate('/appointments')
+            }
+         }
 
       } catch (err) {
          const status = err.response?.status
          const msg = err.response?.data?.message
 
-         // ✅ FIXED: 409 conflict — slot taken, clear selection
          if (status === 409) {
-            setError('This time slot is already booked. Please select a different slot.')
-            setSelectedSlot(null)
-            // ✅ Re-fetch booked slots so UI updates immediately
+            setError(msg || 'This session is fully booked. Please select another.')
+            setSelectedSession(null)
+            // Re-fetch sessions
             if (selectedDate && doctor?._id) {
-               appointmentAPI.getAvailability(doctor._id, format(selectedDate, 'yyyy-MM-dd'))
-                  .then(r => setBookedSlots(r.data.bookedSlots || []))
+               doctorAPI.getAvailability(doctor._id)
+                  .then(res => {
+                     if (res.data.success) {
+                        const dayName = format(selectedDate, 'EEEE')
+                        const dateStr = format(selectedDate, 'yyyy-MM-dd')
+                        setSessions(res.data.data.filter(s =>
+                           s.date ? s.date === dateStr : s.day === dayName
+                        ))
+                     }
+                  })
                   .catch(() => { })
             }
          } else {
@@ -98,39 +134,6 @@ export function BookAppointment() {
             <Button onClick={() => navigate('/search')}>Browse Medical Experts</Button>
          </div>
       </DashboardLayout>
-   )
-
-   if (success) return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 sm:p-12">
-         <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white p-10 sm:p-16 rounded-[3rem] shadow-premium border border-slate-100 max-w-xl w-full text-center relative overflow-hidden"
-         >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-medigo-blue/5 blur-3xl rounded-full" />
-            <div className="w-24 h-24 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
-               <CheckCircle2 size={48} />
-            </div>
-            <h2 className="text-4xl font-black text-medigo-navy leading-tight tracking-tight mb-4">You're All Set!</h2>
-            <p className="text-slate-500 font-medium mb-10 leading-relaxed text-lg">
-               Appointment with{' '}
-               <span className="text-medigo-blue font-black">{doctor.fullName}</span> confirmed for{' '}
-               <span className="text-medigo-navy font-bold">{format(selectedDate, 'MMMM do')}</span> at{' '}
-               <span className="text-medigo-navy font-bold">{selectedSlot}</span>.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4">
-               <Button className="flex-1 h-14 text-lg" onClick={() => navigate('/appointments')}>
-                  My Appointments
-               </Button>
-               <Button variant="outline" className="flex-1 h-14 text-lg border-slate-200" onClick={() => navigate('/dashboard')}>
-                  Home
-               </Button>
-            </div>
-            <p className="mt-8 text-xs text-slate-300 font-bold uppercase tracking-[0.2em]">
-               Check your email for details • HIPAA Encrypted
-            </p>
-         </motion.div>
-      </div>
    )
 
    return (
@@ -178,10 +181,6 @@ export function BookAppointment() {
                         <MapPin size={16} className="text-medigo-blue/40" />
                         {doctor.hospital}
                      </div>
-                     <div className="flex items-center gap-2 text-emerald-500">
-                        <ShieldCheck size={16} />
-                        Consultation Fee: Rs. {doctor.fee?.toLocaleString()}
-                     </div>
                   </div>
                </div>
             </div>
@@ -189,13 +188,15 @@ export function BookAppointment() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                <div className="lg:col-span-8 space-y-8">
 
-                  {/* Type Selection */}
+                  {/* Consultation Type */}
                   <section className="space-y-4">
-                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-2">1. Choose Consultation Type</h3>
+                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+                        1. Choose Consultation Type
+                     </h3>
                      <div className="grid grid-cols-2 gap-4">
                         {[
-                           { v: 'telemedicine', icon: Video, l: 'Video Call', desc: 'Secure high-definition video room' },
-                           { v: 'in-person', icon: MapPin, l: 'Clinic Visit', desc: 'Face-to-face in-person appointment' },
+                           { v: 'telemedicine', icon: Video, l: 'Video Call', desc: 'Secure HD video consultation' },
+                           { v: 'in-person', icon: MapPin, l: 'Clinic Visit', desc: 'Face-to-face appointment' },
                         ].map(t => (
                            <button
                               key={t.v}
@@ -210,9 +211,8 @@ export function BookAppointment() {
                                  <t.icon size={24} />
                               </div>
                               <div className="space-y-1">
-                                 <p className={`text-lg font-black tracking-tight leading-none ${type === t.v ? 'text-medigo-navy' : 'text-slate-500'}`}>
-                                    {t.l}
-                                 </p>
+                                 <p className={`text-lg font-black tracking-tight leading-none ${type === t.v ? 'text-medigo-navy' : 'text-slate-500'
+                                    }`}>{t.l}</p>
                                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t.desc}</p>
                               </div>
                               {type === t.v && (
@@ -225,11 +225,15 @@ export function BookAppointment() {
                      </div>
                   </section>
 
-                  {/* Date Selection */}
+                  {/* Date + Session Selection */}
                   <section className="space-y-4">
-                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-2">2. Select Availability</h3>
-                     <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-premium border border-slate-100">
-                        <div className="flex overflow-x-auto pb-4 gap-3 no-scrollbar snap-x">
+                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+                        2. Select Date & Session
+                     </h3>
+                     <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-premium border border-slate-100 space-y-8">
+
+                        {/* Date Picker */}
+                        <div className="flex overflow-x-auto pb-2 gap-3 no-scrollbar snap-x">
                            {dates.map(d => {
                               const active = selectedDate?.toDateString() === d.toDateString()
                               return (
@@ -255,52 +259,144 @@ export function BookAppointment() {
                            })}
                         </div>
 
+                        {/* Sessions List */}
                         <AnimatePresence mode="wait">
-                           {selectedDate ? (
-                              <motion.div
-                                 key={format(selectedDate, 'yyyy-MM-dd')}
-                                 initial={{ opacity: 0, height: 0 }}
-                                 animate={{ opacity: 1, height: 'auto' }}
-                                 exit={{ opacity: 0, height: 0 }}
-                                 className="mt-10 space-y-6 pt-10 border-t border-slate-50"
-                              >
-                                 {/* ✅ FIXED: Loader2 now imported and works */}
-                                 <div className="flex items-center gap-3 px-1">
-                                    <Clock size={16} className="text-medigo-blue" />
-                                    <h4 className="text-[14px] font-black text-medigo-navy uppercase tracking-widest">
-                                       Choose Time Slot
-                                    </h4>
-                                    {slotsLoading && <Loader2 size={14} className="animate-spin text-slate-400" />}
-                                 </div>
-
-                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                                    {TIME_SLOTS.map(slot => {
-                                       const booked = bookedSlots.includes(slot)
-                                       const active = selectedSlot === slot
-                                       return (
-                                          <button
-                                             key={slot}
-                                             disabled={booked}
-                                             onClick={() => !booked && setSelectedSlot(slot)}
-                                             className={`px-4 py-3 rounded-2xl text-[13px] font-bold border-2 transition-all ${active
-                                                   ? 'bg-blue-50 border-medigo-blue text-medigo-blue shadow-md'
-                                                   : booked
-                                                      ? 'bg-slate-50 border-transparent text-slate-300 line-through opacity-60 cursor-not-allowed'
-                                                      : 'bg-white border-slate-100 text-slate-600 hover:border-medigo-blue/30'
-                                                }`}
-                                          >
-                                             {slot}
-                                          </button>
-                                       )
-                                    })}
-                                 </div>
-                              </motion.div>
-                           ) : (
-                              <div className="mt-10 py-10 text-center border-t border-slate-50 bg-slate-50/50 rounded-3xl">
+                           {!selectedDate ? (
+                              <div className="py-10 text-center bg-slate-50/50 rounded-3xl">
                                  <p className="text-xs font-black text-slate-300 uppercase tracking-widest">
-                                    Select a date above to view available slots
+                                    Select a date to view available sessions
                                  </p>
                               </div>
+                           ) : sessionsLoading ? (
+                              <div className="py-10 flex items-center justify-center gap-3 text-slate-300">
+                                 <Loader2 size={24} className="animate-spin text-medigo-blue" />
+                                 <p className="text-xs font-black uppercase tracking-widest">Loading sessions...</p>
+                              </div>
+                           ) : sessions.length === 0 ? (
+                              <div className="py-10 text-center bg-slate-50/50 rounded-3xl">
+                                 <Calendar size={32} className="text-slate-200 mx-auto mb-3" />
+                                 <p className="text-xs font-black text-slate-300 uppercase tracking-widest">
+                                    No sessions available on this date
+                                 </p>
+                              </div>
+                           ) : (
+                              <motion.div
+                                 initial={{ opacity: 0, y: 8 }}
+                                 animate={{ opacity: 1, y: 0 }}
+                                 className="space-y-3"
+                              >
+                                 <div className="flex items-center gap-2 mb-4">
+                                    <Clock size={14} className="text-medigo-blue" />
+                                    <p className="text-xs font-black text-medigo-navy uppercase tracking-widest">
+                                       Available Sessions — {format(selectedDate, 'EEEE, MMM do')}
+                                    </p>
+                                 </div>
+
+                                 {sessions.map(session => {
+                                    const isFull = session.bookedCount >= session.maxPatients
+                                    const isSelected = selectedSession?._id === session._id
+                                    const remaining = session.maxPatients - (session.bookedCount || 0)
+                                    const apptNo = (session.bookedCount || 0) + 1
+                                    // Estimated time for next patient
+                                    const estimatedTime = (() => {
+                                       try {
+                                          const [h, m] = session.startTime.replace(/\s?(AM|PM)/i, '').split(':').map(Number)
+                                          const isPM = session.startTime.toUpperCase().includes('PM')
+                                          let totalH = isPM && h !== 12 ? h + 12 : h
+                                          let totalM = m + (session.bookedCount || 0) * (session.patientInterval || 30)
+                                          totalH += Math.floor(totalM / 60)
+                                          totalM = totalM % 60
+                                          const period = totalH >= 12 ? 'PM' : 'AM'
+                                          const dispH = totalH > 12 ? totalH - 12 : totalH || 12
+                                          return `${dispH}:${String(totalM).padStart(2, '0')} ${period}`
+                                       } catch {
+                                          return session.startTime
+                                       }
+                                    })()
+
+                                    return (
+                                       <button
+                                          key={session._id}
+                                          disabled={isFull}
+                                          onClick={() => !isFull && setSelectedSession(session)}
+                                          className={`w-full p-5 rounded-[1.5rem] border-2 text-left transition-all duration-200 ${isSelected
+                                                ? 'border-medigo-blue bg-blue-50/50 shadow-premium'
+                                                : isFull
+                                                   ? 'border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed'
+                                                   : 'border-slate-100 bg-white hover:border-medigo-blue/40 hover:shadow-sm'
+                                             }`}
+                                       >
+                                          <div className="flex items-center gap-4">
+                                             {/* Hospital logo placeholder */}
+                                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${isSelected ? 'bg-medigo-blue text-white' : 'bg-slate-100 text-slate-400'
+                                                }`}>
+                                                <MapPin size={20} />
+                                             </div>
+
+                                             <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                   <p className="text-sm font-black text-medigo-navy uppercase truncate">
+                                                      {session.hospital}
+                                                   </p>
+                                                   {isFull ? (
+                                                      <span className="px-2 py-0.5 bg-red-50 text-red-500 border border-red-100 text-[9px] font-black uppercase rounded-full">
+                                                         Full
+                                                      </span>
+                                                   ) : (
+                                                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 text-[9px] font-black uppercase rounded-full">
+                                                         Available
+                                                      </span>
+                                                   )}
+                                                </div>
+
+                                                <div className="flex items-center gap-4 text-[11px] font-bold text-slate-400 uppercase tracking-wide flex-wrap">
+                                                   <span className="flex items-center gap-1">
+                                                      <Clock size={11} className="text-medigo-blue/50" />
+                                                      {session.startTime} – {session.endTime}
+                                                   </span>
+                                                   <span className="flex items-center gap-1">
+                                                      <MapPin size={11} className="text-medigo-blue/50" />
+                                                      {session.location}
+                                                   </span>
+                                                   <span className="flex items-center gap-1 text-emerald-500">
+                                                      <Users size={11} />
+                                                      {remaining} slots left
+                                                   </span>
+                                                </div>
+                                             </div>
+
+                                             <div className="shrink-0 text-right">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                                   Your No.
+                                                </p>
+                                                <p className="text-2xl font-black text-medigo-blue tracking-tighter">
+                                                   #{String(apptNo).padStart(2, '0')}
+                                                </p>
+                                                <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                                                   ~{estimatedTime}
+                                                </p>
+                                             </div>
+                                          </div>
+
+                                          {/* Fee */}
+                                          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                                Channelling Fee
+                                             </span>
+                                             <span className="text-sm font-black text-medigo-navy">
+                                                LKR {session.fee?.toLocaleString()}
+                                             </span>
+                                          </div>
+
+                                          {isSelected && (
+                                             <div className="mt-3 flex items-center gap-2 text-[10px] font-black text-medigo-blue uppercase tracking-widest">
+                                                <CheckCircle2 size={12} /> Selected — Your estimated time is {estimatedTime}
+                                             </div>
+                                          )}
+                                       </button>
+                                    )
+                                 })}
+                              </motion.div>
                            )}
                         </AnimatePresence>
                      </div>
@@ -308,14 +404,16 @@ export function BookAppointment() {
 
                   {/* Reason */}
                   <section className="space-y-4">
-                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-2">3. Consultation Context</h3>
+                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+                        3. Consultation Notes
+                     </h3>
                      <div className="bg-white p-8 rounded-[2.5rem] shadow-premium border border-slate-100 space-y-4">
                         <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">
                            Reason for Visit (Optional)
                         </label>
                         <textarea
                            className="w-full bg-slate-50/50 border border-slate-100 rounded-[1.5rem] px-5 py-4 text-medigo-navy outline-none focus:bg-white focus:border-medigo-blue focus:ring-4 focus:ring-blue-500/5 transition-all font-bold placeholder:text-slate-300 resize-none h-32"
-                           placeholder="Tell us a little bit about your symptoms or medical concerns..."
+                           placeholder="Describe your symptoms or medical concerns..."
                            value={reason}
                            onChange={e => setReason(e.target.value)}
                         />
@@ -326,12 +424,12 @@ export function BookAppointment() {
                      </div>
                   </section>
 
-                  {/* ✅ FIXED: 409 and other errors show clearly */}
+                  {/* Error */}
                   {error && (
                      <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="p-4 bg-red-50 border border-red-100 rounded-2xl flex gap-3 text-red-600 text-sm font-bold shadow-lg shadow-red-500/5"
+                        className="p-4 bg-red-50 border border-red-100 rounded-2xl flex gap-3 text-red-600 text-sm font-bold"
                      >
                         <AlertCircle size={20} className="shrink-0 mt-0.5" />
                         <span>{error}</span>
@@ -343,43 +441,66 @@ export function BookAppointment() {
                <div className="lg:col-span-4 lg:sticky lg:top-24 space-y-6">
                   <div className="bg-gradient-to-br from-medigo-navy to-slate-900 rounded-[2.5rem] shadow-xl text-white p-8 overflow-hidden relative">
                      <div className="absolute top-0 right-0 w-32 h-32 bg-medigo-blue/10 blur-3xl rounded-full" />
-                     <div className="relative z-10 space-y-8">
+                     <div className="relative z-10 space-y-6">
                         <div>
-                           <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 leading-none mb-4">
+                           <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-4">
                               Booking Summary
                            </h3>
                            <div className="h-0.5 w-12 bg-medigo-blue rounded-full" />
                         </div>
+
                         <div className="space-y-4">
                            <SummaryItem label="Doctor" value={doctor.fullName} />
                            <SummaryItem label="Type" value={type === 'telemedicine' ? 'Video Consult' : 'Clinic Visit'} icon={type === 'telemedicine' ? Video : MapPin} />
                            <SummaryItem label="Date" value={selectedDate ? format(selectedDate, 'MMM do, yyyy') : '—'} />
-                           <SummaryItem label="Time Slot" value={selectedSlot || '—'} />
+                           <SummaryItem label="Session" value={selectedSession ? `${selectedSession.startTime} – ${selectedSession.endTime}` : '—'} icon={Clock} />
+                           <SummaryItem label="Hospital" value={selectedSession?.hospital || '—'} icon={MapPin} />
+                           {selectedSession && (
+                              <SummaryItem
+                                 label="Appt No."
+                                 value={`#${String((selectedSession.bookedCount || 0) + 1).padStart(2, '0')}`}
+                                 icon={Hash}
+                              />
+                           )}
                         </div>
-                        <div className="pt-6 border-t border-white/10">
+
+                        <div className="pt-4 border-t border-white/10">
                            <div className="flex justify-between items-end">
                               <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Total Fee</span>
                               <span className="text-3xl font-black text-white tracking-tighter">
-                                 Rs. {doctor.fee?.toLocaleString() ?? '0'}
+                                 LKR {(selectedSession?.fee || doctor.fee || 0).toLocaleString()}
                               </span>
                            </div>
                         </div>
+
                         <Button
                            loading={loading}
-                           disabled={loading || !selectedDate || !selectedSlot}
+                           disabled={loading || !selectedDate || !selectedSession}
                            onClick={handleSubmit}
-                           className="w-full h-14 bg-medigo-blue hover:bg-medigo-blue-dark text-lg font-black group transition-all"
+                           className="w-full h-14 bg-medigo-blue hover:bg-medigo-blue-dark text-lg font-black group"
                         >
-                           Confirm Reservation
+                           Confirm Booking
                            <ArrowRight size={20} className="ml-2 group-hover:translate-x-1 transition-transform" />
                         </Button>
+
                         <div className="flex items-center justify-center gap-2 text-[10px] text-white/30 font-black uppercase tracking-widest">
-                           <CreditCard size={12} /> Secure Stripe Payment
+                           <CreditCard size={12} /> Secure Payment
                         </div>
                      </div>
                   </div>
 
-                  <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm flex items-center gap-4">
+                  {selectedSession && (
+                     <div className="bg-amber-50 border border-amber-100 rounded-[2rem] p-6">
+                        <p className="text-[11px] font-black text-amber-700 uppercase tracking-widest mb-2">
+                           Important Note
+                        </p>
+                        <p className="text-xs text-amber-600 font-medium leading-relaxed">
+                           Please arrive at <span className="font-black">{selectedSession.hospital}</span> at least <span className="font-black">20 minutes</span> before your estimated time. Your appointment number is <span className="font-black">#{String((selectedSession.bookedCount || 0) + 1).padStart(2, '0')}</span>.
+                        </p>
+                     </div>
+                  )}
+
+                  <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center gap-4">
                      <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center border border-emerald-100">
                         <Sparkles size={24} />
                      </div>
