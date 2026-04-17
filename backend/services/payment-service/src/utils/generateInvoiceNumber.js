@@ -6,7 +6,8 @@ const generateInvoiceNumber = () => {
   const dd = String(now.getDate()).padStart(2, "0");
   const random = Math.floor(1000 + Math.random() * 9000);
 
+  // Create a simple invoice number for payment records.
   return `INV-${yyyy}${mm}${dd}-${random}`;
 };
 
-module.exports = generateInvoiceNumber;
+export default generateInvoiceNumber;

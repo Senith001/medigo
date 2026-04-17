@@ -1,7 +1,8 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const paymentSchema = new mongoose.Schema(
   {
+    // Main appointment and user details for the payment.
     appointmentId: {
       type: String,
       required: [true, "Appointment ID is required"],
@@ -94,7 +95,7 @@ const paymentSchema = new mongoose.Schema(
       index: true,
     },
 
-    // Manual bank transfer fields
+    // Bank transfer details
     paymentSlipUrl: {
       type: String,
       default: null,
@@ -107,7 +108,7 @@ const paymentSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // Verification fields
+    // Admin verification details
     verifiedBy: {
       type: String,
       default: null,
@@ -135,6 +136,17 @@ const paymentSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    refundedAt: {
+      type: Date,
+      default: null,
+    },
+
+    refundReason: {
+      type: String,
+      default: null,
+      trim: true,
+    },
   },
   {
     timestamps: true,
@@ -146,4 +158,4 @@ paymentSchema.index({ patientId: 1, createdAt: -1 });
 paymentSchema.index({ status: 1, createdAt: -1 });
 paymentSchema.index({ paymentMethod: 1, status: 1, createdAt: -1 });
 
-module.exports = mongoose.model("Payment", paymentSchema);
+export default mongoose.model("Payment", paymentSchema);

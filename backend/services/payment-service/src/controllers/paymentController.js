@@ -1,41 +1,179 @@
-const Payment = require("../models/Payment");
-const mongoose = require("mongoose");
-const generateInvoiceNumber = require("../utils/generateInvoiceNumber");
-const {
+import axios from "axios";
+import Payment from "../models/Payment.js";
+import {
   createCheckoutSession,
   retrieveCheckoutSession,
-} = require("../services/stripeService");
+  createRefund,
+} from "../services/stripeService.js";
+import generateInvoiceNumber from "../utils/generateInvoiceNumber.js";
 
-const createPayment = async (req, res) => {
+
+// Helper: sync appointment paymentStatus to appointment-service
+const syncAppointmentPayment = async (appointmentId, paymentStatus) => {
   try {
-    const {
-      appointmentId,
-      patientId,
-      patientName,
-      patientEmail,
-      doctorId,
-      doctorName,
-      amount,
-    } = req.body;
+    await axios.put(
+      `${process.env.APPOINTMENT_SERVICE_URL}/api/appointments/internal/payment-status`,
+      { appointmentId, paymentStatus },
+      {
+        headers: {
+          "x-service-secret": process.env.SERVICE_SECRET,
+        },
+      }
+    );
+  } catch (err) {
+    console.error("Failed to sync appointment payment status:", err.message);
+  }
+};
 
-    if (
-      !appointmentId ||
-      !patientId ||
-      !patientName ||
-      !patientEmail ||
-      !doctorId ||
-      !doctorName ||
-      !amount
-    ) {
+// Helper: trigger notification-service for payment-related messages
+const sendNotification = async (payment, type) => {
+  try {
+    await axios.post(
+      `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/internal/payment-status`,
+      {
+        appointmentId: payment.appointmentId,
+        patientName: payment.patientName,
+        patientEmail: payment.patientEmail,
+        patientPhone: payment.patientPhone || null,
+        doctorName: payment.doctorName,
+        amount: payment.amount,
+        currency: payment.currency,
+        invoiceNumber: payment.invoiceNumber,
+        type,
+      },
+      {
+        headers: {
+          "x-service-secret": process.env.SERVICE_SECRET,
+        },
+      }
+    );
+  } catch (err) {
+    console.error(`Failed to send ${type} notification:`, err.message);
+  }
+};
+
+const getUserIdentity = (user) => user.id || user.userId;
+
+const fetchAppointmentDetails = async (appointmentId) => {
+  const appointmentServiceUrl =
+    process.env.APPOINTMENT_SERVICE_URL || "http://localhost:5005";
+
+  const response = await axios.get(
+    `${appointmentServiceUrl}/api/appointments/internal/${appointmentId}`,
+    {
+      headers: {
+        "x-service-secret": process.env.SERVICE_SECRET,
+      },
+    }
+  );
+
+  return response.data.appointment || response.data;
+};
+
+// Convert appointment-service failures into typed errors the shared handler can map.
+const mapAppointmentDependencyError = (error) => {
+  if (!axios.isAxiosError(error)) {
+    return null;
+  }
+
+  const status = error.response?.status;
+
+  if (status === 404) {
+    return {
+      statusCode: 404,
+      message: "Appointment not found.",
+    };
+  }
+
+  if (status === 400) {
+    return {
+      statusCode: 400,
+      message: "Invalid appointment request.",
+    };
+  }
+
+  if (status === 401 || status === 403) {
+    return {
+      statusCode: 502,
+      message: "Unable to validate appointment due to upstream authorization error.",
+    };
+  }
+
+  if (status >= 500 || !error.response) {
+    return {
+      statusCode: 503,
+      message: "Appointment service is temporarily unavailable. Please try again shortly.",
+    };
+  }
+
+  return null;
+};
+
+const findBlockingPayment = async (appointmentId, patientId, paymentMethod) => {
+  const blockingStatuses = ["pending", "paid", "verification_pending"];
+
+  return Payment.findOne({
+    appointmentId,
+    patientId,
+    paymentMethod,
+    status: { $in: blockingStatuses },
+  });
+};
+
+// Create a Stripe payment and save its details in the database.
+const createPayment = async (req, res, next) => {
+  try {
+    const { appointmentId } = req.body;
+
+    if (!appointmentId) {
       return res.status(400).json({
-        message: "All required payment fields must be provided.",
+        message: "Appointment ID is required.",
       });
     }
 
-    // Patient can only create payment for themselves
-    if (req.user.role === "patient" && req.user.userId !== patientId) {
+    const appointment = await fetchAppointmentDetails(appointmentId);
+
+    const patientId = appointment.patientId;
+    const patientName = appointment.patientName;
+    const patientEmail = appointment.patientEmail;
+    const doctorId = appointment.doctorId;
+    const doctorName = appointment.doctorName;
+    const amount = appointment.fee;
+
+    if (!["pending", "confirmed"].includes(appointment.status)) {
+      return res.status(400).json({
+        message: "Payment can only be created for pending or confirmed appointments.",
+      });
+    }
+
+    if (!patientId || !patientName || !patientEmail || !doctorId || !doctorName) {
+      return res.status(400).json({
+        message: "Appointment details are incomplete for payment creation.",
+      });
+    }
+
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({
+        message: "Appointment fee must be available before creating payment.",
+      });
+    }
+
+    // Patient can only create payment for their own appointment.
+    if (req.user.role === "patient" && getUserIdentity(req.user) !== patientId) {
       return res.status(403).json({
         message: "Access denied. You can only create payments for your own appointments.",
+      });
+    }
+
+    const existingPayment = await findBlockingPayment(
+      appointmentId,
+      patientId,
+      "stripe"
+    );
+
+    if (existingPayment) {
+      return res.status(409).json({
+        message: "A Stripe payment already exists for this appointment.",
       });
     }
 
@@ -72,6 +210,8 @@ const createPayment = async (req, res) => {
       stripeSessionId: stripeSession.id,
     });
 
+    await syncAppointmentPayment(appointmentId, "processing");
+
     res.status(201).json({
       message: "Payment session created successfully.",
       payment,
@@ -80,41 +220,59 @@ const createPayment = async (req, res) => {
   } catch (error) {
     console.error("createPayment error:", error.message);
 
-    return res.status(500).json({
-      message: "Server error while creating payment session.",
-    });
+    const dependencyError = mapAppointmentDependencyError(error);
+
+    if (dependencyError) {
+      const dependencyException = new Error(dependencyError.message);
+      dependencyException.statusCode = dependencyError.statusCode;
+      return next(dependencyException);
+    }
+
+    const serverError = new Error("Server error while creating payment session.");
+    serverError.statusCode = 500;
+    return next(serverError);
   }
 };
 
-const createBankTransferPayment = async (req, res) => {
+const createBankTransferPayment = async (req, res, next) => {
   try {
-    const {
-      appointmentId,
-      patientId,
-      patientName,
-      patientEmail,
-      doctorId,
-      doctorName,
-      amount,
-      transferReference,
-    } = req.body;
+    const { appointmentId, transferReference } = req.body;
 
-    if (
-      !appointmentId ||
-      !patientId ||
-      !patientName ||
-      !patientEmail ||
-      !doctorId ||
-      !doctorName ||
-      !amount
-    ) {
+    if (!appointmentId) {
       return res.status(400).json({
-        message: "All required bank transfer payment fields must be provided.",
+        message: "Appointment ID is required.",
       });
     }
 
-    // Patient can only create payment for themselves
-    if (req.user.role === "patient" && req.user.userId !== patientId) {
+    const appointment = await fetchAppointmentDetails(appointmentId);
+
+    const patientId = appointment.patientId;
+    const patientName = appointment.patientName;
+    const patientEmail = appointment.patientEmail;
+    const doctorId = appointment.doctorId;
+    const doctorName = appointment.doctorName;
+    const amount = appointment.fee;
+
+    if (!["pending", "confirmed"].includes(appointment.status)) {
+      return res.status(400).json({
+        message: "Payment can only be submitted for pending or confirmed appointments.",
+      });
+    }
+
+    if (!patientId || !patientName || !patientEmail || !doctorId || !doctorName) {
+      return res.status(400).json({
+        message: "Appointment details are incomplete for bank transfer payment.",
+      });
+    }
+
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({
+        message: "Appointment fee must be available before submitting payment.",
+      });
+    }
+
+    // Patient can only create payment for their own appointment.
+    if (req.user.role === "patient" && getUserIdentity(req.user) !== patientId) {
       return res.status(403).json({
         message: "Access denied. You can only submit payments for your own appointments.",
       });
@@ -126,8 +284,21 @@ const createBankTransferPayment = async (req, res) => {
       });
     }
 
+    const existingPayment = await findBlockingPayment(
+      appointmentId,
+      patientId,
+      "bank_transfer"
+    );
+
+    if (existingPayment) {
+      return res.status(409).json({
+        message: "A bank transfer payment already exists for this appointment.",
+      });
+    }
+
     const invoiceNumber = generateInvoiceNumber();
 
+    // Save the uploaded slip path so admins can review it later.
     const paymentSlipUrl = `/uploads/payment-slips/${req.file.filename}`;
 
     const payment = await Payment.create({
@@ -146,15 +317,29 @@ const createBankTransferPayment = async (req, res) => {
       transferReference: transferReference || null,
     });
 
+    await syncAppointmentPayment(appointmentId, "processing");
+
+    // Notify notification-service that bank transfer is awaiting verification
+    await sendNotification(payment, "verification_pending");
+
     res.status(201).json({
       message: "Bank transfer payment submitted successfully and is pending verification.",
       payment,
     });
   } catch (error) {
     console.error("createBankTransferPayment error:", error.message);
-    res.status(500).json({
-      message: "Server error while submitting bank transfer payment.",
-    });
+
+    const dependencyError = mapAppointmentDependencyError(error);
+
+    if (dependencyError) {
+      const dependencyException = new Error(dependencyError.message);
+      dependencyException.statusCode = dependencyError.statusCode;
+      return next(dependencyException);
+    }
+
+    const serverError = new Error("Server error while submitting bank transfer payment.");
+    serverError.statusCode = 500;
+    return next(serverError);
   }
 };
 
@@ -166,6 +351,7 @@ const handlePaymentSuccess = async (req, res) => {
       return res.status(400).json({ message: "Stripe session ID is required." });
     }
 
+    // Use the Stripe session id to find and update the local payment record.
     const stripeSession = await retrieveCheckoutSession(session_id);
 
     const payment = await Payment.findOne({ stripeSessionId: session_id });
@@ -180,10 +366,21 @@ const handlePaymentSuccess = async (req, res) => {
       payment.stripePaymentIntentId = stripeSession.payment_intent || null;
       payment.failureReason = null;
       await payment.save();
+
+      // Sync appointment payment status to appointment-service
+      await syncAppointmentPayment(payment.appointmentId, "paid");
+
+      // Trigger payment confirmation notification
+      await sendNotification(payment, "paid");
+
+      return res.status(200).json({
+        message: "Payment marked as successful.",
+        payment,
+      });
     }
 
-    res.status(200).json({
-      message: "Payment marked as successful.",
+    return res.status(400).json({
+      message: "Payment is not completed in Stripe.",
       payment,
     });
   } catch (error) {
@@ -202,10 +399,19 @@ const handlePaymentCancel = async (req, res) => {
       return res.status(400).json({ message: "Stripe session ID is required." });
     }
 
+    const stripeSession = await retrieveCheckoutSession(session_id);
+
     const payment = await Payment.findOne({ stripeSessionId: session_id });
 
     if (!payment) {
       return res.status(404).json({ message: "Payment record not found." });
+    }
+
+    if (stripeSession.payment_status === "paid") {
+      return res.status(409).json({
+        message: "Payment is already completed in Stripe and cannot be cancelled.",
+        payment,
+      });
     }
 
     payment.status = "cancelled";
@@ -235,7 +441,7 @@ const getPaymentById = async (req, res) => {
     // Patient can only access their own payment
     if (
       req.user.role !== "admin" &&
-      payment.patientId !== req.user.userId
+      payment.patientId !== getUserIdentity(req.user)
     ) {
       return res.status(403).json({ message: "Access denied." });
     }
@@ -255,7 +461,7 @@ const getPaymentsByPatient = async (req, res) => {
     // Patient can only access their own billing history
     if (
       req.user.role !== "admin" &&
-      req.user.userId !== patientId
+      getUserIdentity(req.user) !== patientId
     ) {
       return res.status(403).json({ message: "Access denied." });
     }
@@ -277,6 +483,7 @@ const getPaymentsByPatient = async (req, res) => {
 
 const getPendingBankTransfers = async (req, res) => {
   try {
+    // Return bank transfer payments that still need admin verification.
     const payments = await Payment.find({
       paymentMethod: "bank_transfer",
       status: "verification_pending",
@@ -314,14 +521,21 @@ const approveBankTransferPayment = async (req, res) => {
       });
     }
 
+    // Mark the verified bank transfer as paid.
     payment.status = "paid";
-    payment.verifiedBy = req.user.userId;
+    payment.verifiedBy = getUserIdentity(req.user);
     payment.verifiedAt = new Date();
     payment.paidAt = new Date();
     payment.rejectionReason = null;
     payment.failureReason = null;
 
     await payment.save();
+
+    // Sync appointment payment status to appointment-service
+    await syncAppointmentPayment(payment.appointmentId, "paid");
+
+    // Trigger approved payment notification
+    await sendNotification(payment, "approved");
 
     res.status(200).json({
       message: "Bank transfer payment approved successfully.",
@@ -358,11 +572,14 @@ const rejectBankTransferPayment = async (req, res) => {
     }
 
     payment.status = "rejected";
-    payment.verifiedBy = req.user.userId;
+    payment.verifiedBy = getUserIdentity(req.user);
     payment.verifiedAt = new Date();
     payment.rejectionReason = rejectionReason || "Payment verification rejected by admin.";
 
     await payment.save();
+
+    // Trigger rejected payment notification
+    await sendNotification(payment, "rejected");
 
     res.status(200).json({
       message: "Bank transfer payment rejected successfully.",
@@ -376,7 +593,61 @@ const rejectBankTransferPayment = async (req, res) => {
   }
 };
 
-module.exports = {
+const refundPayment = async (req, res) => {
+  try {
+    const { refundReason } = req.body;
+
+    const payment = await Payment.findById(req.params.id);
+
+    if (!payment) {
+      return res.status(404).json({ message: "Payment not found." });
+    }
+
+    if (payment.status === "refunded") {
+      return res.status(400).json({
+        message: "Payment is already refunded.",
+      });
+    }
+
+    if (payment.status !== "paid") {
+      return res.status(400).json({
+        message: "Only paid payments can be refunded.",
+      });
+    }
+
+    if (payment.paymentMethod === "stripe") {
+      if (!payment.stripePaymentIntentId) {
+        return res.status(400).json({
+          message: "Stripe payment intent is missing for this payment.",
+        });
+      }
+
+      await createRefund(payment.stripePaymentIntentId);
+    }
+
+    payment.status = "refunded";
+    payment.refundedAt = new Date();
+    payment.refundReason = refundReason || "Refund processed by admin.";
+    payment.failureReason = null;
+
+    await payment.save();
+
+    await syncAppointmentPayment(payment.appointmentId, "refunded");
+    await sendNotification(payment, "refunded");
+
+    res.status(200).json({
+      message: "Payment refunded successfully.",
+      payment,
+    });
+  } catch (error) {
+    console.error("refundPayment error:", error.message);
+    res.status(500).json({
+      message: "Server error while refunding payment.",
+    });
+  }
+};
+
+export {
   createPayment,
   createBankTransferPayment,
   handlePaymentSuccess,
@@ -386,4 +657,5 @@ module.exports = {
   getPendingBankTransfers,
   approveBankTransferPayment,
   rejectBankTransferPayment,
+  refundPayment,
 };

@@ -1,8 +1,12 @@
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+import fs from "fs";
+import multer from "multer";
+import path from "path";
+import { fileURLToPath } from "url";
 
-// Ensure upload directory exists
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Create the upload folder if it does not exist.
 const uploadDir = path.join(__dirname, "../../uploads/payment-slips");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
@@ -15,6 +19,7 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const timestamp = Date.now();
     const ext = path.extname(file.originalname);
+    // Create a simple safe filename for the uploaded file.
     const safeName = file.fieldname + "-" + timestamp + ext;
     cb(null, safeName);
   },
@@ -40,4 +45,4 @@ const upload = multer({
   },
 });
 
-module.exports = upload;
+export default upload;

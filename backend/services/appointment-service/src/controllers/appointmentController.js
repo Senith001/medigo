@@ -2,6 +2,64 @@ const Appointment = require('../models/Appointment');
 const { publishEvent } = require('../config/rabbitmq');
 const axios = require('axios');
 
+// Helper: sync telemedicine-service when appointment date/time changes.
+const syncTelemedicineAppointmentUpdate = async (appointment) => {
+  try {
+    await axios.put(
+      `${process.env.TELEMEDICINE_SERVICE_URL}/api/telemedicine/internal/appointment-updated`,
+      {
+        appointmentId: appointment._id,
+        appointmentDate: appointment.appointmentDate,
+        timeSlot: appointment.timeSlot,
+      },
+      {
+        headers: {
+          'x-service-secret': process.env.SERVICE_SECRET,
+        },
+      }
+    );
+  } catch (syncError) {
+    console.error('Telemedicine sync failed for appointment update:', syncError.message);
+  }
+};
+
+// Helper: sync telemedicine-service when a telemedicine appointment is confirmed.
+const syncTelemedicineAppointmentConfirmation = async (appointment) => {
+  try {
+    await axios.post(
+      `${process.env.TELEMEDICINE_SERVICE_URL}/api/telemedicine/internal/from-appointment`,
+      { appointmentId: appointment._id },
+      {
+        headers: {
+          'x-service-secret': process.env.SERVICE_SECRET,
+        },
+      }
+    );
+  } catch (syncError) {
+    console.error('Telemedicine sync failed for appointment confirmation:', syncError.message);
+  }
+};
+
+// Helper: sync telemedicine-service when a telemedicine appointment is completed or cancelled.
+const syncTelemedicineAppointmentStatus = async (appointment, message) => {
+  try {
+    await axios.put(
+      `${process.env.TELEMEDICINE_SERVICE_URL}/api/telemedicine/internal/appointment-updated`,
+      {
+        appointmentId: appointment._id,
+        status: appointment.status,
+      },
+      {
+        headers: {
+          'x-service-secret': process.env.SERVICE_SECRET,
+        },
+      }
+    );
+  } catch (syncError) {
+    console.error(message, syncError.message);
+  }
+};
+
 // ─────────────────────────────────────────────────────────────
 // POST /api/appointments
 // Book a new appointment (Patient only)
@@ -183,6 +241,7 @@ const modifyAppointment = async (req, res) => {
     }
 
     const { appointmentDate, timeSlot, reason } = req.body;
+    const appointmentDateOrTimeChanged = Boolean(appointmentDate || timeSlot);
 
     if (appointmentDate || timeSlot) {
       const newDate = appointmentDate ? new Date(`${appointmentDate}T00:00:00.000Z`) : appointment.appointmentDate;
@@ -217,6 +276,10 @@ const modifyAppointment = async (req, res) => {
       appointmentDate: appointment.appointmentDate,
       timeSlot:        appointment.timeSlot,
     });
+
+    if (appointment.type === 'telemedicine' && appointmentDateOrTimeChanged) {
+      await syncTelemedicineAppointmentUpdate(appointment);
+    }
 
     res.status(200).json({ message: 'Appointment updated successfully.', appointment });
   } catch (error) {
@@ -260,6 +323,13 @@ const cancelAppointment = async (req, res) => {
       cancelledBy:        role,
       cancellationReason: appointment.cancellationReason,
     });
+
+    if (appointment.type === 'telemedicine') {
+      await syncTelemedicineAppointmentStatus(
+        appointment,
+        'Telemedicine sync failed for appointment cancellation:'
+      );
+    }
 
     res.status(200).json({ message: 'Appointment cancelled.', appointment });
   } catch (error) {
@@ -308,6 +378,21 @@ const updateAppointmentStatus = async (req, res) => {
         meetingLink:     appointment.meetingLink,
         confirmed:       true,
       });
+
+      if (
+        appointment.type === 'telemedicine' &&
+        appointment.status === 'confirmed' &&
+        appointment.paymentStatus === 'paid'
+      ) {
+        await syncTelemedicineAppointmentConfirmation(appointment);
+      }
+    }
+
+    if (appointment.type === 'telemedicine' && appointment.status === 'completed') {
+      await syncTelemedicineAppointmentStatus(
+        appointment,
+        'Telemedicine sync failed for appointment completion:'
+      );
     }
 
     res.status(200).json({ message: `Appointment status updated to ${status}.`, appointment });

@@ -1,12 +1,17 @@
-const express = require("express");
-const cors = require("cors");
-const dotenv = require("dotenv");
-const path = require("path");
+import cors from "cors";
+import dotenv from "dotenv";
+import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 
-const connectDB = require("./config/db");
-const paymentRoutes = require("./routes/paymentRoutes");
+import connectDB from "./config/db.js";
+import { errorHandler, notFound } from "./middleware/errorHandler.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -15,6 +20,7 @@ connectDB();
 app.use(cors());
 app.use(express.json());
 
+// Serve uploaded payment slip files.
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 app.get("/", (req, res) => {
@@ -33,6 +39,10 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/api/payments", paymentRoutes);
+
+// Error handlers must come after routes.
+app.use(notFound);
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5007;
 

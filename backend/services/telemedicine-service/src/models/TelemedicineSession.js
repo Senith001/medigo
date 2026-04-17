@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const telemedicineSessionSchema = new mongoose.Schema(
   {
@@ -6,6 +6,7 @@ const telemedicineSessionSchema = new mongoose.Schema(
       type: String,
       required: [true, "Appointment ID is required"],
       index: true,
+      unique: true,
       trim: true,
     },
     patientId: {
@@ -52,6 +53,16 @@ const telemedicineSessionSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Persist appointment values locally so join-window checks do not depend on appointment-service.
+    appointmentDate: {
+      type: Date,
+      default: null,
+    },
+    timeSlot: {
+      type: String,
+      default: null,
+      trim: true,
+    },
     startedAt: {
       type: Date,
       default: null,
@@ -69,7 +80,4 @@ const telemedicineSessionSchema = new mongoose.Schema(
 telemedicineSessionSchema.index({ doctorId: 1, createdAt: -1 });
 telemedicineSessionSchema.index({ patientId: 1, createdAt: -1 });
 
-module.exports = mongoose.model(
-  "TelemedicineSession",
-  telemedicineSessionSchema
-);
+export default mongoose.model("TelemedicineSession", telemedicineSessionSchema);
