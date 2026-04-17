@@ -60,6 +60,24 @@ const syncTelemedicineAppointmentStatus = async (appointment, message) => {
   }
 };
 
+// Helper: sync doctor-service to update session occupancy.
+const updateDoctorSessionOccupancy = async (sessionId, increment) => {
+  try {
+    if (!sessionId) return;
+    await axios.put(
+      `${process.env.DOCTOR_SERVICE_URL}/api/availability/internal/${sessionId}/occupancy`,
+      { increment },
+      {
+        headers: {
+          'x-service-secret': process.env.SERVICE_SECRET,
+        },
+      }
+    );
+  } catch (err) {
+    console.error('Failed to sync doctor session occupancy:', err.message);
+  }
+};
+
 // ─────────────────────────────────────────────────────────────
 // POST /api/appointments
 // Book a new appointment (Patient only)
@@ -67,7 +85,7 @@ const syncTelemedicineAppointmentStatus = async (appointment, message) => {
 // ─────────────────────────────────────────────────────────────
 const bookAppointment = async (req, res) => {
   try {
-    const { doctorId, appointmentDate, timeSlot, type, reason } = req.body;
+    const { doctorId, sessionId, appointmentDate, timeSlot, type, reason } = req.body;
 
     const patientId    = req.user.id;
     const patientName  = req.user.name;
@@ -108,6 +126,19 @@ const bookAppointment = async (req, res) => {
       });
     }
 
+    // ── Step 1.5: Check Session Capacity (If sessionId provided) 
+    if (sessionId) {
+      try {
+        const availRes = await axios.get(`${process.env.DOCTOR_SERVICE_URL}/api/availability/doctor/${doctorId}`);
+        const session = availRes.data.data.find(s => s._id === sessionId);
+        if (session && session.bookedCount >= session.maxPatients) {
+          return res.status(400).json({ message: 'This clinical session is at full capacity. Please select another time or date.' });
+        }
+      } catch (err) {
+        console.warn('Could not verify session capacity, proceeding anyway.');
+      }
+    }
+
     // ── Step 2: Check if slot is already taken ────────────────
     const existing = await Appointment.findOne({
       doctorId,
@@ -117,6 +148,14 @@ const bookAppointment = async (req, res) => {
     });
 
     if (existing) {
+      // ✅ SMART FIX: If existing appointment belongs to SAME patient and is UNPAID, 
+      // allow them to proceed (return existing one) instead of blocking.
+      if (existing.patientId === patientId && existing.paymentStatus === 'unpaid') {
+        return res.status(200).json({
+          message: 'Redirecting to your existing pending reservation.',
+          appointment: existing,
+        });
+      }
       return res.status(409).json({ message: 'This time slot is already booked.' });
     }
 
@@ -135,7 +174,13 @@ const bookAppointment = async (req, res) => {
       type: type || 'telemedicine',
       reason,
       fee,
+      sessionId,
     });
+
+    // ── Step 3.5: Update Session Occupancy ────────────────────
+    if (sessionId) {
+      await updateDoctorSessionOccupancy(sessionId, 1);
+    }
 
     // ── Step 4: Publish event to RabbitMQ ─────────────────────
     await publishEvent('appointment.booked', {
@@ -308,6 +353,11 @@ const cancelAppointment = async (req, res) => {
     appointment.cancelledBy = role;
     appointment.cancellationReason = req.body.reason || 'No reason provided';
     await appointment.save();
+
+    // ── Step 3.5: Decrement Session Occupancy ───────────────
+    if (appointment.sessionId) {
+      await updateDoctorSessionOccupancy(appointment.sessionId, -1);
+    }
 
     await publishEvent('appointment.cancelled', {
       appointmentId:      appointment._id,

@@ -29,6 +29,8 @@ const Lobby = () => {
   const [error, setError] = useState(null);
   const [cameraOn, setCameraOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
+  const [checking, setChecking] = useState(true);
+  const [signalStrength, setSignalStrength] = useState(100);
 
   useEffect(() => {
     const initLobby = async () => {
@@ -58,6 +60,7 @@ const Lobby = () => {
       } catch (err) {
         setError("Could not retrieve appointment details.");
       } finally {
+        setTimeout(() => setChecking(false), 2000);
         setLoading(false);
       }
     };
@@ -158,11 +161,20 @@ const Lobby = () => {
               </div>
               
               {/* Floating Badge */}
-              <div className="absolute -top-4 -right-4 bg-white/5 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex items-center gap-2 shadow-2xl">
-                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Hardware Verified</span>
-              </div>
-           </div>
+               <div className="absolute -top-4 -right-4 bg-white/5 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex items-center gap-2 shadow-2xl">
+                  {checking ? (
+                    <div className="flex items-center gap-2">
+                       <Loader2 size={12} className="animate-spin text-medigo-mint" />
+                       <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Checking Hardware...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Hardware Verified</span>
+                    </>
+                  )}
+               </div>
+            </div>
            
            <div className="flex items-center gap-8 px-4">
               <div className="flex flex-col gap-1">

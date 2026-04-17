@@ -2,6 +2,10 @@ const mongoose = require('mongoose');
 
 const appointmentSchema = new mongoose.Schema(
   {
+    sessionId: {
+      type: String,
+      default: null, // Link to Availability/Session
+    },
     patientId: {
       type: String,
       required: [true, 'Patient ID is required'],

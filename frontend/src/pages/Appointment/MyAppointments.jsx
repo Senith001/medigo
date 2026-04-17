@@ -21,6 +21,7 @@ export default function MyAppointments() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [cancelling, setCancelling] = useState(null)
+  const [selectedClinic, setSelectedClinic] = useState(null)
 
   const fetchAll = () => {
     setLoading(true)
@@ -136,6 +137,7 @@ export default function MyAppointments() {
                       appt={appt} 
                       index={i} 
                       onCancel={() => handleCancel(appt._id)}
+                      onShowClinic={setSelectedClinic}
                       cancelling={cancelling === appt._id}
                       getStatusStyle={getStatusStyle}
                     />
@@ -154,12 +156,83 @@ export default function MyAppointments() {
               </div>
            </div>
         )}
+         
+         <AnimatePresence>
+            {selectedClinic && (
+              <ClinicDetailsModal 
+                appt={selectedClinic} 
+                onClose={() => setSelectedClinic(null)} 
+              />
+            )}
+         </AnimatePresence>
       </motion.div>
     </DashboardLayout>
   )
 }
 
-function AppointmentCard({ appt, index, onCancel, cancelling, getStatusStyle }) {
+function ClinicDetailsModal({ appt, onClose }) {
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md"
+      onClick={onClose}
+    >
+      <motion.div 
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 20 }}
+        className="bg-white max-w-lg w-full rounded-[3rem] overflow-hidden shadow-premium relative"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="bg-medigo-navy p-10 text-white relative overflow-hidden">
+           <div className="absolute top-0 right-0 w-64 h-64 bg-medigo-blue/20 blur-[60px] rounded-full translate-x-1/2 -translate-y-1/2" />
+           <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-50 mb-3">Clinic Information</p>
+           <h2 className="text-3xl font-black italic uppercase tracking-tighter leading-none">{appt.hospital}</h2>
+           <div className="mt-8 flex items-center gap-4">
+              <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center border border-white/10">
+                 <MapPin size={24} className="text-medigo-mint" />
+              </div>
+              <div>
+                 <p className="text-xs font-bold opacity-60">Physical Address</p>
+                 <p className="font-bold tracking-tight">Main Wing, Level 04, Tower B</p>
+              </div>
+           </div>
+        </div>
+        
+        <div className="p-10 space-y-8">
+           <div className="space-y-4">
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Preparation Instructions</h3>
+              <div className="space-y-4">
+                 {[
+                   { icon: <Clock size={16} />, text: "Arrival: Please check-in 15 mins before your slot." },
+                   { icon: <AlertCircle size={16} />, text: "Documents: Bring your NIC and previous medical records." },
+                   { icon: <CheckCircle2 size={16} />, text: "Mask Policy: Hospital premises require clinical masks." }
+                 ].map((item, i) => (
+                   <div key={i} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100/50">
+                      <div className="text-medigo-blue">{item.icon}</div>
+                      <p className="text-sm font-bold text-slate-600">{item.text}</p>
+                   </div>
+                 ))}
+              </div>
+           </div>
+           
+           <div className="flex gap-4 pt-2">
+              <Button onClick={onClose} className="flex-1 h-14 rounded-2xl bg-slate-100 text-slate-600 hover:bg-slate-200">
+                 Close View
+              </Button>
+              <Button className="flex-1 h-14 rounded-2xl bg-medigo-blue shadow-lg shadow-blue-500/20">
+                 Get Directions
+              </Button>
+           </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function AppointmentCard({ appt, index, onCancel, cancelling, getStatusStyle, onShowClinic }) {
   const navigate = useNavigate()
   const apptDate = new Date(appt.appointmentDate)
   
@@ -229,12 +302,21 @@ function AppointmentCard({ appt, index, onCancel, cancelling, getStatusStyle }) 
         {/* Action Controls */}
         <div className="lg:w-56 shrink-0 lg:border-l lg:border-slate-50 lg:pl-8 flex lg:flex-col items-center gap-3 justify-end lg:justify-center">
            {appt.status === 'confirmed' && (
-              <Button 
-                onClick={() => navigate(`/telemedicine/lobby/${appt._id}`)} 
-                className="w-full h-12 bg-medigo-blue shadow-lg shadow-blue-500/20 group/b flex items-center justify-center gap-2"
-              >
-                <Video size={16} /> Join Now <ArrowRight size={14} className="group-hover/b:translate-x-1 transition-transform" />
-              </Button>
+              appt.type === 'telemedicine' ? (
+                <Button 
+                  onClick={() => navigate(`/telemedicine/lobby/${appt._id}`)} 
+                  className="w-full h-12 bg-medigo-blue shadow-lg shadow-blue-500/20 group/b flex items-center justify-center gap-2"
+                >
+                  <Video size={16} /> Join Now <ArrowRight size={14} className="group-hover/b:translate-x-1 transition-transform" />
+                </Button>
+              ) : (
+                <Button 
+                  onClick={() => onShowClinic(appt)} 
+                  className="w-full h-12 bg-medigo-navy shadow-lg shadow-slate-500/10 group/b flex items-center justify-center gap-2"
+                >
+                  <MapPin size={16} /> Physical Detail <ArrowRight size={14} className="group-hover/b:translate-x-1 transition-transform" />
+                </Button>
+              )
            )}
            
            {['pending', 'confirmed'].includes(appt.status) && (

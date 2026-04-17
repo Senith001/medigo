@@ -20,7 +20,7 @@ export default function Checkout() {
   const location = useLocation()
   const { sessionId } = useParams()
   const { user } = useAuth()
-  const { doctor, session } = location.state || {}
+  const { doctor, session, selectedMode } = location.state || {}
   
   const [form, setForm] = useState({
     title: 'Mr',
@@ -78,14 +78,15 @@ export default function Checkout() {
     try {
       const res = await appointmentAPI.book({
         doctorId: doctor._id || doctor.id,
+        sessionId: session._id || sessionId, // Link to exactly this session
         doctorName: doctor.fullName,
         doctorEmail: doctor.email,
         specialty: doctor.specialty,
         appointmentDate: session.date,
         timeSlot: `${session.startTime} - ${session.endTime}`,
         fee: total,
-        hospital: session.hospital || 'MediGo Virtual Clinic',
-        type: session.type || 'telemedicine',
+        hospital: session.hospital || 'MediGo Central Clinic',
+        type: selectedMode || session.consultationType || 'telemedicine',
         reason: 'General Consultation',
         metadata: {
           patientNic: form.nic,

@@ -336,13 +336,13 @@ export const updateDoctorStatus = async (req, res) => {
     const doctorResponse = await httpClient.patch(
       `${process.env.DOCTOR_SERVICE_URL}/api/doctors/${req.params.id}/status`,
       { status },
-      internalHeaders  // service secret — doctor-service uses verifyInternalService for this route
+      internalHeaders  // service secret
     );
 
     const doctor = doctorResponse.data?.data;
 
     // Step 2: Sync isVerified in auth-service and fire email
-    // Only act on terminal states — not when reverting to "pending"
+    // Only act on terminal states
     if (status === 'verified' || status === 'rejected') {
       try {
         await httpClient.patch(
@@ -463,6 +463,50 @@ export const deletePatientAccount = async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.response?.data?.message || "Failed to delete patient"
+    });
+  }
+};
+
+export const deleteDoctorAccount = async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const isMongoId = /^[0-9a-fA-F]{24}$/.test(targetId);
+
+    // 1. Delete doctor profile from Doctor Service first
+    try {
+      await httpClient.delete(
+        `${process.env.DOCTOR_SERVICE_URL}/api/doctors/internal/${targetId}`,
+        {
+          headers: {
+            "x-service-secret": process.env.SERVICE_SECRET
+          }
+        }
+      );
+    } catch (serviceError) {
+      const status = serviceError.response?.status;
+      if (status !== 404) {
+        return res.status(status || 500).json({
+          success: false,
+          message: serviceError.response?.data?.message || "Failed to delete doctor profile"
+        });
+      }
+    }
+
+    // 2. Delete Auth identity + OTP records
+    await httpClient.delete(
+      `${process.env.AUTH_SERVICE_URL}/api/auth/internal/identities/${targetId}`,
+      internalHeaders
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Doctor account fully deleted"
+    });
+  } catch (error) {
+    console.error("Delete Doctor Error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: error.response?.data?.message || "Failed to delete doctor"
     });
   }
 };

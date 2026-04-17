@@ -1,50 +1,35 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { 
-  Building2, 
-  Upload, 
-  CheckCircle2, 
-  Loader2, 
-  ArrowLeft,
-  ArrowRight,
-  FileText,
-  Copy,
-  Info,
-  ChevronLeft,
-  ShieldCheck,
-  AlertCircle
+import { useParams, useNavigate, Link } from "react-router-dom";
+import {
+  ArrowLeft, Upload, CheckCircle, AlertCircle,
+  Building, Info, ArrowRight
 } from "lucide-react";
 import { appointmentAPI, paymentAPI } from "../../services/api";
-import DashboardLayout from "../../components/DashboardLayout";
-import Button from "../../components/ui/Button";
+import { useAuth } from "../../context/AuthContext";
 
 const BankTransferForm = () => {
   const { appointmentId } = useParams();
   const navigate = useNavigate();
+  const { token } = useAuth();
+
   const [appointment, setAppointment] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [processing, setProcessing] = useState(false);
-  const [message, setMessage] = useState(null);
-  const [success, setSuccess] = useState(false);
-
-  const BANK_DETAILS = {
-    bank: "Medigo Global Bank",
-    accountName: "MEDIGO HEALTHCARE PVT LTD",
-    accountNumber: "001-9238475-201",
-    branch: "Colombo Main",
-    ref: `REF-${appointmentId?.slice(-6).toUpperCase()}`
-  };
+  const [reference, setReference] = useState("");
 
   useEffect(() => {
     const fetchAppointment = async () => {
       try {
-        const { data } = await appointmentAPI.getById(appointmentId);
-        setAppointment(data);
+        const response = await appointmentAPI.getById(appointmentId);
+        // ✅ FIXED: unwrap nested appointment object
+        setAppointment(response.data.appointment || response.data);
       } catch (err) {
-        setMessage({ type: "error", text: "Appointment Identification Failed." });
+        setError("Failed to fetch appointment details.");
+        console.error(err);
       } finally {
         setLoading(false);
       }
@@ -55,208 +40,219 @@ const BankTransferForm = () => {
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
+      if (selectedFile.size > 5 * 1024 * 1024) {
+        setError("File size exceeds 5MB limit.");
+        return;
+      }
       setFile(selectedFile);
-      setPreview(URL.createObjectURL(selectedFile));
+      const reader = new FileReader();
+      reader.onloadend = () => setPreview(reader.result);
+      reader.readAsDataURL(selectedFile);
+      setError(null);
     }
-  };
-
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!file) return;
+    if (!file) {
+      setError("Please upload your bank transfer slip.");
+      return;
+    }
 
-    setProcessing(true);
+    setSubmitting(true);
+    setError(null);
+
     const formData = new FormData();
-    formData.append("appointmentId", appointment._id);
-    formData.append("patientId", appointment.patientId);
-    formData.append("patientName", appointment.patientName);
-    formData.append("patientEmail", appointment.patientEmail);
-    formData.append("doctorId", appointment.doctorId);
-    formData.append("doctorName", appointment.doctorName);
-    formData.append("amount", appointment.fee || 2500);
+    // ✅ FIXED: correct field names matching backend validators
+    formData.append("appointmentId", appointmentId);
     formData.append("paymentSlip", file);
-    formData.append("transferReference", BANK_DETAILS.ref);
+    if (reference) formData.append("transferReference", reference);
 
     try {
       await paymentAPI.bankTransfer(formData);
       setSuccess(true);
+      setTimeout(() => navigate("/appointments"), 3000);
     } catch (err) {
-      setMessage({ type: "error", text: "Secure Upload Protocol failed. Please try again." });
-      setProcessing(false);
+      console.error("Payment error:", err);
+      setError(err.response?.data?.message || "Failed to submit payment verification.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   if (loading) return (
-    <DashboardLayout isPatient={true}>
-      <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
-        <Loader2 className="animate-spin text-medigo-blue w-12 h-12" />
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Syncing Clinical Payload...</p>
-      </div>
-    </DashboardLayout>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+    </div>
   );
 
-  if (success) {
-    return (
-      <DashboardLayout isPatient={true}>
-        <div className="h-[70vh] flex items-center justify-center p-4">
-          <motion.div 
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-white p-12 rounded-[3.5rem] shadow-premium max-w-lg w-full text-center border border-slate-50"
-          >
-            <div className="w-24 h-24 bg-emerald-50 text-emerald-500 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
-              <CheckCircle2 className="w-12 h-12" />
-            </div>
-            <h2 className="text-3xl font-black text-medigo-navy uppercase tracking-tighter italic mb-4 leading-none">Slip Received</h2>
-            <p className="text-slate-500 font-medium mb-10 leading-relaxed px-4">
-              Your clinical settlement slip has been securely uploaded. Our verification protocol takes <span className="font-bold text-medigo-blue">24 hours</span>. Check your dashoard for status updates.
-            </p>
-            <Button 
-              onClick={() => navigate("/dashboard")}
-              className="w-full h-16 text-lg bg-medigo-navy shadow-2xl"
-            >
-              Back to Clinical Dashboard
-            </Button>
-          </motion.div>
+  if (success) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center">
+        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <CheckCircle className="w-12 h-12 text-green-600" />
         </div>
-      </DashboardLayout>
-    );
-  }
-
-  return (
-    <DashboardLayout isPatient={true}>
-      <div className="max-w-6xl mx-auto space-y-12 pb-20 font-inter">
-        {/* Header */}
-        <div className="space-y-4">
-           <button 
-             onClick={() => navigate(-1)}
-             className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] group hover:text-medigo-blue transition-colors"
-           >
-             <ChevronLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
-             Back to Selector
-           </button>
-           <h1 className="text-4xl font-black text-medigo-navy tracking-tighter italic uppercase leading-none">Manual <span className="text-medigo-blue">Settlement</span></h1>
-           <p className="text-slate-500 font-medium">Please transfer the precise authorization amount to our clinical treasury.</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-stretch">
-          {/* Instructions Block */}
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }} 
-            animate={{ opacity: 1, x: 0 }}
-            className="space-y-8"
-          >
-            <div className="bg-slate-900 text-white p-10 rounded-[3.5rem] shadow-3xl shadow-slate-900/40 relative overflow-hidden h-full">
-               <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_100%_0%,rgba(37,99,235,0.15),transparent)]" />
-               
-               <div className="relative z-10 space-y-8">
-                  <div className="flex justify-between items-center border-b border-white/5 pb-6">
-                    <div>
-                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 italic mb-1">Treasury Partner</p>
-                       <p className="text-sm font-bold uppercase">{BANK_DETAILS.bank}</p>
-                    </div>
-                    <Building2 size={24} className="text-white/20" />
-                  </div>
-
-                  <div className="space-y-6">
-                    <div className="space-y-2">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 italic">Full Account Name</p>
-                      <div className="flex justify-between items-center bg-white/5 p-4 rounded-2xl group hover:bg-white/10 transition-colors">
-                        <span className="font-bold text-sm tracking-tight">{BANK_DETAILS.accountName}</span>
-                        <button onClick={() => copyToClipboard(BANK_DETAILS.accountName)} className="text-medigo-blue hover:text-white transition"><Copy size={16} /></button>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 italic">Electronic Unit Identifier (Account)</p>
-                      <div className="flex justify-between items-center bg-white/5 p-4 rounded-2xl group hover:bg-white/10 transition-colors border border-white/5">
-                        <span className="font-mono text-xl font-black text-medigo-blue">{BANK_DETAILS.accountNumber}</span>
-                        <button onClick={() => copyToClipboard(BANK_DETAILS.accountNumber)} className="text-slate-400 hover:text-white transition"><Copy size={16} /></button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-8 border-t border-white/5 flex flex-col gap-1">
-                     <p className="text-[10px] font-black text-medigo-blue uppercase tracking-widest italic leading-none mb-1">Authorization Amount</p>
-                     <p className="text-4xl font-black text-white tracking-tighter italic leading-none">LKR <span className="text-medigo-blue">{(appointment?.fee || 2500).toLocaleString()}</span></p>
-                  </div>
-               </div>
-            </div>
-
-            <div className="bg-blue-50/50 p-6 rounded-[2rem] border border-blue-100 flex gap-4">
-               <Info size={24} className="text-medigo-blue shrink-0" />
-               <div className="space-y-1">
-                  <p className="text-[10px] font-black text-medigo-blue uppercase tracking-widest leading-none italic">Important Protocol</p>
-                  <p className="text-[13px] text-slate-500 font-medium">Specify <span className="font-bold text-slate-900 uppercase tracking-tighter">{BANK_DETAILS.ref}</span> as your transfer reference to ensure immediate identification.</p>
-               </div>
-            </div>
-          </motion.div>
-
-          {/* Form & Upload Area */}
-          <motion.div 
-            initial={{ opacity: 0, x: 20 }} 
-            animate={{ opacity: 1, x: 0 }}
-            className="flex flex-col h-full"
-          >
-            <form onSubmit={handleSubmit} className="bg-white p-10 rounded-[3.5rem] shadow-premium border border-slate-50 flex-1 flex flex-col space-y-10">
-               <div className="flex items-center justify-between">
-                  <h3 className="text-2xl font-black text-medigo-navy uppercase tracking-tighter italic leading-none">Evidence <span className="text-medigo-blue">Upload</span></h3>
-                  <FileText size={24} className="text-slate-200" />
-               </div>
-
-               <div className="flex-1 space-y-8">
-                  <div className={`relative border-2 border-dashed rounded-[2.5rem] p-12 h-64 flex flex-col items-center justify-center transition-all group ${
-                    file ? "border-emerald-500 bg-emerald-50/20" : "border-slate-100 bg-slate-50 hover:border-medigo-blue hover:bg-medigo-blue/5"
-                  }`}>
-                    <input 
-                      type="file" 
-                      onChange={handleFileChange} 
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                      accept="image/*,.pdf"
-                    />
-                    
-                    {preview ? (
-                      <div className="text-center">
-                        <img src={preview} alt="Slip preview" className="w-32 h-32 object-cover rounded-2xl shadow-premium mb-4 mx-auto border-4 border-white" />
-                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest truncate max-w-[200px]">{file.name}</p>
-                      </div>
-                    ) : (
-                      <div className="text-center space-y-4">
-                        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-slate-300 mx-auto shadow-sm group-hover:text-medigo-blue transition-colors">
-                          <Upload size={32} />
-                        </div>
-                        <div>
-                          <p className="text-sm font-black text-medigo-navy uppercase tracking-tighter italic italic">Drop Clinical Slip</p>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Maximum Size 5MB (JPG, PNG, PDF)</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {message && (
-                    <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 italic italic">
-                      <AlertCircle className="w-5 h-5 shrink-0" />
-                      {message.text}
-                    </div>
-                  )}
-               </div>
-
-               <Button
-                 type="submit"
-                 disabled={!file || processing}
-                 loading={processing}
-                 className="w-full h-16 text-lg bg-medigo-blue shadow-2xl shadow-blue-500/20"
-               >
-                 Submit Evidence <ArrowRight size={20} className="ml-2" />
-               </Button>
-            </form>
-          </motion.div>
+        <h2 className="text-3xl font-bold text-gray-900 mb-4">Submission Successful!</h2>
+        <p className="text-gray-600 mb-8">
+          Your payment slip has been submitted for verification. An administrator will review it shortly.
+        </p>
+        <div className="flex items-center justify-center text-sm text-gray-500 animate-pulse">
+          Redirecting to your appointments <ArrowRight className="w-4 h-4 ml-2" />
         </div>
       </div>
-    </DashboardLayout>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-[#F8FAFC] py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto">
+        <Link
+          to={`/payment-selector/${appointmentId}`}
+          className="inline-flex items-center text-gray-600 hover:text-blue-600 mb-8 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5 mr-1" /> Back to Payment Selection
+        </Link>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Form */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
+              <div className="p-8 lg:p-10">
+                <div className="flex items-center space-x-4 mb-8">
+                  <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center">
+                    <Building className="w-7 h-7 text-blue-600" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Bank Transfer</h1>
+                    <p className="text-gray-500">Upload your payment record</p>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start space-x-3">
+                    <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+                    <p className="text-sm text-red-600 font-medium">{error}</p>
+                  </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-8">
+                  {/* File Upload */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3 ml-1">
+                      Upload Receipt / Slip
+                    </label>
+                    <div className={`relative group cursor-pointer border-2 border-dashed rounded-[2rem] p-8 text-center transition-all ${preview
+                        ? 'border-blue-200 bg-blue-50/30'
+                        : 'border-gray-200 hover:border-blue-400 hover:bg-gray-50'
+                      }`}>
+                      <input
+                        type="file"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        accept="image/*,.pdf"
+                        onChange={handleFileChange}
+                      />
+                      {preview ? (
+                        <div className="relative inline-block">
+                          <img
+                            src={preview}
+                            alt="Slip Preview"
+                            className="max-h-64 rounded-2xl shadow-lg border border-white"
+                          />
+                          <div className="absolute -top-3 -right-3 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-lg">
+                            <CheckCircle className="w-5 h-5" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="w-20 h-20 bg-gray-100 rounded-3xl flex items-center justify-center mx-auto group-hover:bg-blue-100 transition-colors">
+                            <Upload className="w-10 h-10 text-gray-400 group-hover:text-blue-600 transition-colors" />
+                          </div>
+                          <div>
+                            <p className="text-lg font-bold text-gray-700">Click or drag to upload</p>
+                            <p className="text-sm text-gray-500">Maximum file size: 5MB (JPG, PNG or PDF)</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Reference */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3 ml-1">
+                      Transaction Reference (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={reference}
+                      onChange={(e) => setReference(e.target.value)}
+                      placeholder="Enter the transaction reference number"
+                      className="w-full h-14 px-6 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-gray-700 placeholder:text-gray-400"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full h-16 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-lg shadow-lg shadow-blue-200 transition-all transform hover:-translate-y-1 active:scale-[0.98] disabled:opacity-50 disabled:translate-y-0"
+                  >
+                    {submitting ? "Submitting..." : "Submit Payment Slip"}
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
+              <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
+                <Info className="w-5 h-5 mr-2 text-blue-600" /> Payment Details
+              </h2>
+              <div className="space-y-6">
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Account Name</p>
+                  <p className="text-gray-900 font-semibold bg-gray-50 px-4 py-3 rounded-xl border border-gray-100">
+                    MEDIGO Healthcare Pvt Ltd
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Account Number</p>
+                  <p className="text-2xl font-black text-gray-900 font-mono tracking-tighter">0023 4567 8910</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Bank & Branch</p>
+                  <p className="text-gray-900 font-semibold bg-gray-50 px-4 py-3 rounded-xl border border-gray-100">
+                    National Trust Bank - Kollupitiya
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-blue-600 rounded-3xl shadow-xl p-8 text-white relative overflow-hidden group">
+              <div className="relative z-10">
+                <p className="text-blue-100 text-sm font-medium mb-1">Total Fee Payable</p>
+                <p className="text-4xl font-black mb-6">
+                  LKR {appointment?.fee?.toLocaleString() ?? '—'}
+                </p>
+                <div className="pt-6 border-t border-blue-500/50 space-y-4">
+                  <div className="flex items-center text-sm">
+                    <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-2" />
+                    <span className="text-blue-100">
+                      Ref: {appointmentId?.slice(-8).toUpperCase()}
+                    </span>
+                  </div>
+                  <p className="text-xs text-blue-200 leading-relaxed italic">
+                    Include the Reference ID in your bank transfer description for faster verification.
+                  </p>
+                </div>
+              </div>
+              <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700" />
+              <div className="absolute -left-12 -top-12 w-48 h-48 bg-white/5 rounded-full blur-2xl" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 

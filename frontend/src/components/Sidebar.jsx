@@ -15,6 +15,7 @@ const Sidebar = ({ isPatient, isDoctor, isAdmin }) => {
     { name: 'Dashboard', icon: Home, path: '/dashboard' },
     { name: 'Find Doctors', icon: Search, path: '/search' },
     { name: 'My Appointments', icon: Calendar, path: '/appointments' },
+    { name: 'Telemedicine', icon: Video, path: '/telemedicine' },
     { name: 'Medical Reports', icon: FileText, path: '/reports' },
     { name: 'Payments', icon: CreditCard, path: '/payments' },
     { name: 'Profile', icon: User, path: '/profile' },

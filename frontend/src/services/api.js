@@ -1,14 +1,14 @@
 import axios from 'axios'
 
 // Service URLs (Local Dev Environment)
-const AUTH_URL     = 'http://localhost:5001'
-const PATIENT_URL  = 'http://localhost:5002'
-const ADMIN_URL    = 'http://localhost:5003'
-const DOCTOR_URL   = 'http://localhost:5004'
-const APPT_URL     = 'http://localhost:5005'
-const REPORT_URL   = 'http://localhost:5006'
-const PAYMENT_URL  = 'http://localhost:5007'
-const TELE_URL     = 'http://localhost:5008'
+const AUTH_URL = 'http://localhost:5001'
+const PATIENT_URL = 'http://localhost:5002'
+const ADMIN_URL = 'http://localhost:5003'
+const DOCTOR_URL = 'http://localhost:5004'
+const APPT_URL = 'http://localhost:5005'
+const REPORT_URL = 'http://localhost:5006'
+const PAYMENT_URL = 'http://localhost:5007'
+const TELE_URL = 'http://localhost:5008'
 
 const api = axios.create({ baseURL: '/api', headers: { 'Content-Type': 'application/json' } })
 
@@ -21,8 +21,8 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) { 
-      localStorage.removeItem('token'); 
+    if (err.response?.status === 401) {
+      localStorage.removeItem('token');
       const currentPath = window.location.pathname;
       if (currentPath !== '/login' && currentPath !== '/admin-login') {
         window.location.href = currentPath.startsWith('/admin') ? '/admin-login' : '/login';
@@ -34,13 +34,13 @@ api.interceptors.response.use(
 
 // ── Auth Service ──────────────────────────────────────────────
 export const authAPI = {
-  login:            (data) => api.post(`${AUTH_URL}/api/auth/login`, data),
-  register:         (data) => api.post(`${AUTH_URL}/api/auth/register/patient`, data),
-  verifyOtp:        (data) => api.post(`${AUTH_URL}/api/auth/verify-otp`, data),
-  getMe:            () => api.get(`${AUTH_URL}/api/auth/me`),
-  changePassword:   (data) => api.put(`${AUTH_URL}/api/auth/change-password`, data),
+  login: (data) => api.post(`${AUTH_URL}/api/auth/login`, data),
+  register: (data) => api.post(`${AUTH_URL}/api/auth/register/patient`, data),
+  verifyOtp: (data) => api.post(`${AUTH_URL}/api/auth/verify-otp`, data),
+  getMe: () => api.get(`${AUTH_URL}/api/auth/me`),
+  changePassword: (data) => api.put(`${AUTH_URL}/api/auth/change-password`, data),
   requestDeleteOtp: () => api.post(`${AUTH_URL}/api/auth/me/request-delete-otp`),
-  deleteMyAccount:  (data) => api.delete(`${AUTH_URL}/api/auth/me`, { data }),
+  deleteMyAccount: (data) => api.delete(`${AUTH_URL}/api/auth/me`, { data }),
   setupAdminPassword: (data) => api.post(`${AUTH_URL}/api/auth/setup-password`, data),
 }
 
@@ -70,47 +70,49 @@ export const patientAPI = {
 
 // ── Appointment Service ───────────────────────────────────────
 export const appointmentAPI = {
-  book:            (data)       => api.post(`${APPT_URL}/api/appointments`, data),
-  getAll:          (params)     => api.get(`${APPT_URL}/api/appointments`, { params }),
-  getById:         (id)         => api.get(`${APPT_URL}/api/appointments/${id}`),
-  modify:          (id, data)   => api.put(`${APPT_URL}/api/appointments/${id}`, data),
-  cancel:          (id, reason) => api.put(`${APPT_URL}/api/appointments/${id}/cancel`, { reason }),
-  updateStatus:    (id, data)   => api.put(`${APPT_URL}/api/appointments/${id}/status`, data),
+  book: (data) => api.post(`${APPT_URL}/api/appointments`, data),
+  getAll: (params) => api.get(`${APPT_URL}/api/appointments`, { params }),
+  getById: (id) => api.get(`${APPT_URL}/api/appointments/${id}`),
+  modify: (id, data) => api.put(`${APPT_URL}/api/appointments/${id}`, data),
+  cancel: (id, reason) => api.put(`${APPT_URL}/api/appointments/${id}/cancel`, { reason }),
+  updateStatus: (id, data) => api.put(`${APPT_URL}/api/appointments/${id}/status`, data),
   getAvailability: (doctorId, date) => api.get(`${APPT_URL}/api/appointments/doctor/${doctorId}/availability`, { params: { date } }),
-  searchDoctors:   (specialty)  => api.get(`${APPT_URL}/api/appointments/search`, { params: { specialty } }),
+  searchDoctors: (specialty) => api.get(`${APPT_URL}/api/appointments/search`, { params: { specialty } }),
 }
 
 // ── Doctor Service ──────────────────────────────────────────── (Re-Integrated)
 export const doctorAPI = {
-  register:    (data) => api.post(`${DOCTOR_URL}/api/doctors`, data),
+  register: (data) => api.post(`${DOCTOR_URL}/api/doctors`, data),
   getProfiles: (params) => api.get(`${DOCTOR_URL}/api/doctors`, { params }),
-  getMyProfile: ()       => api.get(`${DOCTOR_URL}/api/doctors/me`),
-  getById:     (id)     => api.get(`${DOCTOR_URL}/api/doctors/${id}`),
+  getMyProfile: () => api.get(`${DOCTOR_URL}/api/doctors/me`),
+  getById: (id) => api.get(`${DOCTOR_URL}/api/doctors/${id}`),
   getProfileByEmail: (email) => api.get(`${DOCTOR_URL}/api/doctors/profile/${email}`),
   getAvailability: (doctorId) => api.get(`${DOCTOR_URL}/api/doctors/${doctorId}/availability`),
   addAvailability: (doctorId, data) => api.post(`${DOCTOR_URL}/api/doctors/${doctorId}/availability`, data),
   deleteAvailability: (id) => api.delete(`${DOCTOR_URL}/api/doctors/availability/${id}`),
 }
 
-// ── Payment Service ─────────────────────────────────────────── (Re-Integrated)
+// ── Payment Service ─────────────────────────────────────────── 
 export const paymentAPI = {
   createSession: (data) => api.post(`${PAYMENT_URL}/api/payments`, data),
-  bankTransfer:  (data) => api.post(`${PAYMENT_URL}/api/payments/bank-transfer`, data, { 
-    headers: { 'Content-Type': 'multipart/form-data' } 
+  bankTransfer: (data) => api.post(`${PAYMENT_URL}/api/payments/bank-transfer`, data, {
+    // IMPORTANT: Setting Content-Type manually for multipart data often breaks boundary calculation.
+    // If you experience 400 Bad Request / Empty Body errors, remove the manual header and 
+    // allow Axios to set it automatically from the FormData object.
+    headers: { 'Content-Type': 'multipart/form-data' },
   }),
 }
-
 // ── Telemedicine Service ────────────────────────────────────── (Re-Integrated)
 export const telemedicineAPI = {
-  create:       (data) => api.post(`${TELE_URL}/api/telemedicine`, data),
-  getByAppt:    (apptId) => api.get(`${TELE_URL}/api/telemedicine/appointment/${apptId}`),
-  join:         (id) => api.put(`${TELE_URL}/api/telemedicine/${id}/join`),
+  create: (data) => api.post(`${TELE_URL}/api/telemedicine`, data),
+  getByAppt: (apptId) => api.get(`${TELE_URL}/api/telemedicine/appointment/${apptId}`),
+  join: (id) => api.put(`${TELE_URL}/api/telemedicine/${id}/join`),
   updateStatus: (id, status) => api.put(`${TELE_URL}/api/telemedicine/${id}/status`, { status }),
 }
 
 // ── Report Service ──────────────────────────────────────────── (Re-Integrated)
 export const reportAPI = {
-  upload:       (data) => api.post(`${REPORT_URL}/api/reports`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  upload: (data) => api.post(`${REPORT_URL}/api/reports`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
   getByPatient: (patientId) => api.get(`${REPORT_URL}/api/reports/patient/${patientId}`),
 }
 

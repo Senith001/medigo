@@ -70,6 +70,10 @@ const doctorSchema = new mongoose.Schema(
       type: String,
       enum: ["pending", "verified", "rejected"],
       default: "pending"
+    },
+    offersTelemedicine: {
+      type: Boolean,
+      default: true
     }
   },
   {
