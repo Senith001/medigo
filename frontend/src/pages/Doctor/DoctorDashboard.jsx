@@ -218,13 +218,15 @@ export default function DoctorDashboard() {
                           )}
                           {apt.status === 'confirmed' && (
                             <>
-                              <Button 
-                                size="sm" 
-                                className="h-10 px-4" 
-                                onClick={() => navigate(`/telemedicine/lobby/${apt._id}`)}
-                              >
-                                <Video size={16} className="mr-2" /> Join
-                              </Button>
+                              {apt.type === 'telemedicine' && (
+                                <Button 
+                                  size="sm" 
+                                  className="h-10 px-4" 
+                                  onClick={() => navigate(`/telemedicine/lobby/${apt._id}`)}
+                                >
+                                  <Video size={16} className="mr-2" /> Join
+                                </Button>
+                              )}
                               <button 
                                 onClick={() => updateStatus(apt._id, 'completed')}
                                 className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-medigo-blue transition-all border border-slate-100"
@@ -234,9 +236,15 @@ export default function DoctorDashboard() {
                               </button>
                             </>
                           )}
-                          <button className="p-2.5 text-slate-300 hover:text-slate-600 transition-colors">
-                             <MoreVertical size={18} />
-                          </button>
+                          <Button 
+                             variant="outline"
+                             size="sm"
+                             className="h-10 px-3 bg-white text-medigo-navy border-slate-200 hover:border-medigo-blue hover:text-medigo-blue transition-colors ml-1"
+                             onClick={() => navigate('/doctor/records')}
+                             title="View Clinical Records"
+                          >
+                             <ClipboardList size={16} />
+                          </Button>
                         </div>
                       </td>
                     </motion.tr>

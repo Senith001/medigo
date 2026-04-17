@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import {
   Building2, CheckCircle2, XCircle,
   Eye, Search, Loader2, Clock,
   Check, AlertCircle, RefreshCw
-} from "lucide-react";
-import { paymentAPI } from "../../services/api";
+} from "lucide-react"
+import { paymentAPI } from "../../services/api"
 
 const AdminPayments = () => {
   const [payments, setPayments] = useState([])
@@ -20,7 +20,6 @@ const AdminPayments = () => {
   const fetchPending = async () => {
     setLoading(true)
     try {
-      // ✅ FIXED: getPendingTransfers — correct method
       const { data } = await paymentAPI.getPendingTransfers()
       setPayments(data.payments || [])
     } catch (err) {
@@ -76,6 +75,7 @@ const AdminPayments = () => {
   )
 
   return (
+    // ✅ No DashboardLayout — AdminLayout already wraps
     <div className="max-w-6xl mx-auto space-y-8 pb-20">
 
       {/* Header */}
@@ -129,7 +129,7 @@ const AdminPayments = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-white rounded-[2.5rem] p-8 shadow-premium border border-slate-100 flex flex-col md:flex-row gap-6 items-center"
+                className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 flex flex-col md:flex-row gap-6 items-center"
               >
                 {/* Slip Preview */}
                 <div
@@ -268,7 +268,7 @@ const AdminPayments = () => {
         )}
       </AnimatePresence>
 
-      {/* Reject Reason Modal */}
+      {/* Reject Modal */}
       <AnimatePresence>
         {rejectTarget && (
           <motion.div
@@ -293,11 +293,13 @@ const AdminPayments = () => {
                 </div>
               </div>
 
-              {/* Quick presets */}
               <div className="space-y-2">
                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Quick Reason</p>
                 <div className="flex flex-wrap gap-2">
-                  {['Invalid slip image', 'Amount mismatch', 'Unreadable slip', 'Wrong account transfer', 'Duplicate submission'].map(r => (
+                  {[
+                    'Invalid slip image', 'Amount mismatch',
+                    'Unreadable slip', 'Wrong account transfer', 'Duplicate submission'
+                  ].map(r => (
                     <button
                       key={r}
                       onClick={() => setRejectReason(r)}
@@ -310,7 +312,6 @@ const AdminPayments = () => {
                 </div>
               </div>
 
-              {/* Custom reason */}
               <div className="space-y-2">
                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Rejection Reason</p>
                 <textarea
@@ -327,7 +328,6 @@ const AdminPayments = () => {
                 )}
               </div>
 
-              {/* Notification note */}
               <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-100 rounded-2xl">
                 <AlertCircle size={16} className="text-amber-500 shrink-0 mt-0.5" />
                 <p className="text-xs font-bold text-amber-700 leading-relaxed">

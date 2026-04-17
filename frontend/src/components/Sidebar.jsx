@@ -1,4 +1,4 @@
-// ✅ FIX: import top එකට move කරන්න
+
 import { motion } from 'framer-motion'
 import { Link, useLocation } from 'react-router-dom'
 import {
@@ -28,7 +28,7 @@ const Sidebar = ({ isPatient, isDoctor, isAdmin }) => {
   const doctorLinks = [
     { name: 'Medical Hub', icon: Home, path: '/doctor/dashboard' },
     { name: 'Clinical Sessions', icon: CalendarDays, path: '/doctor/availability' },
-    { name: 'Consultations', icon: Calendar, path: '/doctor/appointments' },
+    { name: 'Consultations', icon: Calendar, path: '/doctor/dashboard' },
     { name: 'Telemedicine', icon: Video, path: '/telemedicine' },
     { name: 'Patient Files', icon: FileText, path: '/doctor/records' },
     { name: 'Settings', icon: User, path: '/doctor/profile' },
@@ -67,16 +67,16 @@ const Sidebar = ({ isPatient, isDoctor, isAdmin }) => {
             key={link.name}
             to={link.path}
             className={`flex items-center justify-between group px-4 py-3 rounded-2xl text-[14px] font-bold transition-all duration-200 ${isActive(link.path)
-                ? 'bg-blue-50 text-medigo-blue shadow-sm'
-                : 'text-slate-500 hover:bg-slate-50 hover:text-medigo-navy'
+              ? 'bg-blue-50 text-medigo-blue shadow-sm'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-medigo-navy'
               }`}
           >
             <div className="flex items-center gap-3">
               <link.icon
                 size={18}
                 className={`transition-colors ${isActive(link.path)
-                    ? 'text-medigo-blue'
-                    : 'text-slate-400 group-hover:text-medigo-navy'
+                  ? 'text-medigo-blue'
+                  : 'text-slate-400 group-hover:text-medigo-navy'
                   }`}
               />
               {link.name}

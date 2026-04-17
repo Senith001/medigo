@@ -7,7 +7,6 @@ const makeInstance = () => {
     const token = localStorage.getItem('token')
     if (token) config.headers.Authorization = `Bearer ${token}`
 
-    // ✅ FormData detect කරලා Content-Type auto handle
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type']
     } else {
@@ -99,7 +98,8 @@ export const paymentAPI = {
   bankTransfer: (data) => api.post('/api/payments/bank-transfer', data),
   getById: (id) => api.get(`/api/payments/${id}`),
   getByPatient: (patientId) => api.get(`/api/payments/patient/${patientId}`),
-  getPendingTransfers: () => api.get('/api/payments/admin/pending'),
+  // ✅ FIXED: /admin/pending → /pending-transfers (proxy conflict fix)
+  getPendingTransfers: () => api.get('/api/payments/pending-transfers'),
   approve: (id) => api.put(`/api/payments/${id}/approve`),
   reject: (id, data) => api.put(`/api/payments/${id}/reject`, data),
   refund: (id, data) => api.put(`/api/payments/${id}/refund`, data),

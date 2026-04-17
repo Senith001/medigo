@@ -1,9 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate, authorize } = require('../middleware/auth');
-const { getAllNotifications, getByAppointment, sendPaymentNotification } = require('../controllers/notificationController');
+const {
+  getAllNotifications,
+  getByAppointment,
+  sendPaymentNotification
+} = require('../controllers/notificationController');
 
-// Internal service-to-service middleware
 const verifyInternalService = (req, res, next) => {
   const secret = req.headers['x-service-secret'];
   if (!secret || secret !== process.env.SERVICE_SECRET) {
@@ -12,13 +15,14 @@ const verifyInternalService = (req, res, next) => {
   next();
 };
 
-// Internal — payment-service calls this after payment confirmed
+// ✅ FIXED: Both paths accept — payment-service uses /payment-status
+router.post('/internal/payment-status', verifyInternalService, sendPaymentNotification);
 router.post('/internal/payment-confirmed', verifyInternalService, sendPaymentNotification);
 
-// Admin: view all notification logs
+// Admin logs
 router.get('/', authenticate, authorize('admin'), getAllNotifications);
 
-// Get notifications for a specific appointment
+// Appointment notifications
 router.get('/appointment/:appointmentId', authenticate, authorize('admin', 'doctor', 'patient'), getByAppointment);
 
 module.exports = router;

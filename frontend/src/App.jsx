@@ -95,7 +95,7 @@ function Layout() {
         <Route path="/payment/cancel" element={<StripeCallback status="cancel" />} />
 
         {/* Telemedicine */}
-        <Route path="/telemedicine" element={<ProtectedRoute roles={['patient']}><Telemedicine /></ProtectedRoute>} />
+        <Route path="/telemedicine" element={<ProtectedRoute roles={['patient', 'doctor']}><Telemedicine /></ProtectedRoute>} />
         <Route path="/telemedicine/lobby/:appointmentId" element={<ProtectedRoute roles={['patient', 'doctor']}><Lobby /></ProtectedRoute>} />
         <Route path="/telemedicine/room/:sessionId" element={<ProtectedRoute roles={['patient', 'doctor']}><VideoRoom /></ProtectedRoute>} />
 

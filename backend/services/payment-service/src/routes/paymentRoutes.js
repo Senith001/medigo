@@ -1,5 +1,5 @@
-import express from "express";
-const router = express.Router();
+import express from "express"
+const router = express.Router()
 
 import {
   createPayment,
@@ -12,22 +12,21 @@ import {
   approveBankTransferPayment,
   rejectBankTransferPayment,
   refundPayment,
-} from "../controllers/paymentController.js";
+} from "../controllers/paymentController.js"
 
-import { protect, authorize } from "../middleware/auth.js";
-import validate from "../middleware/validate.js";
-import validateObjectId from "../middleware/validateObjectId.js";
-import upload from "../middleware/upload.js";
-
+import { protect, authorize } from "../middleware/auth.js"
+import validate from "../middleware/validate.js"
+import validateObjectId from "../middleware/validateObjectId.js"
+import upload from "../middleware/upload.js"
 import {
   createPaymentValidation,
   createBankTransferValidation,
   paymentIdValidation,
   rejectPaymentValidation,
   refundPaymentValidation,
-} from "../validators/paymentValidators.js";
+} from "../validators/paymentValidators.js"
 
-// Patient creates a Stripe payment session.
+// Patient — Stripe session
 router.post(
   "/",
   protect,
@@ -35,9 +34,9 @@ router.post(
   createPaymentValidation,
   validate,
   createPayment
-);
+)
 
-// Patient submits a bank transfer payment with an uploaded slip.
+// Patient — Bank transfer
 router.post(
   "/bank-transfer",
   protect,
@@ -46,70 +45,70 @@ router.post(
   createBankTransferValidation,
   validate,
   createBankTransferPayment
-);
+)
 
-// Stripe callback routes stay open.
-router.get("/success", handlePaymentSuccess);
-router.get("/cancel", handlePaymentCancel);
+// Stripe callbacks
+router.get("/success", handlePaymentSuccess)
+router.get("/cancel", handlePaymentCancel)
 
-// Admin gets bank transfers waiting for verification.
+// ✅ FIXED: /admin/pending → /pending-transfers (no /admin/ in path)
 router.get(
-  "/admin/pending",
+  "/pending-transfers",
   protect,
-  authorize("admin"),
+  authorize("admin", "superadmin"),
   getPendingBankTransfers
-);
+)
 
-// Admin approves a pending bank transfer payment.
+// Admin approve
 router.put(
   "/:id/approve",
   protect,
-  authorize("admin"),
+  authorize("admin", "superadmin"),
   paymentIdValidation,
   validate,
   validateObjectId("id"),
   approveBankTransferPayment
-);
+)
 
-// Admin rejects a pending bank transfer payment.
+// Admin reject
 router.put(
   "/:id/reject",
   protect,
-  authorize("admin"),
+  authorize("admin", "superadmin"),
   rejectPaymentValidation,
   validate,
   validateObjectId("id"),
   rejectBankTransferPayment
-);
+)
 
-// Admin refunds a paid payment.
+// Admin refund
 router.put(
   "/:id/refund",
   protect,
-  authorize("admin"),
+  authorize("admin", "superadmin"),
   refundPaymentValidation,
   validate,
   validateObjectId("id"),
   refundPayment
-);
+)
 
-// Patient or admin gets billing history for a patient.
+// Patient billing history
 router.get(
   "/patient/:patientId",
   protect,
-  authorize("patient", "admin"),
+  authorize("patient", "admin", "superadmin"),
   getPaymentsByPatient
-);
+)
 
-// Patient gets own payment by id, admin can get any.
+// Single payment
 router.get(
   "/:id",
   protect,
-  authorize("patient", "admin"),
+  authorize("patient", "admin", "superadmin"),
   paymentIdValidation,
   validate,
   validateObjectId("id"),
   getPaymentById
-);
+)
 
-export default router;
+export default router

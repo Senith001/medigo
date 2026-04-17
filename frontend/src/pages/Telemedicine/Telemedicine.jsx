@@ -10,8 +10,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { appointmentAPI } from '../../services/api'
 import DashboardLayout from '../../components/DashboardLayout'
 import Button from '../../components/ui/Button'
+import { useAuth } from '../../context/AuthContext'
 
 export default function Telemedicine() {
+  const { user } = useAuth()
+  const isDoctor = user?.role === 'doctor'
   const navigate = useNavigate()
   const [appointments, setAppointments] = useState([])
   const [loading, setLoading] = useState(true)
@@ -19,10 +22,10 @@ export default function Telemedicine() {
   const fetchTeleAppointments = async () => {
     try {
       setLoading(true)
-      const res = await appointmentAPI.getAppointments()
-      if (res.data.success) {
+      const res = await appointmentAPI.getAll()
+      if (res.data && res.data.appointments) {
         // Filter for telemedicine and sort by date
-        const tele = res.data.data
+        const tele = res.data.appointments
           .filter(apt => apt.type === 'telemedicine')
           .sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate))
         setAppointments(tele)
@@ -51,7 +54,7 @@ export default function Telemedicine() {
 
   if (loading) {
     return (
-      <DashboardLayout isPatient={true}>
+      <DashboardLayout isPatient={!isDoctor} isDoctor={isDoctor}>
         <div className="h-[60vh] flex flex-col items-center justify-center gap-4 text-slate-300">
           <Loader2 size={48} className="animate-spin text-medigo-blue" />
           <p className="text-xs font-black uppercase tracking-widest">Synchronizing Telemedicine Channel...</p>
@@ -61,7 +64,7 @@ export default function Telemedicine() {
   }
 
   return (
-    <DashboardLayout isPatient={true}>
+    <DashboardLayout isPatient={!isDoctor} isDoctor={isDoctor}>
       <div className="max-w-6xl mx-auto space-y-10 pb-20 font-inter">
         {/* Header */}
         <div className="space-y-2">

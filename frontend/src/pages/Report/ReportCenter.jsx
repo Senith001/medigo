@@ -20,17 +20,18 @@ import {
   ArrowRight,
   Info
 } from "lucide-react";
-import { reportAPI } from "../../services/api";
+import { reportAPI, appointmentAPI } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 import DashboardLayout from "../../components/DashboardLayout";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 
 export default function ReportCenter() {
+  const { user } = useAuth();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
-  const [currentUser, setCurrentUser] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
   const [doctors, setDoctors] = useState([]);
   const [uploadForm, setUploadForm] = useState({
@@ -43,13 +44,12 @@ export default function ReportCenter() {
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
-    const userData = JSON.parse(localStorage.getItem("user") || "{}");
-    setCurrentUser(userData);
-    
+    if (!user) return;
+
     const fetchReports = async () => {
       try {
-        const { data } = await reportAPI.getByPatient(userData.userId || userData._id);
-        setReports(data.data || []); // Fixed data indexing
+        const { data } = await reportAPI.getByPatient(user.id || user.userId);
+        setReports(data.data || []);
       } catch (err) {
         console.error("Report Sync Error:", err);
       } finally {
@@ -59,12 +59,12 @@ export default function ReportCenter() {
 
     const fetchMyDoctors = async () => {
       try {
-        // Fetch confirmed appointments to get unique doctors
-        const { data } = await appointmentAPI.getAll({ status: 'confirmed' });
-        if (data.success) {
+        // Fetch all patient appointments to populate the doctor dropdown
+        const { data } = await appointmentAPI.getAll();
+        if (data && data.appointments) {
           const uniqueDoctors = [];
           const seen = new Set();
-          data.data.forEach(apt => {
+          data.appointments.forEach(apt => {
             if (!seen.has(apt.doctorId)) {
               seen.add(apt.doctorId);
               uniqueDoctors.push({ id: apt.doctorId, name: apt.doctorName });
@@ -77,11 +77,9 @@ export default function ReportCenter() {
       }
     };
 
-    if (userData.userId || userData._id) {
-      fetchReports();
-      fetchMyDoctors();
-    }
-  }, []);
+    fetchReports();
+    fetchMyDoctors();
+  }, [user]);
 
   const filteredReports = reports.filter(r => 
     (r.reportTitle?.toLowerCase().includes(search.toLowerCase()) || 
@@ -98,7 +96,7 @@ export default function ReportCenter() {
     try {
       const formData = new FormData();
       formData.append('reportFile', uploadForm.file);
-      formData.append('patientId', currentUser.userId || currentUser._id);
+      formData.append('patientId', user.id || user.userId);
       formData.append('doctorId', uploadForm.doctorId);
       formData.append('reportTitle', uploadForm.title);
       formData.append('reportType', uploadForm.type);
