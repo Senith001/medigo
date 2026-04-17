@@ -3,11 +3,11 @@ kind: Service
 metadata:
   name: payment-service-network
 spec:
-  type: NodePort # Exposes the service so it can be accessed from the local machine
+  type: NodePort
   selector:
     app: payment-service
   ports:
     - protocol: TCP
       port: 5007
       targetPort: 5007
-      nodePort: 30007 # Hit http://localhost:30007 in Postman to reach K8s
+      nodePort: 30007 # Hit http://localhost:30007 for payment-service API

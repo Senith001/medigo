@@ -1,39 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  User, Mail, Phone, MapPin, 
-  Calendar, Droplets, ShieldCheck, 
-  Lock, Trash2, Camera, Info,
-  Save, RotateCcw, ArrowRight,
-  AlertCircle, ChevronRight, CheckCircle2,
-  Heart, Smartphone, Activity
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { patientAPI, authAPI } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
-import DashboardLayout from '../../components/DashboardLayout';
-import Button from '../../components/ui/Button';
-import Input from '../../components/ui/Input';
 
-// --- Client-side validators ---
+// --- Client-side validators (mirroring backend logic) ---
 const validatePatientProfileFields = (data) => {
   const errors = {};
   if (!data.fullName) {
-    errors.fullName = "Full legal name is required";
+    errors.fullName = "Name is required";
   } else if (data.fullName.length > 30) {
-    errors.fullName = "Name is too long";
+    errors.fullName = "Name must not exceed 30 characters";
   } else if (!/^[A-Za-z ]+$/.test(data.fullName)) {
-    errors.fullName = "Name contains invalid characters";
+    errors.fullName = "Name cannot contain special characters or digits";
   }
 
-  if (!data.phone || String(data.phone).trim() === '') {
-    errors.phone = "Mobile contact is required";
-  } else if (!/^(0[0-9]{9}|(77|76|74|78|75|71|70)[0-9]{7})$/.test(String(data.phone).trim())) {
-    errors.phone = "Enter a valid SL mobile number";
+  if (!data.phone || typeof data.phone !== 'string' || data.phone.trim() === '') {
+    errors.phone = "Mobile number is required";
+  } else if (!/^(0[0-9]{9}|(77|76|74|78|75|71|70)[0-9]{7})$/.test(data.phone.trim())) {
+    errors.phone = "Invalid mobile number";
   }
 
-  if (data.address && data.address.trim().length > 100) {
-    errors.address = "Address is too long (max 100 chars)";
+  if (data.address && typeof data.address === 'string' && data.address.trim() !== '') {
+    if (!/^[A-Za-z0-9/\-,/. ]+$/.test(data.address.trim())) {
+      errors.address = "Address can only contain letters, numbers, '/', and '-'";
+    } else if (data.address.trim().length > 100) {
+      errors.address = "Address must not exceed 100 characters";
+    }
+  }
+
+  if (data.emergencyContactName && typeof data.emergencyContactName === 'string' && data.emergencyContactName.trim() !== '') {
+    if (data.emergencyContactName.length > 30) {
+      errors.emergencyContactName = "Name must not exceed 30 characters";
+    } else if (!/^[A-Za-z ]+$/.test(data.emergencyContactName)) {
+      errors.emergencyContactName = "Name cannot contain special characters or digits";
+    }
+  }
+
+  if (data.emergencyContactPhone && typeof data.emergencyContactPhone === 'string' && data.emergencyContactPhone.trim() !== '') {
+    if (!/^(0[0-9]{9}|(77|76|74|78|75|71|70)[0-9]{7})$/.test(data.emergencyContactPhone.trim())) {
+      errors.emergencyContactPhone = "Invalid mobile number";
+    }
   }
 
   return errors;
@@ -42,16 +48,16 @@ const validatePatientProfileFields = (data) => {
 export default function PatientProfile() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [profileData, setProfileData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('profile');
+  const [profileData, setProfileData]   = useState(null);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState('');
+  const [activeTab, setActiveTab]       = useState('profile');
 
   // Password change state
-  const [pwdForm, setPwdForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [pwdForm, setPwdForm]       = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [pwdLoading, setPwdLoading] = useState(false);
   const [pwdMessage, setPwdMessage] = useState('');
-  const [pwdError, setPwdError] = useState(false);
+  const [pwdError, setPwdError]     = useState(false);
 
   // Account deletion state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -74,7 +80,7 @@ export default function PatientProfile() {
         if (response.data.success) {
           const data = response.data.data;
           setProfileData(data);
-          const initialForm = {
+          setFormData({
             title: 'Mr',
             fullName: data.fullName || '',
             phone: data.phone || '',
@@ -86,12 +92,12 @@ export default function PatientProfile() {
             emergencyContactName: data.emergencyContactName || '',
             emergencyContactPhone: data.emergencyContactPhone || '',
             nic: data.nic || ''
-          };
-          setFormData(initialForm);
-          setFieldErrors(validatePatientProfileFields(initialForm));
+          });
+        } else {
+          setError('Failed to fetch profile details.');
         }
       } catch (err) {
-        setError('Synchronizing error: ' + (err.response?.data?.message || err.message));
+        setError('Error loading profile. ' + (err.response?.data?.message || err.message));
       } finally {
         setLoading(false);
       }
@@ -107,15 +113,20 @@ export default function PatientProfile() {
     });
   };
 
+  useEffect(() => {
+    setFieldErrors(validatePatientProfileFields(formData));
+  }, [profileData, formData]);
+
   const handleUpdate = async () => {
     try {
       setLoading(true);
       await patientAPI.updateMyProfile(formData);
       const res = await patientAPI.getMyProfile();
       setProfileData(res.data.data);
-      alert('Profile security and data updated successfully!');
+      alert('Profile updated successfully!');
     } catch (err) {
-      alert(`Update failed: ${err.response?.data?.message || err.message}`);
+      const msg = err.response?.data?.message || err.message || 'Unknown error';
+      alert(`Failed to update profile: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -136,7 +147,6 @@ export default function PatientProfile() {
         emergencyContactPhone: profileData.emergencyContactPhone || '',
         nic: profileData.nic || ''
       });
-      setFieldErrors({});
     }
   };
 
@@ -177,329 +187,310 @@ export default function PatientProfile() {
     e.preventDefault();
     if (pwdForm.newPassword !== pwdForm.confirmPassword) {
       setPwdError(true);
-      setPwdMessage('Confirmation password does not match.');
+      setPwdMessage('New passwords do not match.');
       return;
     }
     setPwdLoading(true); setPwdMessage(''); setPwdError(false);
     try {
       const res = await authAPI.changePassword({ currentPassword: pwdForm.currentPassword, newPassword: pwdForm.newPassword });
       if (res.data.success) {
-        setPwdMessage('Security credentials updated successfully.');
+        setPwdMessage('✅ Password changed successfully.');
         setPwdForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       }
     } catch (err) {
       setPwdError(true);
-      setPwdMessage(err.response?.data?.message || "Failed to update security credentials.");
+      setPwdMessage('❌ ' + (err.response?.data?.message || err.message));
     } finally {
       setPwdLoading(false);
     }
   };
 
+  if (loading && !profileData) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading profile...</div>;
+  if (error) return <div style={{ padding: '2rem', color: 'red', textAlign: 'center' }}>{error}</div>;
+
   const tabs = [
-    { id: 'profile', label: 'Identity & Vital Info', icon: User },
-    { id: 'emergency_contacts', label: 'Emergency Network', icon: Heart },
-    { id: 'password', label: 'Security & Access', icon: Lock },
+    { id: 'profile',            label: 'My Profile' },
+    { id: 'emergency_contacts', label: 'Emergency Contact Numbers' },
+    { id: 'password',           label: 'Change Password' },
   ];
 
-  if (loading && !profileData) return (
-    <DashboardLayout isPatient={true}>
-      <div className="flex flex-col items-center justify-center py-20 animate-pulse">
-         <div className="w-16 h-16 bg-slate-100 rounded-full mb-4" />
-         <div className="h-4 bg-slate-100 rounded-full w-48 mb-2" />
-         <div className="h-3 bg-slate-100 rounded-full w-32" />
-      </div>
-    </DashboardLayout>
-  );
+  const hasValidationErrors = Object.values(fieldErrors).some(Boolean);
 
   return (
-    <DashboardLayout isPatient={true}>
-      <motion.div 
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-6xl mx-auto space-y-8 pb-20 font-inter"
-      >
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-8 bg-white p-8 sm:p-10 rounded-[3rem] shadow-premium border border-slate-100 relative overflow-hidden group">
-           <div className="absolute top-0 right-0 w-64 h-64 bg-medigo-blue/5 blur-[100px] rounded-full pointer-events-none" />
-           
-           <div className="flex flex-col md:flex-row items-center gap-8 relative z-10 w-full md:w-auto">
-              <div className="relative group/avatar">
-                 <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-[2rem] bg-gradient-to-tr from-medigo-blue to-medigo-teal text-white flex items-center justify-center text-4xl font-black shadow-xl group-hover/avatar:scale-105 transition-transform duration-500">
-                    {formData.fullName?.[0]?.toUpperCase() || 'P'}
-                 </div>
-                 <button className="absolute -bottom-2 -right-2 w-10 h-10 bg-white border border-slate-100 rounded-xl shadow-lg flex items-center justify-center text-slate-400 hover:text-medigo-blue transition-colors">
-                    <Camera size={18} />
-                 </button>
-              </div>
-              
-              <div className="text-center md:text-left space-y-1">
-                 <h1 className="text-3xl font-black text-medigo-navy tracking-tight uppercase italic">{formData.fullName}</h1>
-                 <div className="flex flex-wrap justify-center md:justify-start items-center gap-x-6 gap-y-2 text-sm font-bold text-slate-400">
-                    <div className="flex items-center gap-2">
-                       <ShieldCheck size={16} className="text-medigo-mint" />
-                       Patient ID: <span className="text-medigo-navy">#{profileData?.userId?.slice(-6) || 'N/A'}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                       <Activity size={16} className="text-medigo-blue/40" />
-                       Verified Member
-                    </div>
-                 </div>
-              </div>
-           </div>
-           
-           <div className="flex gap-3 relative z-10">
-              <Button onClick={() => navigate('/appointments')} variant="outline" className="border-slate-200">History</Button>
-              <Button onClick={() => navigate('/book')} className="shadow-lg shadow-blue-500/10">Book Slot</Button>
-           </div>
+    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '2rem' }}>
+      <div style={{ maxWidth: '1100px', margin: '0 auto', background: '#ffffff', padding: '3rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+
+        {/* ── HEADER ── */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+            <div style={{ width: '100px', height: '100px', borderRadius: '50%', backgroundColor: '#3b82f6', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem', fontWeight: '500' }}>
+              {profileData?.fullName?.[0]?.toUpperCase() || user?.name?.[0]?.toUpperCase() || 'P'}
+            </div>
+            <div>
+              <h2 style={{ margin: 0, textTransform: 'uppercase', color: '#1e293b', fontSize: '1.5rem', fontWeight: '600', letterSpacing: '0.5px' }}>
+                {profileData?.fullName || user?.name}
+              </h2>
+              <p style={{ margin: '0.4rem 0', color: '#94a3b8', fontSize: '0.9rem' }}>Member ID : {profileData?.userId || 'Loading...'}</p>
+              <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.9rem' }}>
+                Registered : {new Date(profileData?.createdAt || Date.now()).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })}
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button style={{ background: '#ffffff', color: '#3b82f6', border: '1px solid #3b82f6', borderRadius: '6px', padding: '0.6rem 1.2rem', fontSize: '0.9rem', cursor: 'pointer' }} onClick={() => navigate('/appointments')}>My Appointment</button>
+            <button style={{ background: '#3b82f6', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.6rem 1.2rem', fontSize: '0.9rem', cursor: 'pointer' }} onClick={() => navigate('/book')}>Make An Appointment</button>
+          </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <section className="flex flex-wrap items-center gap-2 bg-white p-2 border border-slate-100 rounded-[2rem] shadow-sm overflow-x-auto no-scrollbar">
-           {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-3 px-6 py-3 rounded-full text-xs font-black uppercase tracking-widest transition-all duration-300 ${
-                  activeTab === tab.id 
-                    ? 'bg-medigo-navy text-white shadow-xl' 
-                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <tab.icon size={16} />
-                {tab.label}
-              </button>
-           ))}
-        </section>
+        {/* ── HORIZONTAL TAB NAV ── */}
+        <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', marginBottom: '2.5rem', gap: '2rem' }}>
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '0 0 1rem 0',
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                fontWeight: activeTab === tab.id ? '500' : '400',
+                fontSize: '0.95rem',
+                color: activeTab === tab.id ? '#3b82f6' : '#64748b',
+                borderBottom: activeTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent',
+                marginBottom: '-1px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-        {/* Tab Content Wrapper */}
-        <AnimatePresence mode="wait">
-           <motion.div 
-             key={activeTab}
-             initial={{ opacity: 0, y: 10 }}
-             animate={{ opacity: 1, y: 0 }}
-             exit={{ opacity: 0, y: -10 }}
-             className="bg-white p-8 sm:p-12 rounded-[3.5rem] shadow-premium border border-slate-100"
-           >
-              {activeTab === 'profile' && (
-                 <div className="space-y-10">
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-                       <div className="md:col-span-2">
-                          <Input label="Title" name="title" type="select" value={formData.title} onChange={handleInputChange}>
-                             <option>Mr</option><option>Mrs</option><option>Miss</option><option>Dr</option>
-                          </Input>
-                       </div>
-                       <div className="md:col-span-10">
-                          <Input 
-                            label="Full Legal Name" 
-                            name="fullName" 
-                            value={formData.fullName} 
-                            onChange={handleInputChange} 
-                            icon={User}
-                            error={fieldErrors.fullName}
-                          />
-                       </div>
-                    </div>
+        {/* ── TAB CONTENT ── */}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                       <Input 
-                         label="Communication Email" 
-                         value={formData.email} 
-                         disabled 
-                         icon={Mail} 
-                         helper="Email cannot be changed"
-                       />
-                       <Input 
-                         label="Primary Mobile" 
-                         name="phone" 
-                         value={formData.phone} 
-                         onChange={handleInputChange} 
-                         icon={Smartphone}
-                         error={fieldErrors.phone}
-                       />
-                    </div>
+        {/* PROFILE FORM */}
+        {activeTab === 'profile' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.8rem' }}>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                       <Input label="Biological Gender" name="gender" type="select" value={formData.gender} onChange={handleInputChange}>
-                          <option value="">Select</option>
-                          <option value="male">Male</option>
-                          <option value="female">Female</option>
-                          <option value="other">Other</option>
-                       </Input>
-                       <Input label="Birth Date" name="dateOfBirth" type="date" value={formData.dateOfBirth} onChange={handleInputChange} icon={Calendar} />
-                       <Input label="Blood Group" name="bloodGroup" type="select" value={formData.bloodGroup} onChange={handleInputChange} icon={Droplets}>
-                          <option value="">Select</option>
-                          {['A+','A-','B+','B-','AB+','AB-','O+','O-'].map(g => <option key={g} value={g}>{g}</option>)}
-                       </Input>
-                    </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(100px, 1fr) 3fr 3fr', gap: '1.5rem' }}>
+              <div>
+                <label style={labelStyle}>Title</label>
+                <select name="title" value={formData.title} onChange={handleInputChange} style={inputStyle}>
+                  <option>Mr</option><option>Mrs</option><option>Miss</option><option>Dr</option>
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>First name</label>
+                <input type="text" name="fullName" value={formData.fullName.split(' ')[0] || formData.fullName} onChange={(e) => {
+                  const last = formData.fullName.split(' ').slice(1).join(' ');
+                  handleInputChange({ target: { name: 'fullName', value: `${e.target.value} ${last}`.trim() } });
+                }} style={inputStyle} />
+                {fieldErrors.fullName && <div style={errorStyle}>{fieldErrors.fullName}</div>}
+              </div>
+              <div>
+                <label style={labelStyle}>Last name</label>
+                <input type="text" value={formData.fullName.split(' ').slice(1).join(' ') || ''} onChange={(e) => {
+                  const first = formData.fullName.split(' ')[0] || '';
+                  handleInputChange({ target: { name: 'fullName', value: `${first} ${e.target.value}`.trim() } });
+                }} style={inputStyle} />
+              </div>
+            </div>
 
-                    <Input 
-                      label="Permanent Residential Address" 
-                      name="address" 
-                      value={formData.address} 
-                      onChange={handleInputChange} 
-                      icon={MapPin} 
-                      error={fieldErrors.address}
-                      placeholder="Street, City, Province"
-                    />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+              <div>
+                <label style={labelStyle}>Phone</label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <select style={{ width: '80px', flexShrink: 0, ...inputStyle }}><option>+94</option></select>
+                  <input type="text" name="phone" value={formData.phone} onChange={handleInputChange} style={{...inputStyle, flex: 1}} />
+                </div>
+                {fieldErrors.phone && <div style={errorStyle}>{fieldErrors.phone}</div>}
+              </div>
+              <div>
+                <label style={labelStyle}>Email</label>
+                <input type="email" name="email" value={formData.email} style={inputStyle} disabled />
+              </div>
+            </div>
 
-                    <div className="pt-10 border-t border-slate-50 flex flex-col sm:flex-row justify-between items-center gap-6">
-                       <button 
-                         onClick={() => setShowDeleteConfirm(true)}
-                         className="flex items-center gap-2 text-[11px] font-black text-red-400 uppercase tracking-widest hover:text-red-600 transition-colors"
-                       >
-                          <Trash2 size={16} /> Privacy: Deactivate Account
-                       </button>
-                       <div className="flex gap-4">
-                          <Button variant="outline" className="border-slate-200" onClick={handleReset}><RotateCcw size={18} className="mr-2" /> Reset</Button>
-                          <Button className="px-10" onClick={handleUpdate} disabled={Object.keys(fieldErrors).length > 0}><Save size={18} className="mr-2" /> Save Profile</Button>
-                       </div>
-                    </div>
-                 </div>
-              )}
+            <div>
+              <label style={labelStyle}>Address</label>
+              <input type="text" name="address" value={formData.address} onChange={handleInputChange} style={{...inputStyle, width: '100%'}} />
+              {fieldErrors.address && <div style={errorStyle}>{fieldErrors.address}</div>}
+            </div>
 
-              {activeTab === 'emergency_contacts' && (
-                 <div className="space-y-10">
-                    <div className="bg-indigo-50/50 p-8 rounded-[2.5rem] border border-indigo-100/50 flex items-start gap-4">
-                       <Info size={24} className="text-medigo-blue shrink-0 mt-1" />
-                       <div className="space-y-1">
-                          <h4 className="text-sm font-black text-medigo-navy uppercase tracking-tight italic">Why we need this?</h4>
-                          <p className="text-xs text-slate-500 font-medium leading-relaxed">In case of medical emergencies during telemedicine sessions or clinical visits, we will contact your primary emergency network representative.</p>
-                       </div>
-                    </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
+              <div>
+                <label style={labelStyle}>Gender</label>
+                <select name="gender" value={formData.gender} onChange={handleInputChange} style={{ ...inputStyle, width: '100%' }}>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Date of Birth</label>
+                <input type="date" name="dateOfBirth" value={formData.dateOfBirth} onChange={handleInputChange} style={{ ...inputStyle, width: '100%' }} />
+              </div>
+              <div>
+                <label style={labelStyle}>Blood Group</label>
+                <select name="bloodGroup" value={formData.bloodGroup} onChange={handleInputChange} style={{ ...inputStyle, width: '100%' }}>
+                  <option value="">Select</option>
+                  {['A+','A-','B+','B-','AB+','AB-','O+','O-'].map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+            </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                       <Input 
-                         label="Emergency Contact Representative" 
-                         name="emergencyContactName" 
-                         value={formData.emergencyContactName} 
-                         onChange={handleInputChange} 
-                         placeholder="Full Legal Name"
-                         icon={User}
-                       />
-                       <Input 
-                         label="Direct Contact Line" 
-                         name="emergencyContactPhone" 
-                         value={formData.emergencyContactPhone} 
-                         onChange={handleInputChange} 
-                         placeholder="07XXXXXXXX"
-                         icon={Smartphone}
-                       />
-                    </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem' }}>
+              <button style={{ background: '#b4534f', color: '#ffffff', borderRadius: '6px', padding: '0.6rem 1.5rem', border: 'none', cursor: 'pointer' }} onClick={() => setShowDeleteConfirm(true)}>Account Delete</button>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button style={{ background: '#9ca3af', color: '#ffffff', borderRadius: '6px', padding: '0.6rem 2rem', border: 'none', cursor: 'pointer' }} onClick={handleReset}>Reset</button>
+                <button style={{ background: '#4fa3e4', color: '#ffffff', borderRadius: '6px', padding: '0.6rem 2rem', border: 'none', opacity: hasValidationErrors ? 0.6 : 1, cursor: hasValidationErrors ? 'not-allowed' : 'pointer' }} onClick={handleUpdate} disabled={hasValidationErrors}>Update</button>
+              </div>
+            </div>
+          </div>
+        )}
 
-                    <div className="pt-10 border-t border-slate-50 flex justify-end">
-                       <Button className="px-12" onClick={handleUpdate}><Save size={18} className="mr-2" /> Secure Contacts</Button>
-                    </div>
-                 </div>
-              )}
+        {/* EMERGENCY CONTACTS */}
+        {activeTab === 'emergency_contacts' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.8rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+              <div>
+                <label style={labelStyle}>Contact Name</label>
+                <input type="text" name="emergencyContactName" value={formData.emergencyContactName} onChange={handleInputChange} style={{...inputStyle, width: '100%'}} />
+                {fieldErrors.emergencyContactName && <div style={errorStyle}>{fieldErrors.emergencyContactName}</div>}
+              </div>
+              <div>
+                <label style={labelStyle}>Contact Phone</label>
+                <input type="text" name="emergencyContactPhone" value={formData.emergencyContactPhone} onChange={handleInputChange} style={{...inputStyle, width: '100%'}} />
+                {fieldErrors.emergencyContactPhone && <div style={errorStyle}>{fieldErrors.emergencyContactPhone}</div>}
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+              <button style={{ background: '#4fa3e4', color: '#ffffff', borderRadius: '6px', padding: '0.6rem 2rem', border: 'none', opacity: hasValidationErrors ? 0.6 : 1, cursor: hasValidationErrors ? 'not-allowed' : 'pointer' }} onClick={handleUpdate} disabled={hasValidationErrors}>Save Changes</button>
+            </div>
+          </div>
+        )}
 
-              {activeTab === 'password' && (
-                 <div className="space-y-10">
-                    <div className="space-y-1">
-                       <h3 className="text-xl font-black text-medigo-navy uppercase tracking-tight italic">Security Refresh</h3>
-                       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Update your vault access credentials</p>
-                    </div>
-
-                    <form onSubmit={handlePasswordChange} className="max-w-md space-y-6">
-                       <Input 
-                         label="Current Verification Password" 
-                         type="password" 
-                         value={pwdForm.currentPassword} 
-                         onChange={e => setPwdForm({ ...pwdForm, currentPassword: e.target.value })} 
-                         required 
-                       />
-                       <div className="space-y-4">
-                          <Input 
-                            label="New Vault Key (Password)" 
-                            type="password" 
-                            value={pwdForm.newPassword} 
-                            onChange={e => setPwdForm({ ...pwdForm, newPassword: e.target.value })} 
-                            required 
-                          />
-                          <Input 
-                            label="Confirm New Key" 
-                            type="password" 
-                            value={pwdForm.confirmPassword} 
-                            onChange={e => setPwdForm({ ...pwdForm, confirmPassword: e.target.value })} 
-                            required 
-                          />
-                       </div>
-
-                       <AnimatePresence>
-                          {pwdMessage && (
-                             <motion.div 
-                               initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-                               className={`p-4 rounded-2xl flex items-center gap-3 text-xs font-bold ${pwdError ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}
-                             >
-                                {pwdError ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
-                                {pwdMessage}
-                             </motion.div>
-                          )}
-                       </AnimatePresence>
-
-                       <Button 
-                         type="submit" 
-                         className="w-full h-14" 
-                         disabled={pwdLoading}
-                         loading={pwdLoading}
-                       >
-                          Update Security Credentials
-                       </Button>
-                    </form>
-                 </div>
-              )}
-           </motion.div>
-        </AnimatePresence>
-      </motion.div>
-
-      {/* MODALS */}
-      <AnimatePresence>
-         {showDeleteConfirm && (
-            <>
-               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-medigo-navy/60 backdrop-blur-md z-[100]" onClick={() => setShowDeleteConfirm(false)} />
-               <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="fixed inset-0 flex items-center justify-center p-6 z-[101] pointer-events-none">
-                  <div className="bg-white p-10 rounded-[3rem] shadow-3xl border border-slate-100 max-w-sm w-full text-center pointer-events-auto overflow-hidden relative">
-                     <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-3xl rounded-full" />
-                     <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-                        <Trash2 size={32} />
-                     </div>
-                     <h3 className="text-2xl font-black text-medigo-navy uppercase tracking-tight italic mb-4">Permanent Deletion</h3>
-                     <p className="text-slate-500 font-medium mb-10 leading-relaxed text-sm">Deleting your account will purge all medical records, consultation history, and health data. This cannot be reversed.</p>
-                     
-                     <div className="space-y-3">
-                        <Button className="w-full h-14 bg-red-500 hover:bg-red-600 border-none shadow-lg shadow-red-500/20" onClick={requestDeletion} loading={deleteLoading}>Verify with Email OTP</Button>
-                        <button className="text-[11px] font-black text-slate-400 uppercase tracking-widest hover:text-medigo-navy" onClick={() => setShowDeleteConfirm(false)}>Dismiss Operation</button>
-                     </div>
+        {/* CHANGE PASSWORD */}
+        {activeTab === 'password' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.8rem' }}>
+            <form onSubmit={handlePasswordChange} style={{ maxWidth: '500px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div>
+                <label style={labelStyle}>Current Password</label>
+                <input type="password" value={pwdForm.currentPassword} onChange={e => setPwdForm({ ...pwdForm, currentPassword: e.target.value })} required style={{...inputStyle, width: '100%'}} />
+              </div>
+              <div>
+                <label style={labelStyle}>New Password</label>
+                <input type="password" value={pwdForm.newPassword} onChange={e => setPwdForm({ ...pwdForm, newPassword: e.target.value })} required style={{...inputStyle, width: '100%'}} />
+                {pwdForm.newPassword && !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(pwdForm.newPassword) && (
+                  <div style={errorStyle}>
+                    Must be at least 8 characters and contain at least one uppercase, lowercase, number, and special character.
                   </div>
-               </motion.div>
-            </>
-         )}
+                )}
+              </div>
+              <div>
+                <label style={labelStyle}>Confirm New Password</label>
+                <input type="password" value={pwdForm.confirmPassword} onChange={e => setPwdForm({ ...pwdForm, confirmPassword: e.target.value })} required style={{...inputStyle, width: '100%'}} />
+                {pwdForm.confirmPassword && pwdForm.confirmPassword !== pwdForm.newPassword && (
+                  <div style={errorStyle}>Passwords do not match.</div>
+                )}
+              </div>
+              {pwdMessage && (
+                <div style={{ padding: '10px', borderRadius: '6px', backgroundColor: pwdError ? '#fef2f2' : '#f0fdf4', color: pwdError ? '#b91c1c' : '#15803d', fontSize: '0.85rem' }}>
+                  {pwdMessage}
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '0.5rem' }}>
+                <button 
+                  type="submit" 
+                  disabled={pwdLoading || (pwdForm.newPassword && !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(pwdForm.newPassword)) || (pwdForm.confirmPassword && pwdForm.confirmPassword !== pwdForm.newPassword)} 
+                  style={{ 
+                    background: '#4fa3e4', color: '#ffffff', borderRadius: '6px', padding: '0.6rem 2rem', border: 'none', 
+                    opacity: (pwdLoading || (pwdForm.newPassword && !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(pwdForm.newPassword)) || (pwdForm.confirmPassword && pwdForm.confirmPassword !== pwdForm.newPassword)) ? 0.6 : 1, 
+                    cursor: (pwdLoading || (pwdForm.newPassword && !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(pwdForm.newPassword)) || (pwdForm.confirmPassword && pwdForm.confirmPassword !== pwdForm.newPassword)) ? 'not-allowed' : 'pointer' 
+                  }}
+                >
+                  {pwdLoading ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
 
-         {showDeleteOtp && (
-            <>
-               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-slate-900/80 backdrop-blur-xl z-[100]" />
-               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed inset-0 flex items-center justify-center p-6 z-[101] pointer-events-auto">
-                  <div className="bg-white p-10 rounded-[3rem] shadow-3xl border border-slate-100 max-w-sm w-full text-center relative overflow-hidden">
-                     <div className="w-20 h-20 bg-indigo-50 text-medigo-blue rounded-full flex items-center justify-center mx-auto mb-6">
-                        <ShieldCheck size={32} />
-                     </div>
-                     <h3 className="text-xl font-black text-medigo-navy uppercase tracking-tight mb-4">Security Verification</h3>
-                     <p className="text-slate-400 text-sm font-medium mb-8">Enter the 6-digit code sent to your email to confirm identity for deletion.</p>
-                     
-                     <input 
-                       type="text" 
-                       maxLength="6"
-                       value={deleteOtp}
-                       onChange={(e) => setDeleteOtp(e.target.value)}
-                       className="w-full bg-slate-50 h-20 rounded-2xl text-center text-4xl font-black tracking-[0.5em] text-medigo-navy border border-slate-100 focus:bg-white focus:border-medigo-blue focus:ring-4 focus:ring-blue-500/5 outline-none mb-4"
-                     />
-                     
-                     <Button className="w-full h-14 bg-red-500 hover:bg-red-600" onClick={confirmDeletion} loading={deleteLoading} disabled={deleteOtp.length !== 6}>Authorize Wipe</Button>
-                     <button className="mt-6 text-[10px] font-black text-slate-300 uppercase tracking-widest hover:text-slate-500" onClick={() => setShowDeleteOtp(false)}>Abort Process</button>
-                  </div>
-               </motion.div>
-            </>
-         )}
-      </AnimatePresence>
-    </DashboardLayout>
+        {/* DELETE CONFIRMATION MODAL */}
+        {showDeleteConfirm && (
+          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+            <div style={{ background: '#fff', padding: '2rem', borderRadius: '12px', maxWidth: '400px', width: '100%', textAlign: 'center' }}>
+              <h3 style={{ margin: '0 0 1rem 0', color: '#1e293b' }}>Delete Account</h3>
+              <p style={{ margin: '0 0 1.5rem 0', color: '#64748b', fontSize: '0.95rem' }}>
+                Are you sure you want to permanently delete your account? This action cannot be undone.
+              </p>
+              {deleteError && <p style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '1rem' }}>{deleteError}</p>}
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button onClick={() => { setShowDeleteConfirm(false); setDeleteError(''); }} disabled={deleteLoading} style={{ flex: 1, padding: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', color: '#475569', cursor: 'pointer' }}>Cancel</button>
+                <button onClick={requestDeletion} disabled={deleteLoading} style={{ flex: 1, padding: '0.75rem', borderRadius: '6px', border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', opacity: deleteLoading ? 0.7 : 1 }}>
+                  {deleteLoading ? 'Sending OTP...' : 'Yes, Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* DELETE OTP MODAL */}
+        {showDeleteOtp && (
+          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+            <div style={{ background: '#fff', padding: '2rem', borderRadius: '12px', maxWidth: '400px', width: '100%', textAlign: 'center' }}>
+              <h3 style={{ margin: '0 0 1rem 0', color: '#1e293b' }}>Verify Deletion</h3>
+              <p style={{ margin: '0 0 1.5rem 0', color: '#64748b', fontSize: '0.95rem' }}>
+                We've sent a 6-digit code to your email. Enter it below to confirm.
+              </p>
+              <input 
+                type="text" 
+                maxLength="6"
+                value={deleteOtp}
+                onChange={(e) => setDeleteOtp(e.target.value)}
+                placeholder="000000"
+                style={{ width: '100%', boxSizing: 'border-box', padding: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '1.5rem', textAlign: 'center', letterSpacing: '0.5rem', marginBottom: '1rem', outline: 'none' }}
+              />
+              {deleteError && <p style={{ color: '#ef4444', fontSize: '0.85rem', margin: '-0.5rem 0 1rem 0' }}>{deleteError}</p>}
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button onClick={() => { setShowDeleteOtp(false); setDeleteOtp(''); setDeleteError(''); }} disabled={deleteLoading} style={{ flex: 1, padding: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', color: '#475569', cursor: 'pointer' }}>Cancel</button>
+                <button onClick={confirmDeletion} disabled={deleteLoading || deleteOtp.length !== 6} style={{ flex: 1, padding: '0.75rem', borderRadius: '6px', border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', opacity: (deleteLoading || deleteOtp.length !== 6) ? 0.7 : 1 }}>
+                  {deleteLoading ? 'Verifying...' : 'Confirm Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
   );
 }
+
+// Extracted styles to keep JSX clean and match the UI design
+const labelStyle = { 
+  display: 'block', 
+  fontSize: '0.85rem', 
+  color: '#64748b', 
+  marginBottom: '0.4rem',
+  fontWeight: '400'
+};
+
+const inputStyle = { 
+  boxSizing: 'border-box',
+  width: '100%',
+  borderRadius: '6px', 
+  padding: '0.6rem 0.8rem', 
+  color: '#334155',
+  border: '1px solid #e2e8f0',
+  backgroundColor: '#ffffff',
+  outline: 'none',
+  fontSize: '0.95rem'
+};
+
+const errorStyle = { 
+  color: '#ef4444', 
+  fontSize: '0.8rem', 
+  marginTop: '0.3rem' 
+};
