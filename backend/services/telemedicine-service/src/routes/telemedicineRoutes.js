@@ -8,6 +8,7 @@ import {
   syncAppointmentUpdateValidation,
   updateSessionValidation,
   updateSessionStatusValidation,
+  validateJoinSessionWindow,
 } from "../validators/telemedicineValidators.js";
 
 import {
@@ -101,6 +102,7 @@ router.put(
   sessionIdValidation,
   validate,
   validateObjectId("id"),
+  validateJoinSessionWindow,
   joinSession
 );
 

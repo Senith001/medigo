@@ -45,16 +45,19 @@ const toSessionResponse = (sessionDoc) => {
     };
   }
 
-  // Telemedicine slots are fixed 30-minute windows; end time is derived from start.
-  const end = new Date(start.getTime() + 30 * 60 * 1000);
-  const appointmentDate = formatLocalDate(start);
+  const appointmentDate =
+    session.appointmentDate && !Number.isNaN(new Date(session.appointmentDate).getTime())
+      ? formatLocalDate(new Date(session.appointmentDate))
+      : formatLocalDate(start);
   const startTime = formatLocalTime(start);
-  const endTime = formatLocalTime(end);
+  const fallbackEnd = new Date(start.getTime() + 30 * 60 * 1000);
+  const fallbackEndTime = formatLocalTime(fallbackEnd);
+  const timeSlot = session.timeSlot || `${startTime} - ${fallbackEndTime}`;
 
   return {
     ...session,
     appointmentDate,
-    timeSlot: `${startTime} - ${endTime}`,
+    timeSlot,
     scheduledAtLocal: `${appointmentDate} ${startTime}`,
   };
 };
@@ -371,6 +374,9 @@ const createSessionForAppointment = async (
     patientName,
     doctorId,
     doctorName,
+    // Store slot data locally so join-window validation can be derived from telemedicine DB.
+    appointmentDate: appointment.appointmentDate || null,
+    timeSlot: appointment.timeSlot || null,
     roomName,
     meetingLink,
     status: "scheduled",
@@ -753,6 +759,13 @@ const syncAppointmentUpdate = async (req, res) => {
       }
 
       session.scheduledAt = scheduledAt;
+      // Mirror updated appointment slot details for future join validation.
+      if (appointmentDate) {
+        session.appointmentDate = appointmentDate;
+      }
+      if (timeSlot) {
+        session.timeSlot = timeSlot;
+      }
     }
 
     await session.save();

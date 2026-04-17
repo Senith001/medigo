@@ -53,6 +53,16 @@ const telemedicineSessionSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Persist appointment values locally so join-window checks do not depend on appointment-service.
+    appointmentDate: {
+      type: Date,
+      default: null,
+    },
+    timeSlot: {
+      type: String,
+      default: null,
+      trim: true,
+    },
     startedAt: {
       type: Date,
       default: null,
