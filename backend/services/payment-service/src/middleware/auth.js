@@ -1,23 +1,11 @@
 const jwt = require("jsonwebtoken");
 
+// Check the user and attach their data to req.user.
 const protect = (req, res, next) => {
   try {
-    const testingMode = process.env.TEST_MODE === "true";
-
-    // Temporary testing bypass
-    if (testingMode) {
-      req.user = {
-        id: "temp-mongo-id",
-        userId: req.headers["x-test-userid"] || "patient001",
-        email: req.headers["x-test-email"] || "patient@medigo.com",
-        role: req.headers["x-test-role"] || "patient",
-      };
-
-      return next();
-    }
-
     let token;
 
+    // Read the token from the Authorization header.
     if (
       req.headers.authorization &&
       req.headers.authorization.startsWith("Bearer ")
@@ -32,11 +20,13 @@ const protect = (req, res, next) => {
       });
     }
 
+    // Verify the token and keep the decoded user on the request.
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     req.user = decoded;
     next();
   } catch (error) {
+    // This handles invalid, expired, or malformed tokens.
     return res.status(401).json({
       success: false,
       message: "Not authorized",
@@ -45,6 +35,7 @@ const protect = (req, res, next) => {
   }
 };
 
+// Allow access only to the given roles.
 const authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {

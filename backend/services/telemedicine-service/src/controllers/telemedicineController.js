@@ -1,9 +1,8 @@
-const mongoose = require("mongoose");
-
 const TelemedicineSession = require("../models/TelemedicineSession");
 const generateRoomName = require("../utils/generateRoomName");
 const { generateJitsiMeetingLink } = require("../services/jitsiService");
 
+// Check whether the current user is allowed to view or join this session.
 const canAccessSession = (session, user) => {
   return (
     user.role === "admin" ||
@@ -12,6 +11,7 @@ const canAccessSession = (session, user) => {
   );
 };
 
+// Only sessions that have not started yet can be updated or deleted.
 const isUpcomingSession = (session) => {
   const allowedStatuses = ["scheduled", "waiting"];
 
@@ -26,6 +26,15 @@ const isUpcomingSession = (session) => {
   return true;
 };
 
+// Define which status changes are allowed from each current status.
+const allowedStatusTransitions = {
+  scheduled: ["waiting", "active", "cancelled"],
+  waiting: ["active", "ended", "cancelled"],
+  active: ["ended"],
+  ended: [],
+  cancelled: [],
+};
+
 const createSession = async (req, res) => {
   try {
     const {
@@ -34,6 +43,7 @@ const createSession = async (req, res) => {
       patientName,
       doctorId,
       doctorName,
+      type,
       scheduledAt,
     } = req.body;
 
@@ -42,13 +52,22 @@ const createSession = async (req, res) => {
       !patientId ||
       !patientName ||
       !doctorId ||
-      !doctorName
+      !doctorName ||
+      !type
     ) {
       return res.status(400).json({
         message: "All required session fields must be provided.",
       });
     }
 
+    // For now, telemedicine-service only creates sessions for telemedicine appointments.
+    if (type !== "telemedicine") {
+      return res.status(400).json({
+        message: "Only telemedicine appointments can create a session.",
+      });
+    }
+
+    // Prevent duplicate sessions for the same appointment.
     const existingSession = await TelemedicineSession.findOne({ appointmentId });
 
     if (existingSession) {
@@ -58,6 +77,7 @@ const createSession = async (req, res) => {
       });
     }
 
+    // Build the room name first, then generate the Jitsi link from it.
     const roomName = generateRoomName(appointmentId, doctorId, patientId);
     const meetingLink = generateJitsiMeetingLink(roomName);
 
@@ -88,10 +108,6 @@ const createSession = async (req, res) => {
 
 const getSessionById = async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: "Invalid session ID." });
-    }
-
     const session = await TelemedicineSession.findById(req.params.id);
 
     if (!session) {
@@ -102,6 +118,7 @@ const getSessionById = async (req, res) => {
       return res.status(403).json({ message: "Access denied." });
     }
 
+    // Return the full session if the current user belongs to it.
     return res.status(200).json(session);
   } catch (error) {
     console.error("getSessionById error:", error.message);
@@ -112,6 +129,7 @@ const getSessionById = async (req, res) => {
 
 const getSessionByAppointmentId = async (req, res) => {
   try {
+    // This is useful when the frontend only knows the appointment id.
     const session = await TelemedicineSession.findOne({
       appointmentId: req.params.appointmentId,
     });
@@ -136,10 +154,6 @@ const getSessionByAppointmentId = async (req, res) => {
 
 const joinSession = async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: "Invalid session ID." });
-    }
-
     const session = await TelemedicineSession.findById(req.params.id);
 
     if (!session) {
@@ -150,6 +164,14 @@ const joinSession = async (req, res) => {
       return res.status(403).json({ message: "Access denied." });
     }
 
+    // Do not allow users to join sessions that are already finished or cancelled.
+    if (["ended", "cancelled"].includes(session.status)) {
+      return res.status(400).json({
+        message: `Cannot join a session with status: ${session.status}.`,
+      });
+    }
+
+    // The first join moves the session from scheduled to waiting.
     if (session.status === "scheduled") {
       session.status = "waiting";
       await session.save();
@@ -169,10 +191,6 @@ const joinSession = async (req, res) => {
 
 const updateSession = async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: "Invalid session ID." });
-    }
-
     const session = await TelemedicineSession.findById(req.params.id);
 
     if (!session) {
@@ -189,6 +207,7 @@ const updateSession = async (req, res) => {
       });
     }
 
+    // Only a few editable fields are allowed here.
     const { patientName, doctorName, scheduledAt } = req.body;
 
     if (patientName !== undefined) {
@@ -227,6 +246,7 @@ const updateSession = async (req, res) => {
 const updateSessionStatus = async (req, res) => {
   try {
     const { status } = req.body;
+    // Keep session status changes inside the known lifecycle values.
     const allowedStatuses = [
       "scheduled",
       "waiting",
@@ -241,10 +261,6 @@ const updateSessionStatus = async (req, res) => {
       });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: "Invalid session ID." });
-    }
-
     const session = await TelemedicineSession.findById(req.params.id);
 
     if (!session) {
@@ -255,12 +271,24 @@ const updateSessionStatus = async (req, res) => {
       return res.status(403).json({ message: "Access denied." });
     }
 
+    // Read the allowed next statuses for the session's current state.
+    const nextStatuses = allowedStatusTransitions[session.status] || [];
+
+    // Block invalid jumps like ended -> active or cancelled -> scheduled.
+    if (!nextStatuses.includes(status)) {
+      return res.status(400).json({
+        message: `Cannot change session status from ${session.status} to ${status}.`,
+      });
+    }
+
     session.status = status;
 
+    // Save start time the first time the session becomes active.
     if (status === "active" && !session.startedAt) {
       session.startedAt = new Date();
     }
 
+    // Save end time when the session is finished.
     if (status === "ended") {
       session.endedAt = new Date();
     }
@@ -282,10 +310,6 @@ const updateSessionStatus = async (req, res) => {
 
 const deleteSession = async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: "Invalid session ID." });
-    }
-
     const session = await TelemedicineSession.findById(req.params.id);
 
     if (!session) {
@@ -302,6 +326,7 @@ const deleteSession = async (req, res) => {
       return res.status(403).json({ message: "Access denied." });
     }
 
+    // Past, ongoing, or already progressed sessions should not be removed.
     if (!isUpcomingSession(session)) {
       if (session.scheduledAt && new Date(session.scheduledAt) <= new Date()) {
         return res.status(400).json({

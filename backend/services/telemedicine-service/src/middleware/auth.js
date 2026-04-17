@@ -1,21 +1,8 @@
 const jwt = require("jsonwebtoken");
 
+// Read the token from the Authorization header and attach the decoded user.
 const protect = (req, res, next) => {
   try {
-    const testingMode = process.env.TEST_MODE === "true";
-
-    // Temporary development-only bypass for local API testing.
-    if (testingMode) {
-      req.user = {
-        id: "temp-mongo-id",
-        userId: req.headers["x-test-userid"] || "doctor001",
-        email: req.headers["x-test-email"] || "doctor@medigo.com",
-        role: req.headers["x-test-role"] || "doctor",
-      };
-
-      return next();
-    }
-
     let token;
 
     if (
@@ -45,6 +32,7 @@ const protect = (req, res, next) => {
   }
 };
 
+// Allow access only if the logged-in user's role is in the route's allowed list.
 const authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {

@@ -36,3 +36,29 @@ services:
       - "5003:5003" 
     env_file:
       - ./backend/services/admin-service/.env
+
+#====================================================
+#               PAYMENT SERVICE
+#====================================================
+  payment-service:
+    build:
+      context: ./backend/services/payment-service
+    container_name: medigo-payment-service
+    ports:
+      - "5007:5007"
+    env_file:
+      - ./backend/services/payment-service/.env
+    volumes:
+      - ./backend/services/payment-service/uploads:/app/uploads
+
+#====================================================
+#            TELEMEDICINE SERVICE
+#====================================================
+  telemedicine-service:
+    build:
+      context: ./backend/services/telemedicine-service
+    container_name: medigo-telemedicine-service
+    ports:
+      - "5008:5008"
+    env_file:
+      - ./backend/services/telemedicine-service/.env

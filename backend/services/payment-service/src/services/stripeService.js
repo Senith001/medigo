@@ -10,6 +10,7 @@ const createCheckoutSession = async ({
   successUrl,
   cancelUrl,
 }) => {
+  // Create a Stripe Checkout session for a consultation payment.
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ["card"],
     mode: "payment",
@@ -37,7 +38,14 @@ const retrieveCheckoutSession = async (sessionId) => {
   return await stripe.checkout.sessions.retrieve(sessionId);
 };
 
+const createRefund = async (paymentIntentId) => {
+  return await stripe.refunds.create({
+    payment_intent: paymentIntentId,
+  });
+};
+
 module.exports = {
   createCheckoutSession,
   retrieveCheckoutSession,
+  createRefund,
 };

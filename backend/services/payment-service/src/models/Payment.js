@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const paymentSchema = new mongoose.Schema(
   {
+    // Main appointment and user details for the payment.
     appointmentId: {
       type: String,
       required: [true, "Appointment ID is required"],
@@ -94,7 +95,7 @@ const paymentSchema = new mongoose.Schema(
       index: true,
     },
 
-    // Manual bank transfer fields
+    // Bank transfer details
     paymentSlipUrl: {
       type: String,
       default: null,
@@ -107,7 +108,7 @@ const paymentSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // Verification fields
+    // Admin verification details
     verifiedBy: {
       type: String,
       default: null,
@@ -134,6 +135,17 @@ const paymentSchema = new mongoose.Schema(
     paidAt: {
       type: Date,
       default: null,
+    },
+
+    refundedAt: {
+      type: Date,
+      default: null,
+    },
+
+    refundReason: {
+      type: String,
+      default: null,
+      trim: true,
     },
   },
   {

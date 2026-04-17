@@ -1,11 +1,69 @@
 const Payment = require("../models/Payment");
-const mongoose = require("mongoose");
+const axios = require("axios");
 const generateInvoiceNumber = require("../utils/generateInvoiceNumber");
 const {
   createCheckoutSession,
   retrieveCheckoutSession,
+  createRefund,
 } = require("../services/stripeService");
 
+
+// Helper: sync appointment paymentStatus to appointment-service
+const syncAppointmentPayment = async (appointmentId, paymentStatus) => {
+  try {
+    await axios.put(
+      `${process.env.APPOINTMENT_SERVICE_URL}/api/appointments/internal/payment-status`,
+      { appointmentId, paymentStatus },
+      {
+        headers: {
+          "x-service-secret": process.env.SERVICE_SECRET,
+        },
+      }
+    );
+  } catch (err) {
+    console.error("Failed to sync appointment payment status:", err.message);
+  }
+};
+
+// Helper: trigger notification-service for payment-related messages
+const sendNotification = async (payment, type) => {
+  try {
+    await axios.post(
+      `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/internal/payment-status`,
+      {
+        appointmentId: payment.appointmentId,
+        patientName: payment.patientName,
+        patientEmail: payment.patientEmail,
+        patientPhone: payment.patientPhone || null,
+        doctorName: payment.doctorName,
+        amount: payment.amount,
+        currency: payment.currency,
+        invoiceNumber: payment.invoiceNumber,
+        type,
+      },
+      {
+        headers: {
+          "x-service-secret": process.env.SERVICE_SECRET,
+        },
+      }
+    );
+  } catch (err) {
+    console.error(`Failed to send ${type} notification:`, err.message);
+  }
+};
+
+const findBlockingPayment = async (appointmentId, patientId, paymentMethod) => {
+  const blockingStatuses = ["pending", "paid", "verification_pending"];
+
+  return Payment.findOne({
+    appointmentId,
+    patientId,
+    paymentMethod,
+    status: { $in: blockingStatuses },
+  });
+};
+
+// Create a Stripe payment and save its details in the database.
 const createPayment = async (req, res) => {
   try {
     const {
@@ -36,6 +94,18 @@ const createPayment = async (req, res) => {
     if (req.user.role === "patient" && req.user.userId !== patientId) {
       return res.status(403).json({
         message: "Access denied. You can only create payments for your own appointments.",
+      });
+    }
+
+    const existingPayment = await findBlockingPayment(
+      appointmentId,
+      patientId,
+      "stripe"
+    );
+
+    if (existingPayment) {
+      return res.status(409).json({
+        message: "A Stripe payment already exists for this appointment.",
       });
     }
 
@@ -126,8 +196,21 @@ const createBankTransferPayment = async (req, res) => {
       });
     }
 
+    const existingPayment = await findBlockingPayment(
+      appointmentId,
+      patientId,
+      "bank_transfer"
+    );
+
+    if (existingPayment) {
+      return res.status(409).json({
+        message: "A bank transfer payment already exists for this appointment.",
+      });
+    }
+
     const invoiceNumber = generateInvoiceNumber();
 
+    // Save the uploaded slip path so admins can review it later.
     const paymentSlipUrl = `/uploads/payment-slips/${req.file.filename}`;
 
     const payment = await Payment.create({
@@ -145,6 +228,9 @@ const createBankTransferPayment = async (req, res) => {
       paymentSlipUrl,
       transferReference: transferReference || null,
     });
+
+    // Notify notification-service that bank transfer is awaiting verification
+    await sendNotification(payment, "verification_pending");
 
     res.status(201).json({
       message: "Bank transfer payment submitted successfully and is pending verification.",
@@ -166,6 +252,7 @@ const handlePaymentSuccess = async (req, res) => {
       return res.status(400).json({ message: "Stripe session ID is required." });
     }
 
+    // Use the Stripe session id to find and update the local payment record.
     const stripeSession = await retrieveCheckoutSession(session_id);
 
     const payment = await Payment.findOne({ stripeSessionId: session_id });
@@ -180,10 +267,21 @@ const handlePaymentSuccess = async (req, res) => {
       payment.stripePaymentIntentId = stripeSession.payment_intent || null;
       payment.failureReason = null;
       await payment.save();
+
+      // Sync appointment payment status to appointment-service
+      await syncAppointmentPayment(payment.appointmentId, "paid");
+
+      // Trigger payment confirmation notification
+      await sendNotification(payment, "paid");
+
+      return res.status(200).json({
+        message: "Payment marked as successful.",
+        payment,
+      });
     }
 
-    res.status(200).json({
-      message: "Payment marked as successful.",
+    return res.status(400).json({
+      message: "Payment is not completed in Stripe.",
       payment,
     });
   } catch (error) {
@@ -202,10 +300,19 @@ const handlePaymentCancel = async (req, res) => {
       return res.status(400).json({ message: "Stripe session ID is required." });
     }
 
+    const stripeSession = await retrieveCheckoutSession(session_id);
+
     const payment = await Payment.findOne({ stripeSessionId: session_id });
 
     if (!payment) {
       return res.status(404).json({ message: "Payment record not found." });
+    }
+
+    if (stripeSession.payment_status === "paid") {
+      return res.status(409).json({
+        message: "Payment is already completed in Stripe and cannot be cancelled.",
+        payment,
+      });
     }
 
     payment.status = "cancelled";
@@ -277,6 +384,7 @@ const getPaymentsByPatient = async (req, res) => {
 
 const getPendingBankTransfers = async (req, res) => {
   try {
+    // Return bank transfer payments that still need admin verification.
     const payments = await Payment.find({
       paymentMethod: "bank_transfer",
       status: "verification_pending",
@@ -314,6 +422,7 @@ const approveBankTransferPayment = async (req, res) => {
       });
     }
 
+    // Mark the verified bank transfer as paid.
     payment.status = "paid";
     payment.verifiedBy = req.user.userId;
     payment.verifiedAt = new Date();
@@ -322,6 +431,12 @@ const approveBankTransferPayment = async (req, res) => {
     payment.failureReason = null;
 
     await payment.save();
+
+    // Sync appointment payment status to appointment-service
+    await syncAppointmentPayment(payment.appointmentId, "paid");
+
+    // Trigger approved payment notification
+    await sendNotification(payment, "approved");
 
     res.status(200).json({
       message: "Bank transfer payment approved successfully.",
@@ -364,6 +479,9 @@ const rejectBankTransferPayment = async (req, res) => {
 
     await payment.save();
 
+    // Trigger rejected payment notification
+    await sendNotification(payment, "rejected");
+
     res.status(200).json({
       message: "Bank transfer payment rejected successfully.",
       payment,
@@ -372,6 +490,60 @@ const rejectBankTransferPayment = async (req, res) => {
     console.error("rejectBankTransferPayment error:", error.message);
     res.status(500).json({
       message: "Server error while rejecting bank transfer payment.",
+    });
+  }
+};
+
+const refundPayment = async (req, res) => {
+  try {
+    const { refundReason } = req.body;
+
+    const payment = await Payment.findById(req.params.id);
+
+    if (!payment) {
+      return res.status(404).json({ message: "Payment not found." });
+    }
+
+    if (payment.status === "refunded") {
+      return res.status(400).json({
+        message: "Payment is already refunded.",
+      });
+    }
+
+    if (payment.status !== "paid") {
+      return res.status(400).json({
+        message: "Only paid payments can be refunded.",
+      });
+    }
+
+    if (payment.paymentMethod === "stripe") {
+      if (!payment.stripePaymentIntentId) {
+        return res.status(400).json({
+          message: "Stripe payment intent is missing for this payment.",
+        });
+      }
+
+      await createRefund(payment.stripePaymentIntentId);
+    }
+
+    payment.status = "refunded";
+    payment.refundedAt = new Date();
+    payment.refundReason = refundReason || "Refund processed by admin.";
+    payment.failureReason = null;
+
+    await payment.save();
+
+    await syncAppointmentPayment(payment.appointmentId, "refunded");
+    await sendNotification(payment, "refunded");
+
+    res.status(200).json({
+      message: "Payment refunded successfully.",
+      payment,
+    });
+  } catch (error) {
+    console.error("refundPayment error:", error.message);
+    res.status(500).json({
+      message: "Server error while refunding payment.",
     });
   }
 };
@@ -386,4 +558,5 @@ module.exports = {
   getPendingBankTransfers,
   approveBankTransferPayment,
   rejectBankTransferPayment,
+  refundPayment,
 };
