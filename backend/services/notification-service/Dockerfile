@@ -1,15 +1,7 @@
-# Stage 1: Build
-FROM node:18-alpine AS builder
+FROM node:18-slim
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production
-
-# Stage 2: Production image
-FROM node:18-alpine
-WORKDIR /app
-COPY --from=builder /app/node_modules ./node_modules
+RUN npm install
 COPY . .
-
-EXPOSE 3005
-
-CMD ["node", "src/index.js"]
+EXPOSE 5009
+CMD ["npm", "run", "dev"]

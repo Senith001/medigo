@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+      - name: notification-service
+        image: medigo-notification-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5009
+        env:
+        - name: PORT
+          value: "5009"
+        - name: MONGO_URI
+          value: "mongodb+srv://medigoAdmin:mediGo%40SE127@medigo-cluster.ega902t.mongodb.net/notification_db?retryWrites=true&w=majority"
+        - name: RABBITMQ_URL
+          value: "amqp://rabbitmq:5672"
+        - name: EMAIL_HOST
+          value: "sandbox.smtp.mailtrap.io"
+        - name: EMAIL_PORT
+          value: "2525"
+        - name: EMAIL_USER
+          value: "af13fd1a966019"
+        - name: EMAIL_PASS
+          value: "1d975f407a7da0"
+        - name: EMAIL_FROM
+          value: "MediGo <no-reply@medigo.com>"
+        - name: TWILIO_ACCOUNT_SID
+          value: ""
+        - name: TWILIO_AUTH_TOKEN
+          value: ""
+        - name: TWILIO_PHONE_NUMBER
+          value: ""

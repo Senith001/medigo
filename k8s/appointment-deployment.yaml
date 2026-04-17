@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: appointment-service-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: appointment-service
+  template:
+    metadata:
+      labels:
+        app: appointment-service
+    spec:
+      containers:
+      - name: appointment-service
+        image: medigo-appointment-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5005
+        env:
+        - name: PORT
+          value: "5005"
+        - name: MONGO_URI
+          value: "mongodb+srv://medigoAdmin:mediGo%40SE127@medigo-cluster.ega902t.mongodb.net/appointment_db?retryWrites=true&w=majority"
+        - name: JWT_SECRET
+          value: "medigo_super_secret_key"
+        - name: SERVICE_SECRET
+          value: "medigo_super_secret_key"
+        - name: ADMIN_SUPER_KEY
+          value: "medigo_admin_super_key_123"
+        - name: AUTH_SERVICE_URL
+          value: "http://auth-service-network:5001"
+        - name: PATIENT_SERVICE_URL
+          value: "http://patient-service-network:5002"
