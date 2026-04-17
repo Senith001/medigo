@@ -7,7 +7,8 @@
     "start:auth": "cd services/auth-service && npm run dev",
     "start:patient": "cd services/patient-service && npm run dev",
     "start:admin": "cd services/admin-service && npm run dev",
-    "dev": "concurrently -n \"AUTH,PATIENT,ADMIN\" -c \"cyan,green,magenta\" \"npm run start:auth\" \"npm run start:patient\" \"npm run start:admin\""
+    "start:doctor": "cd services/doctor-service && npm run dev",
+    "dev": "concurrently -n \"AUTH,PATIENT,ADMIN,DOCTOR\" -c \"cyan,green,magenta,blue\" \"npm run start:auth\" \"npm run start:patient\" \"npm run start:admin\" \"npm run start:doctor\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

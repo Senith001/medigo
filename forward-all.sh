@@ -23,11 +23,17 @@ kubectl port-forward service/doctor-service-network 5004:5004 &
 echo "📅 Forwarding Appointment Service (Port 5005)..."
 kubectl port-forward service/appointment-service-network 5005:5005 &
 
+echo "📅 Forwarding Medical Report Service (Port 5006)..."
+kubectl port-forward service/medicalreport-service-network 5006:5006 &
+
 echo "📅 Forwarding Payment Service (Port 5007)..."
 kubectl port-forward service/payment-service-network 5007:5007 &
 
 echo "📅 Forwarding Telemedicine Service (Port 5008)..."
 kubectl port-forward service/telemedicine-service-network 5008:5008 &
+
+echo "📅 Forwarding Notification Service (Port 5009)..."
+kubectl port-forward service/notification-service-network 5009:5009 &
 
 echo "======================================================"
 echo "✅ All ports are now forwarding in the background!"
