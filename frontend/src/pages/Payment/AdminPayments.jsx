@@ -137,7 +137,7 @@ const AdminPayments = () => {
                   onClick={() => setSelectedSlip(p)}
                 >
                   <img
-                    src={`http://localhost:5007${p.paymentSlipUrl}`}
+                    src={p.paymentSlipUrl}
                     alt="Slip"
                     className="w-full h-full object-cover rounded-2xl shadow-md border border-slate-100 group-hover:opacity-70 transition"
                   />
@@ -218,7 +218,7 @@ const AdminPayments = () => {
             >
               <div className="max-h-[60vh] overflow-hidden bg-slate-900 flex items-center justify-center">
                 <img
-                  src={`http://localhost:5007${selectedSlip.paymentSlipUrl}`}
+                  src={selectedSlip.paymentSlipUrl}
                   className="w-full object-contain max-h-[60vh]"
                   alt="Payment Slip"
                 />

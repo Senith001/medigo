@@ -29,7 +29,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Internal Server Error' });
 });
 
-const PORT = process.env.PORT || 3005;
+const PORT = process.env.PORT || 5009;
 
 const start = async () => {
   await connectDB();

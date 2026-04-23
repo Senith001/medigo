@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -37,10 +37,15 @@ import VideoRoom from './pages/Telemedicine/VideoRoom'
 import Telemedicine from './pages/Telemedicine/Telemedicine'
 import PatientRecords from './pages/Doctor/PatientRecords'
 import ReportCenter from './pages/Report/ReportCenter'
+import PaymentHistory from './pages/Patient/PaymentHistory'
+import MyPrescriptions from './pages/Patient/MyPrescriptions'
+import DoctorPrescriptions from './pages/Doctor/Prescriptions'
 
 function Layout() {
   const { token, user } = useAuth()
-  const showStandardNavbar = token && user?.role === 'patient'
+  const location = useLocation()
+  const isLandingPage = location.pathname === '/'
+  const showStandardNavbar = token && user?.role === 'patient' && !isLandingPage
 
   return (
     <>
@@ -87,6 +92,13 @@ function Layout() {
 
         {/* Reports */}
         <Route path="/reports" element={<ProtectedRoute roles={['patient']}><ReportCenter /></ProtectedRoute>} />
+
+        {/* Payment History */}
+        <Route path="/payments" element={<ProtectedRoute roles={['patient']}><PaymentHistory /></ProtectedRoute>} />
+
+        {/* Prescriptions */}
+        <Route path="/prescriptions" element={<ProtectedRoute roles={['patient']}><MyPrescriptions /></ProtectedRoute>} />
+        <Route path="/doctor/prescriptions" element={<ProtectedRoute roles={['doctor']}><DoctorPrescriptions /></ProtectedRoute>} />
 
         {/* Payment */}
         <Route path="/payment/:appointmentId" element={<ProtectedRoute roles={['patient']}><PaymentSelector /></ProtectedRoute>} />

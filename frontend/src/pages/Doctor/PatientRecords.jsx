@@ -225,13 +225,13 @@ export default function PatientRecords() {
                   {/* Actions */}
                   <div className="flex items-center gap-2 pt-4 border-t border-slate-50">
                     <button
-                      onClick={() => window.open(`http://localhost:5006${report.fileUrl}`, '_blank')}
+                      onClick={() => window.open(report.fileUrl, '_blank')}
                       className="flex-1 flex items-center justify-center gap-2 h-10 bg-slate-50 hover:bg-medigo-blue hover:text-white text-slate-500 text-xs font-black rounded-xl transition-all border border-slate-100 hover:border-medigo-blue"
                     >
                       <Download size={14} /> Download
                     </button>
                     <button
-                      onClick={() => window.open(`http://localhost:5006${report.fileUrl}`, '_blank')}
+                      onClick={() => window.open(report.fileUrl, '_blank')}
                       className="w-10 h-10 flex items-center justify-center bg-slate-50 hover:bg-blue-50 text-slate-400 hover:text-medigo-blue rounded-xl transition-all border border-slate-100"
                     >
                       <ArrowUpRight size={15} />

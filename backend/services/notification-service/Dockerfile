@@ -10,6 +10,6 @@ WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY . .
 
-EXPOSE 3005
+EXPOSE 5009
 
 CMD ["node", "src/index.js"]

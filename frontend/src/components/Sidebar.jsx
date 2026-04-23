@@ -5,7 +5,7 @@ import {
   Home, Search, Calendar, FileText,
   User, LogOut, CreditCard, Video,
   CalendarDays, Stethoscope, CreditCard as PayIcon,
-  Users, LayoutDashboard, ShieldCheck
+  Users, LayoutDashboard, ShieldCheck, Pill
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -21,6 +21,7 @@ const Sidebar = ({ isPatient, isDoctor, isAdmin }) => {
     { name: 'My Appointments', icon: Calendar, path: '/appointments' },
     { name: 'Telemedicine', icon: Video, path: '/telemedicine' },
     { name: 'Medical Reports', icon: FileText, path: '/reports' },
+    { name: 'Prescriptions', icon: Pill, path: '/prescriptions' },
     { name: 'Payments', icon: CreditCard, path: '/payments' },
     { name: 'Profile', icon: User, path: '/profile' },
   ]
@@ -30,6 +31,7 @@ const Sidebar = ({ isPatient, isDoctor, isAdmin }) => {
     { name: 'Clinical Sessions', icon: CalendarDays, path: '/doctor/availability' },
     { name: 'Consultations', icon: Calendar, path: '/doctor/dashboard' },
     { name: 'Telemedicine', icon: Video, path: '/telemedicine' },
+    { name: 'Prescriptions', icon: Pill, path: '/doctor/prescriptions' },
     { name: 'Patient Files', icon: FileText, path: '/doctor/records' },
     { name: 'Settings', icon: User, path: '/doctor/profile' },
   ]

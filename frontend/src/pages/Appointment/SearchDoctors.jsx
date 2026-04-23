@@ -1,195 +1,243 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  Search, Filter, Star, ChevronRight, Stethoscope,
-  Loader2, AlertCircle, LayoutGrid, List,
-  MapPin, Clock, BadgeCheck, Video, Building2
+  Search, Star, ChevronRight, Stethoscope,
+  Loader2, AlertCircle, Video, Building2,
+  Clock, BadgeCheck, SlidersHorizontal, X, Users
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import DashboardLayout from '../../components/DashboardLayout'
 import { doctorAPI } from '../../services/api'
 
 const SPECIALTIES = [
-  'All Specialties', 'Cardiology', 'Dermatology', 'Neurology', 'Orthopedics',
+  'All', 'Cardiology', 'Dermatology', 'Neurology', 'Orthopedics',
   'Pediatrics', 'Psychiatry', 'Gynecology', 'General Medicine',
   'Ophthalmology', 'ENT', 'Urology', 'Oncology', 'Immunology'
 ]
 
-const SPECIALTY_ICONS = {
-  Cardiology: '❤️', Dermatology: '🧬', Neurology: '🧠',
-  Orthopedics: '🦴', Pediatrics: '👶', Psychiatry: '💭',
-  Gynecology: '🌸', 'General Medicine': '🏥', Oncology: '🔬',
-  Ophthalmology: '👁️', ENT: '👂', Urology: '💧', Immunology: '🛡️'
+const SPECIALTY_META = {
+  Cardiology:         { icon: '❤️', color: 'bg-red-50 text-red-600 border-red-100' },
+  Dermatology:        { icon: '🧬', color: 'bg-pink-50 text-pink-600 border-pink-100' },
+  Neurology:          { icon: '🧠', color: 'bg-purple-50 text-purple-600 border-purple-100' },
+  Orthopedics:        { icon: '🦴', color: 'bg-orange-50 text-orange-600 border-orange-100' },
+  Pediatrics:         { icon: '👶', color: 'bg-yellow-50 text-yellow-600 border-yellow-100' },
+  Psychiatry:         { icon: '💭', color: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
+  Gynecology:         { icon: '🌸', color: 'bg-rose-50 text-rose-600 border-rose-100' },
+  'General Medicine': { icon: '🏥', color: 'bg-green-50 text-green-600 border-green-100' },
+  Ophthalmology:      { icon: '👁️', color: 'bg-cyan-50 text-cyan-600 border-cyan-100' },
+  ENT:                { icon: '👂', color: 'bg-teal-50 text-teal-600 border-teal-100' },
+  Urology:            { icon: '💧', color: 'bg-blue-50 text-blue-600 border-blue-100' },
+  Oncology:           { icon: '🔬', color: 'bg-slate-50 text-slate-600 border-slate-200' },
+  Immunology:         { icon: '🛡️', color: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
 }
+
+const AVATAR_GRADIENTS = [
+  'from-blue-500 to-indigo-600',
+  'from-teal-500 to-cyan-600',
+  'from-violet-500 to-purple-600',
+  'from-rose-500 to-pink-600',
+  'from-amber-500 to-orange-600',
+  'from-emerald-500 to-green-600',
+]
 
 export default function SearchDoctors() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [doctors, setDoctors] = useState([])
+  const [allDoctors, setAllDoctors] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [nameFilter, setNameFilter] = useState(searchParams.get('name') || '')
-  const [specFilter, setSpecFilter] = useState(searchParams.get('specialty') || '')
-  const [viewMode, setViewMode] = useState('grid')
+  const [specFilter, setSpecFilter] = useState(searchParams.get('specialty') || 'All')
 
-  const fetchDoctors = async (name = nameFilter, specialty = specFilter) => {
-    try {
-      setLoading(true)
-      setError(null)
-      const res = await doctorAPI.getProfiles({
-        fullName: name || undefined,
-        specialty: specialty && specialty !== 'All Specialties' ? specialty : undefined,
-        status: 'verified'
-      })
-      if (res.data.success) setDoctors(res.data.data)
-      else setError('Unable to retrieve practitioners.')
-    } catch {
-      setError('Network error. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
+  // Fetch all doctors once — filter client-side
   useEffect(() => {
-    const sp = searchParams.get('specialty')
-    if (sp) setSpecFilter(sp)
-    fetchDoctors(searchParams.get('name'), sp)
-  }, [searchParams])
+    const load = async () => {
+      try {
+        setLoading(true)
+        const res = await doctorAPI.getProfiles({})
+        if (res.data.success) setAllDoctors(res.data.data)
+        else setError('Unable to retrieve doctors.')
+      } catch {
+        setError('Network error. Please try again.')
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
 
-  const handleSearch = (e) => { e?.preventDefault(); fetchDoctors() }
+  // Compute filtered list reactively — no stale closures possible
+  const doctors = allDoctors.filter(d => {
+    const matchName = !nameFilter.trim() ||
+      d.fullName?.toLowerCase().includes(nameFilter.toLowerCase())
+    const matchSpec = !specFilter || specFilter === 'All' ||
+      d.specialty?.toLowerCase() === specFilter.toLowerCase()
+    return matchName && matchSpec
+  })
+
+  const handleSearch = (e) => e?.preventDefault()
+  const selectSpecialty = (s) => setSpecFilter(s)
+  const clearFilters = () => { setNameFilter(''); setSpecFilter('All') }
+  const hasFilters = nameFilter || (specFilter && specFilter !== 'All')
+
+
+
 
   return (
     <DashboardLayout isPatient={true}>
-      <div className="max-w-7xl mx-auto space-y-8 pb-20 font-inter">
+      <div className="max-w-7xl mx-auto space-y-6 pb-20" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-        {/* ── Hero Search ── */}
-        <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 p-8 sm:p-10">
-          {/* Background glow blobs */}
-          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/20 rounded-full blur-[100px] pointer-events-none" />
-          <div className="absolute bottom-0 left-20 w-64 h-64 bg-indigo-600/15 rounded-full blur-[80px] pointer-events-none" />
+        {/* ── Hero Banner ── */}
+        <div className="relative rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0c1a2e 100%)' }}>
+          {/* Decorative circles */}
+          <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full opacity-10" style={{ background: 'radial-gradient(circle, #3b82f6, transparent)' }} />
+          <div className="absolute -bottom-10 left-10 w-60 h-60 rounded-full opacity-8" style={{ background: 'radial-gradient(circle, #6366f1, transparent)' }} />
 
-          <div className="relative z-10 space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-blue-500/20 border border-blue-500/30 rounded-xl flex items-center justify-center">
-                <Stethoscope size={18} className="text-blue-400" />
-              </div>
-              <span className="text-blue-400 text-xs font-black uppercase tracking-widest">Find Doctors</span>
+          <div className="relative z-10 p-8 sm:p-10">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full px-3 py-1.5 mb-5">
+              <Stethoscope size={14} className="text-blue-400" />
+              <span className="text-blue-300 text-xs font-bold uppercase tracking-wider">MediGo Doctor Directory</span>
             </div>
 
-            <div>
-              <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-none">
-                Find Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">Specialist</span>
-              </h1>
-              <p className="text-slate-400 mt-2 text-base">Book verified medical professionals in seconds.</p>
-            </div>
+            <h1 className="text-3xl sm:text-4xl font-black text-white leading-tight mb-2">
+              Find Your <span className="text-transparent" style={{ WebkitBackgroundClip: 'text', backgroundClip: 'text', backgroundImage: 'linear-gradient(90deg, #60a5fa, #34d399)' }}>Perfect Doctor</span>
+            </h1>
+            <p className="text-slate-400 text-sm mb-7 max-w-lg">
+              Browse from our network of verified specialists and book your appointment instantly.
+            </p>
 
-            {/* Search form */}
-            <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
+            {/* Search Bar */}
+            <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3 max-w-2xl">
               <div className="relative flex-1">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                 <input
                   type="text"
-                  placeholder="Doctor name..."
+                  placeholder="Search by doctor name..."
                   value={nameFilter}
                   onChange={e => setNameFilter(e.target.value)}
-                  className="w-full h-13 py-3.5 pl-11 pr-4 bg-white/8 border border-white/10 rounded-2xl text-white placeholder:text-slate-500 font-medium text-sm outline-none focus:border-blue-500/50 focus:bg-white/10 transition-all backdrop-blur-sm"
+                  className="w-full h-12 pl-11 pr-4 rounded-xl text-sm font-medium outline-none transition-all"
+                  style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'white' }}
+                  onFocus={e => e.target.style.borderColor = 'rgba(96,165,250,0.6)'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
                 />
-              </div>
-              <div className="relative sm:w-52">
-                <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={18} />
-                <select
-                  value={specFilter}
-                  onChange={e => setSpecFilter(e.target.value)}
-                  className="w-full h-13 py-3.5 pl-11 pr-4 bg-white/8 border border-white/10 rounded-2xl text-white font-medium text-sm outline-none appearance-none focus:border-blue-500/50 focus:bg-white/10 transition-all backdrop-blur-sm"
-                >
-                  {SPECIALTIES.map(s => <option key={s} value={s === 'All Specialties' ? '' : s} className="bg-slate-900 text-white">{s}</option>)}
-                </select>
               </div>
               <button
                 type="submit"
                 disabled={loading}
-                className="px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-sm rounded-2xl shadow-lg shadow-blue-500/30 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-60 whitespace-nowrap"
+                className="h-12 px-7 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 whitespace-nowrap"
+                style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', boxShadow: '0 4px 15px rgba(37,99,235,0.4)' }}
               >
-                {loading ? <Loader2 size={18} className="animate-spin mx-auto" /> : 'Search'}
+                {loading ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'Search'}
               </button>
-            </form>
-
-            {/* Specialty pill filters */}
-            <div className="flex flex-wrap gap-2 pt-1">
-              {SPECIALTIES.slice(1, 8).map(s => (
-                <button
-                  key={s}
-                  onClick={() => { setSpecFilter(s); fetchDoctors(nameFilter, s) }}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all border ${
-                    specFilter === s
-                      ? 'bg-blue-500 border-blue-500 text-white shadow-md shadow-blue-500/30'
-                      : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'
-                  }`}
-                >
-                  {SPECIALTY_ICONS[s]} {s}
-                </button>
-              ))}
-              {specFilter && (
-                <button
-                  onClick={() => { setSpecFilter(''); fetchDoctors(nameFilter, '') }}
-                  className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-all"
-                >
-                  ✕ Clear
+              {hasFilters && (
+                <button type="button" onClick={clearFilters}
+                  className="h-12 px-4 rounded-xl font-bold text-sm text-slate-300 border border-white/10 hover:bg-white/10 transition-all flex items-center gap-2">
+                  <X size={14} /> Clear
                 </button>
               )}
-            </div>
+            </form>
           </div>
         </div>
 
-        {/* ── Results Bar ── */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <p className="text-sm font-bold text-slate-500">
-              <span className="text-medigo-navy font-black">{doctors.length}</span> doctors found
-              {specFilter ? <span className="text-medigo-blue"> in {specFilter}</span> : ''}
-            </p>
-            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">Live</span>
+        {/* ── Specialty Filter Pills ── */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <SlidersHorizontal size={14} className="text-slate-400" />
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Filter by Specialty</span>
           </div>
-          <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-            <button onClick={() => setViewMode('grid')} className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-medigo-blue' : 'text-slate-400'}`}>
-              <LayoutGrid size={15} />
-            </button>
-            <button onClick={() => setViewMode('list')} className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-medigo-blue' : 'text-slate-400'}`}>
-              <List size={15} />
-            </button>
+          <div className="flex flex-wrap gap-2">
+            {SPECIALTIES.map(s => {
+              const meta = SPECIALTY_META[s]
+              const isActive = specFilter === s || (s === 'All' && (!specFilter || specFilter === 'All'))
+              return (
+                <button
+                  key={s}
+                  onClick={() => selectSpecialty(s)}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                    isActive
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-md'
+                      : 'bg-slate-50 border-slate-100 text-slate-500 hover:bg-slate-100'
+                  }`}
+                >
+                  {meta && <span>{meta.icon}</span>}
+                  {s}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* ── Results Header ── */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {loading ? (
+              <span className="text-sm text-slate-400 font-medium">Searching...</span>
+            ) : (
+              <>
+                <Users size={16} className="text-slate-400" />
+                <span className="text-sm font-bold text-slate-600">
+                  <span className="text-blue-600">{doctors.length}</span> doctors found
+                  {specFilter && specFilter !== 'All' && <span className="text-slate-400 font-medium"> in {specFilter}</span>}
+                </span>
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse ml-1" />
+              </>
+            )}
           </div>
         </div>
 
         {/* ── Results ── */}
         {loading ? (
-          <div className="py-32 flex flex-col items-center gap-4 text-slate-300">
-            <Loader2 size={48} className="animate-spin text-medigo-blue" />
-            <p className="text-xs font-black uppercase tracking-widest">Finding specialists…</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {[1,2,3,4,5,6,7,8].map(i => (
+              <div key={i} className="bg-white rounded-2xl border border-slate-100 p-5 animate-pulse">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-14 h-14 bg-slate-100 rounded-xl" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 bg-slate-100 rounded w-16" />
+                    <div className="h-4 bg-slate-100 rounded w-28" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="h-3 bg-slate-100 rounded" />
+                  <div className="h-3 bg-slate-100 rounded w-3/4" />
+                </div>
+                <div className="h-10 bg-slate-100 rounded-xl mt-4" />
+              </div>
+            ))}
           </div>
         ) : error ? (
-          <div className="py-24 text-center space-y-4 bg-white rounded-3xl border border-slate-100">
-            <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto">
-              <AlertCircle size={28} className="text-red-400" />
+          <div className="bg-white rounded-2xl border border-red-100 p-10 text-center">
+            <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <AlertCircle size={24} className="text-red-400" />
             </div>
-            <p className="text-slate-500 font-bold">{error}</p>
-            <button onClick={fetchDoctors} className="text-medigo-blue font-black text-sm underline underline-offset-2">Retry</button>
+            <p className="font-bold text-slate-700 mb-1">Something went wrong</p>
+            <p className="text-slate-400 text-sm mb-4">{error}</p>
+            <button onClick={fetchDoctors}
+              className="px-5 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-all">
+              Try Again
+            </button>
           </div>
         ) : doctors.length === 0 ? (
-          <div className="py-28 text-center bg-white rounded-3xl border-2 border-dashed border-slate-100 space-y-3">
-            <div className="text-5xl mb-2">🔍</div>
-            <h3 className="text-lg font-black text-medigo-navy">No doctors found</h3>
-            <p className="text-slate-400 text-sm">Try a different specialty or clear your filters.</p>
+          <div className="bg-white rounded-2xl border-2 border-dashed border-slate-100 p-16 text-center">
+            <div className="text-5xl mb-3">🔍</div>
+            <h3 className="text-lg font-black text-slate-700 mb-1">No doctors found</h3>
+            <p className="text-slate-400 text-sm mb-4">
+              Try searching with a different name or selecting another specialty.
+            </p>
+            <button onClick={clearFilters}
+              className="px-5 py-2 bg-slate-100 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-200 transition-all">
+              Clear Filters
+            </button>
           </div>
         ) : (
-          <motion.div layout className={`grid gap-5 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}>
+          <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <AnimatePresence>
               {doctors.map((doc, i) => (
                 <DoctorCard
                   key={doc._id}
                   doctor={doc}
                   index={i}
-                  viewMode={viewMode}
                   onBook={() => navigate(`/doctor/${doc._id}/sessions`, { state: { doctor: doc } })}
                 />
               ))}
@@ -201,77 +249,116 @@ export default function SearchDoctors() {
   )
 }
 
-function DoctorCard({ doctor, index, viewMode, onBook }) {
-  const isGrid = viewMode === 'grid'
-  const initials = doctor.fullName?.replace('Dr. ', '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-  const colors = ['from-blue-600 to-indigo-700', 'from-teal-600 to-cyan-700', 'from-violet-600 to-purple-700', 'from-rose-600 to-pink-700']
-  const colorClass = colors[index % colors.length]
+function DoctorCard({ doctor, index, onBook }) {
+  const initials = (doctor.fullName || 'DR')
+    .replace(/^Dr\.?\s*/i, '')
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+
+  const gradient = AVATAR_GRADIENTS[index % AVATAR_GRADIENTS.length]
+  const specialtyMeta = SPECIALTY_META[doctor.specialty]
 
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ delay: index * 0.04 }}
-      className={`bg-white rounded-2xl border border-slate-100 hover:border-blue-100 hover:shadow-xl hover:shadow-blue-500/8 transition-all duration-300 group overflow-hidden ${isGrid ? 'flex flex-col' : 'flex flex-row items-center'}`}
+      exit={{ opacity: 0, scale: 0.96 }}
+      transition={{ delay: index * 0.035 }}
+      className="bg-white rounded-2xl border border-slate-100 hover:border-blue-200 hover:shadow-lg transition-all duration-200 group flex flex-col overflow-hidden"
     >
-      {/* Top gradient accent */}
-      <div className={`h-1 bg-gradient-to-r ${colorClass} w-full`} />
-
-      <div className={`${isGrid ? 'p-6 flex flex-col items-center text-center' : 'p-5 flex items-center gap-5 flex-1'}`}>
-        {/* Avatar */}
-        <div className={`${isGrid ? 'w-20 h-20 mb-4' : 'w-16 h-16 shrink-0'} relative rounded-2xl bg-gradient-to-br ${colorClass} flex items-center justify-center text-white text-xl font-black shadow-lg`}>
-          {initials}
-          <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full" />
-        </div>
-
-        <div className={`${isGrid ? '' : 'flex-1 min-w-0'}`}>
-          {/* Specialty */}
-          <span className="text-[10px] font-black text-medigo-blue uppercase tracking-widest">{doctor.specialty}</span>
-
-          {/* Name */}
-          <h3 className={`font-black text-medigo-navy tracking-tight leading-tight mt-0.5 ${isGrid ? 'text-lg' : 'text-base truncate'}`}>
-            {doctor.fullName}
-          </h3>
-
-          {/* Meta */}
-          <div className={`flex items-center gap-3 mt-2 text-[11px] font-bold text-slate-400 ${isGrid ? 'justify-center' : ''}`}>
-            <span className="flex items-center gap-1"><Star size={11} fill="#f59e0b" className="text-amber-500" /> 4.9</span>
-            <span>•</span>
-            <span className="flex items-center gap-1"><Clock size={11} /> {doctor.experienceYears || '—'}y exp</span>
+      {/* Card Header */}
+      <div className="p-5 pb-4">
+        <div className="flex items-start gap-3 mb-4">
+          {/* Avatar */}
+          <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-black text-lg shadow-md relative shrink-0`}>
+            {initials}
+            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full" />
           </div>
 
-          {/* Hospital / Location */}
-          {(doctor.clinicLocation || doctor.hospital) && (
-            <div className={`flex items-center gap-1 mt-1.5 text-[11px] text-slate-400 font-semibold ${isGrid ? 'justify-center' : ''}`}>
-              <Building2 size={11} className="shrink-0" />
-              <span className="truncate">{doctor.clinicLocation || doctor.hospital}</span>
+          {/* Name & Specialty */}
+          <div className="flex-1 min-w-0">
+            {specialtyMeta && (
+              <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border mb-1 ${specialtyMeta.color}`}>
+                {specialtyMeta.icon} {doctor.specialty}
+              </span>
+            )}
+            <h3 className="font-black text-slate-800 text-sm leading-tight truncate group-hover:text-blue-600 transition-colors">
+              {doctor.fullName}
+            </h3>
+          </div>
+        </div>
+
+        {/* Details */}
+        <div className="space-y-2">
+          {/* Rating & Experience */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1">
+              {[...Array(5)].map((_, i) => (
+                <Star key={i} size={12} fill="#f59e0b" className="text-amber-400" />
+              ))}
+              <span className="text-xs font-bold text-slate-600 ml-1">4.9</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-slate-500 font-medium">
+              <Clock size={11} />
+              {doctor.experienceYears || '—'}y experience
+            </div>
+          </div>
+
+          {/* Location */}
+          {doctor.clinicLocation && (
+            <div className="flex items-start gap-1.5 text-xs text-slate-500">
+              <Building2 size={12} className="mt-0.5 shrink-0 text-slate-400" />
+              <span className="line-clamp-1">{doctor.clinicLocation}</span>
+            </div>
+          )}
+
+          {/* Qualifications */}
+          {doctor.qualifications && (
+            <div className="flex items-start gap-1.5 text-xs text-slate-500">
+              <BadgeCheck size={12} className="mt-0.5 shrink-0 text-blue-400" />
+              <span className="line-clamp-1">{doctor.qualifications}</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* CTA */}
-      <div className={`${isGrid ? 'px-6 pb-6 pt-2' : 'pr-5 shrink-0'}`}>
-        {isGrid && (
-          <div className="flex items-center justify-between mb-3 pb-3 border-t border-slate-50 pt-3">
-            <div className={`flex items-center gap-1.5 text-xs font-semibold ${doctor.offersTelemedicine ? 'text-blue-500' : 'text-slate-400'}`}>
-              {doctor.offersTelemedicine
-                ? <><Video size={12} /> Telemedicine</>
-                : <><Building2 size={12} /> Clinic Only</>
-              }
-            </div>
-            <span className="text-base font-black text-medigo-navy">
+      {/* Divider */}
+      <div className="border-t border-slate-50 mx-5" />
+
+      {/* Card Footer */}
+      <div className="p-4 mt-auto">
+        <div className="flex items-center justify-between mb-3">
+          {/* Consultation type badge */}
+          <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg ${
+            doctor.offersTelemedicine
+              ? 'bg-blue-50 text-blue-600'
+              : 'bg-slate-50 text-slate-500'
+          }`}>
+            <Video size={10} />
+            {doctor.offersTelemedicine ? 'Online & In-person' : 'Clinic Only'}
+          </span>
+
+          {/* Fee */}
+          <div className="text-right">
+            <p className="text-[10px] text-slate-400 font-medium leading-none mb-0.5">From</p>
+            <p className="text-sm font-black text-slate-800">
               LKR {doctor.consultationFee?.toLocaleString() || '—'}
-            </span>
+            </p>
           </div>
-        )}
+        </div>
+
+        {/* Book Button */}
         <button
           onClick={e => { e.stopPropagation(); onBook() }}
-          className={`${isGrid ? 'w-full' : 'w-36'} flex items-center justify-center gap-1.5 bg-medigo-navy hover:bg-medigo-blue text-white font-black text-xs py-3 px-4 rounded-xl transition-all hover:scale-[1.02] active:scale-95 shadow-md group`}
+          className="w-full h-10 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-1.5 transition-all hover:opacity-90 active:scale-95 group-hover:shadow-md"
+          style={{ background: 'linear-gradient(135deg, #1d4ed8, #2563eb)' }}
         >
-          Book Now <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+          Book Appointment
+          <ChevronRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
         </button>
       </div>
     </motion.div>

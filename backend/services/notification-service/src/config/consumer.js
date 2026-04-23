@@ -120,6 +120,17 @@ const handleAppointmentUpdated = async (data) => {
     } catch (err) {
       await logNotification(data.appointmentId, recipient.email, recipient.name, 'appointment_updated', 'email', 'failed', err.message);
     }
+    
+    // SMS Notifications
+    if (recipient.phone) {
+      const smsBody = buildUpdateSMS({ ...data, recipientName: recipient.name });
+      try {
+        await sendSMS(recipient.phone, smsBody);
+        await logNotification(data.appointmentId, recipient.email, recipient.name, 'appointment_updated', 'sms', 'sent');
+      } catch (err) {
+        await logNotification(data.appointmentId, recipient.email, recipient.name, 'appointment_updated', 'sms', 'failed', err.message);
+      }
+    }
   }
 };
 

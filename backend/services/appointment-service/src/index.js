@@ -36,7 +36,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 3003;
+const PORT = process.env.PORT || 5005;
 
 const start = async () => {
   await connectDB();

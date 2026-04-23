@@ -46,10 +46,36 @@ export default function DoctorSessions() {
   const hospitals = ['all', ...new Set(sessions.map(s => s.hospital))]
 
   const filteredSessions = sessions.filter(s => {
+    let upcoming = true;
+    if (s.date) {
+      // Explicitly parse the year, month, and day to avoid timezones completely
+      const datePart = s.date.split('T')[0];
+      const parts = datePart.split('-');
+      if (parts.length >= 3) {
+        const sessionDate = new Date(parts[0], parts[1] - 1, parts[2]);
+        sessionDate.setHours(0, 0, 0, 0);
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        console.log(`Checking session ${s.hospital}:`, {
+          originalDate: s.date,
+          sessionDate: sessionDate.toString(),
+          today: today.toString(),
+          isPast: sessionDate < today
+        });
+        
+        if (sessionDate < today) {
+          upcoming = false;
+        }
+      }
+    }
+
     const matchesHospital = selectedHospital === 'all' || s.hospital === selectedHospital;
     const mode = s.consultationType || 'both';
     const matchesMode = selectedMode === null || mode === 'both' || mode === selectedMode;
-    return matchesHospital && matchesMode;
+    
+    return upcoming && matchesHospital && matchesMode;
   });
 
   if (loading) return (
@@ -234,12 +260,25 @@ export default function DoctorSessions() {
                                 <div className="flex-1 space-y-3">
                                    <div className="flex items-center gap-4">
                                       <div className="w-14 h-14 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col items-center justify-center italic leading-none group-hover:bg-blue-50 group-hover:border-blue-100 transition-colors">
-                                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{session.day?.slice(0, 3)}</span>
-                                         <span className="text-lg font-black text-medigo-navy">{session.date ? session.date.split('-')[2] : '∞'}</span>
+                                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                           {(() => {
+                                             if (session.date) {
+                                               // Ensure accurate weekday computation from YYYY-MM-DD
+                                               const [y, m, d] = session.date.split('T')[0].split('-');
+                                               const dt = new Date(y, m - 1, d);
+                                               return dt.toLocaleDateString('en-US', { weekday: 'short' });
+                                             }
+                                             // For repeating slots without dates, fallback to the dropdown day
+                                             return session.day?.slice(0, 3);
+                                            })()}
+                                         </span>
+                                         <span className="text-lg font-black text-medigo-navy">
+                                           {session.date ? session.date.split('T')[0].split('-')[2] : '∞'}
+                                         </span>
                                       </div>
                                       <div>
                                          <div className="flex items-center gap-2 mb-1">
-                                            <h4 className="text-sm font-black text-medigo-navy uppercase italic italic">{session.hospital || 'Private Clinic'}</h4>
+                                            <h4 className="text-sm font-black text-medigo-navy uppercase italic">{session.hospital || 'Private Clinic'}</h4>
                                             <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded transition-colors ${
                                               selectedMode === 'telemedicine' 
                                                 ? 'bg-blue-50 text-medigo-blue group-hover:bg-medigo-blue group-hover:text-white' 

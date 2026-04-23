@@ -88,6 +88,15 @@ const appointmentSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // Snapshotted at booking time so display never needs a cross-service call
+    patientNumber: {
+      type: Number,
+      default: null,
+    },
+    maxPatients: {
+      type: Number,
+      default: null,
+    },
   },
   {
     timestamps: true,

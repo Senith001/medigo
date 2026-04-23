@@ -367,7 +367,7 @@ function ReportCard({ report, index }) {
         <div className="pt-2 flex gap-3">
           <Button 
             className="flex-1 h-12 shadow-sm"
-            onClick={() => window.open(`http://localhost:5006${report.fileUrl}`, '_blank')}
+            onClick={() => window.open(report.fileUrl, '_blank')}
           >
             <Download size={16} className="mr-2" /> Download
           </Button>

@@ -118,4 +118,13 @@ export const reportAPI = {
   getByDoctor: (doctorId) => api.get(`/api/reports/doctor/${doctorId}`),
 }
 
+export const prescriptionAPI = {
+  create: (data) => api.post('/api/prescriptions', data),
+  getAll: () => api.get('/api/prescriptions'),
+  getById: (id) => api.get(`/api/prescriptions/${id}`),
+  getByPatient: (patientId) => api.get(`/api/prescriptions/patient/${patientId}`),
+  update: (id, data) => api.put(`/api/prescriptions/${id}`, data),
+  remove: (id) => api.delete(`/api/prescriptions/${id}`),
+}
+
 export default api

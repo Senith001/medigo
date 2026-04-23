@@ -18,6 +18,7 @@ export default function Navbar() {
     { name: 'Find Doctors', path: '/search' },
     { name: 'Appointments', path: '/appointments' },
     { name: 'Medical Reports', path: '/reports' },
+    { name: 'Prescriptions', path: '/prescriptions' },
   ]
 
   const handleLogout = () => {

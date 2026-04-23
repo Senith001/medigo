@@ -125,17 +125,24 @@ const bookAppointment = async (req, res) => {
       })
     }
 
-    // ── Step 1.5: Check Session Capacity ──────────────────────
+    // ── Step 1.5: Check Session Capacity + snapshot position ────
+    let patientNumber = null
+    let sessionMaxPatients = null
     if (sessionId) {
       try {
         const availRes = await axios.get(
           `${process.env.DOCTOR_SERVICE_URL}/api/availability/doctor/${doctorId}`
         )
         const session = availRes.data.data?.find(s => s._id === sessionId)
-        if (session && session.bookedCount >= session.maxPatients) {
-          return res.status(400).json({
-            message: 'This session is at full capacity. Please select another time or date.',
-          })
+        if (session) {
+          if (session.bookedCount >= session.maxPatients) {
+            return res.status(400).json({
+              message: 'This session is at full capacity. Please select another time or date.',
+            })
+          }
+          // Snapshot position: next patient number after current bookedCount
+          patientNumber = (session.bookedCount || 0) + 1
+          sessionMaxPatients = session.maxPatients || null
         }
       } catch (err) {
         console.warn('Could not verify session capacity, proceeding anyway.')
@@ -211,6 +218,8 @@ const bookAppointment = async (req, res) => {
       reason,
       fee,
       sessionId: sessionId || null,
+      patientNumber,
+      maxPatients: sessionMaxPatients,
     })
 
     // ── Step 3.5: Increment session occupancy ─────────────────
@@ -336,8 +345,19 @@ const modifyAppointment = async (req, res) => {
       })
     }
 
-    const { appointmentDate, timeSlot, reason } = req.body
+    const { appointmentDate, timeSlot, reason, sessionId } = req.body
     const dateOrTimeChanged = Boolean(appointmentDate || timeSlot)
+
+    // Handle session occupancy swap if sessionId changed
+    if (sessionId && sessionId !== appointment.sessionId) {
+      // Decrement occupancy for old session
+      if (appointment.sessionId) {
+        await updateDoctorSessionOccupancy(appointment.sessionId, -1)
+      }
+      // Increment occupancy for new session
+      await updateDoctorSessionOccupancy(sessionId, 1)
+      appointment.sessionId = sessionId
+    }
 
     if (appointmentDate || timeSlot) {
       const newDate = appointmentDate
@@ -368,7 +388,7 @@ const modifyAppointment = async (req, res) => {
       doctorEmail: appointment.doctorEmail,
       patientName: appointment.patientName,
       doctorName: appointment.doctorName,
-      patientPhone: null,
+      patientPhone: req.user.phone || null,
       doctorPhone: null,
       hospital: appointment.hospital,
       appointmentDate: appointment.appointmentDate,
