@@ -71,6 +71,7 @@ export const patientAPI = {
 export const appointmentAPI = {
   book: (data) => api.post('/api/appointments', data),
   getAll: (params) => api.get('/api/appointments', { params }),
+  getAllAdmin: (params) => api.get('/api/appointments/admin/all', { params }),
   getById: (id) => api.get(`/api/appointments/${id}`),
   modify: (id, data) => api.put(`/api/appointments/${id}`, data),
   cancel: (id, reason) => api.put(`/api/appointments/${id}/cancel`, { reason }),
@@ -100,6 +101,7 @@ export const paymentAPI = {
   getByPatient: (patientId) => api.get(`/api/payments/patient/${patientId}`),
   // ✅ FIXED: /admin/pending → /pending-transfers (proxy conflict fix)
   getPendingTransfers: () => api.get('/api/payments/pending-transfers'),
+  getAllPayments: (params) => api.get('/api/payments/all', { params }),
   approve: (id) => api.put(`/api/payments/${id}/approve`),
   reject: (id, data) => api.put(`/api/payments/${id}/reject`, data),
   refund: (id, data) => api.put(`/api/payments/${id}/refund`, data),

@@ -14,6 +14,7 @@ import ManageAvailability from './pages/Doctor/ManageAvailability'
 import PatientDashboard from './pages/Patient/PatientDashboard'
 import PatientProfile from './pages/Patient/PatientProfile'
 import DoctorDashboard from './pages/Doctor/DoctorDashboard'
+import DoctorAppointments from './pages/Doctor/DoctorAppointments'
 import DoctorProfile from './pages/Doctor/DoctorProfile'
 import AdminLayout from './pages/Admin/AdminLayout'
 import AdminDashboard from './pages/Admin/AdminDashboard'
@@ -77,6 +78,7 @@ function Layout() {
         {/* Doctor Protected */}
         <Route path="/doctor" element={<ProtectedRoute roles={['doctor']}><DoctorDashboard /></ProtectedRoute>} />
         <Route path="/doctor/dashboard" element={<ProtectedRoute roles={['doctor']}><DoctorDashboard /></ProtectedRoute>} />
+        <Route path="/doctor/appointments" element={<ProtectedRoute roles={['doctor']}><DoctorAppointments /></ProtectedRoute>} />
         <Route path="/doctor/availability" element={<ProtectedRoute roles={['doctor']}><ManageAvailability /></ProtectedRoute>} />
         <Route path="/doctor/profile" element={<ProtectedRoute roles={['doctor']}><DoctorProfile /></ProtectedRoute>} />
         <Route path="/doctor/records" element={<ProtectedRoute roles={['doctor']}><PatientRecords /></ProtectedRoute>} />

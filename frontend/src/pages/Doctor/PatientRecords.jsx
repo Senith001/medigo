@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import {
   FileText, Search, Plus, Download, User, Calendar,
   Stethoscope, Send, Paperclip, ArrowUpRight,
-  ShieldCheck, Inbox, FolderOpen, X, CheckCircle2
+  ShieldCheck, Inbox, FolderOpen, X, CheckCircle2,
+  MessageSquare, Clock
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { reportAPI, appointmentAPI } from '../../services/api'
@@ -15,7 +16,7 @@ export default function PatientRecords() {
   const [reports, setReports] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [tab, setTab] = useState('all') // all | sent | received
+  const [tab, setTab] = useState('all') // all | sent | received | messages
   const [showUpload, setShowUpload] = useState(false)
   const [appointments, setAppointments] = useState([])
   const [uploadForm, setUploadForm] = useState({
@@ -34,15 +35,7 @@ export default function PatientRecords() {
       ])
       if (reportsRes.data.success) setReports(reportsRes.data.data)
       if (apptsRes.data?.appointments) {
-        const uniquePatients = []
-        const seen = new Set()
-        apptsRes.data.appointments.forEach(apt => {
-          if (!seen.has(apt.patientId)) {
-            seen.add(apt.patientId)
-            uniquePatients.push({ id: apt.patientId, name: apt.patientName || 'Patient' })
-          }
-        })
-        setAppointments(uniquePatients)
+        setAppointments(apptsRes.data.appointments) // store full appointments for messages + patient select
       }
     } catch (err) {
       console.error('Clinical Sync Error:', err)
@@ -92,6 +85,10 @@ export default function PatientRecords() {
 
   const sentCount = reports.filter(r => r.uploadedBy === 'doctor').length
   const receivedCount = reports.filter(r => r.uploadedBy === 'patient').length
+  const patientMessages = appointments.filter(apt => apt.reason && apt.reason.trim())
+  const uniquePatients = Array.from(
+    new Map(appointments.map(apt => [apt.patientId, { id: apt.patientId, name: apt.patientName || 'Patient' }])).values()
+  )
 
   return (
     <DashboardLayout isDoctor={true}>
@@ -115,11 +112,12 @@ export default function PatientRecords() {
         </div>
 
         {/* ── Stats Row ── */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           {[
             { label: 'Total Files', value: reports.length, icon: FolderOpen, color: 'text-slate-600 bg-slate-50 border-slate-100' },
             { label: 'Sent by You', value: sentCount, icon: Send, color: 'text-indigo-600 bg-indigo-50 border-indigo-100' },
             { label: 'From Patients', value: receivedCount, icon: Inbox, color: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
+            { label: 'Patient Notes', value: patientMessages.length, icon: MessageSquare, color: 'text-teal-600 bg-teal-50 border-teal-100' },
           ].map(stat => (
             <div key={stat.label} className="bg-white rounded-2xl border border-slate-100 p-5 flex items-center gap-4">
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${stat.color}`}>
@@ -146,7 +144,7 @@ export default function PatientRecords() {
             />
           </div>
           <div className="flex bg-slate-50 p-1 rounded-xl gap-1 shrink-0">
-            {[['all', 'All'], ['sent', 'Sent'], ['received', 'Received']].map(([key, label]) => (
+            {[['all', 'All'], ['sent', 'Sent'], ['received', 'Received'], ['messages', 'Patient Notes']].map(([key, label]) => (
               <button
                 key={key}
                 onClick={() => setTab(key)}
@@ -244,6 +242,62 @@ export default function PatientRecords() {
         )}
       </div>
 
+      {/* ── Patient Messages Section ── */}
+      {tab === 'messages' && (
+        <div className="space-y-4">
+          {patientMessages.length === 0 ? (
+            <div className="bg-white rounded-2xl border-2 border-dashed border-slate-100 py-24 text-center space-y-4">
+              <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto text-slate-200">
+                <MessageSquare size={32} />
+              </div>
+              <h3 className="text-lg font-black text-medigo-navy">No Patient Messages</h3>
+              <p className="text-slate-400 text-sm max-w-xs mx-auto">When patients leave pre-appointment notes, they will appear here.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <AnimatePresence>
+                {patientMessages.map((apt, idx) => (
+                  <motion.div
+                    key={apt._id}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.04 }}
+                    className="bg-white rounded-2xl border border-slate-100 p-6 hover:border-teal-200 hover:shadow-lg transition-all"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-600">
+                          <MessageSquare size={18} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-black text-medigo-navy">{apt.patientName || 'Patient'}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                            <Clock size={10} /> {apt.appointmentDate ? new Date(apt.appointmentDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                          </p>
+                        </div>
+                      </div>
+                      <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${
+                        apt.status === 'confirmed' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                        apt.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                        'bg-amber-50 text-amber-600 border-amber-100'
+                      }`}>{apt.status}</span>
+                    </div>
+
+                    <div className="bg-teal-50/60 border border-teal-100 rounded-xl px-4 py-3">
+                      <p className="text-xs font-bold text-medigo-navy leading-relaxed">"{apt.reason}"</p>
+                    </div>
+
+                    <div className="mt-3 flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      <Stethoscope size={11} className="text-teal-500" /> {apt.specialty || 'General'} · {apt.timeSlot || '—'}
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Upload Modal ── */}
       <AnimatePresence>
         {showUpload && (
@@ -301,7 +355,7 @@ export default function PatientRecords() {
                       onChange={e => setUploadForm({ ...uploadForm, patientId: e.target.value })}
                     >
                       <option value="">Select a patient…</option>
-                      {appointments.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      {uniquePatients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                   </div>
 

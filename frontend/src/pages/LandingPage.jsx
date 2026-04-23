@@ -28,7 +28,7 @@ function NavBar({ scrolled, isSinhala, setIsSinhala }) {
   const navigate = useNavigate();
   const [active, setActive] = useState('Home');
 
-  // Link එකක් ක්ලික් කළ විට අදාළ පිටුවට යාම සඳහා Navigation logic එක එක් කළා
+
   const navItems = isSinhala
     ? [
       { name: 'මුල් පිටුව', path: '/' },
@@ -79,22 +79,70 @@ function NavBar({ scrolled, isSinhala, setIsSinhala }) {
           ))}
         </div>
 
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setIsSinhala(!isSinhala)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-slate-900/10 bg-white/50 backdrop-blur-sm text-xs font-black text-slate-900 hover:bg-white transition-all shadow-sm"
-          >
-            <Languages size={14} className="text-[#008080]" />
-            {isSinhala ? 'English' : 'සිංහල'}
-          </button>
-          <Link to="/login" className="hidden sm:block text-sm font-black text-slate-900 hover:text-[#008080] drop-shadow-sm">Sign in</Link>
-          <Link to="/register">
-            <Button size="sm" className="bg-[#008080] hover:bg-[#006666] font-bold shadow-lg shadow-teal-500/10 px-8 h-10">Get started</Button>
-          </Link>
-        </div>
+        <NavBarActions scrolled={scrolled} isSinhala={isSinhala} setIsSinhala={setIsSinhala} />
       </div>
     </nav>
   )
+}
+
+// ─── NavBar Auth Actions (auth-aware) ──────────────────────────────────────────
+function NavBarActions({ scrolled, isSinhala, setIsSinhala }) {
+  const { token, user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const dashboardPath =
+    user?.role === 'doctor' ? '/doctor/dashboard'
+      : user?.role === 'admin' ? '/admin/dashboard'
+        : '/dashboard';
+
+  const initials = user?.name
+    ? user.name.trim().split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+    : 'U';
+
+  return (
+    <div className="flex items-center gap-3">
+      <button
+        onClick={() => setIsSinhala(!isSinhala)}
+        className="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-slate-900/10 bg-white/50 backdrop-blur-sm text-xs font-black text-slate-900 hover:bg-white transition-all shadow-sm"
+      >
+        <Languages size={14} className="text-[#008080]" />
+        {isSinhala ? 'English' : 'සිංහල'}
+      </button>
+
+      {token ? (
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate(dashboardPath)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#008080]/10 hover:bg-[#008080]/20 border border-[#008080]/20 transition-all"
+          >
+            <div className="w-7 h-7 rounded-lg bg-[#008080] text-white text-[11px] font-black flex items-center justify-center shadow-sm">
+              {initials}
+            </div>
+            <span className="hidden sm:block text-sm font-black text-[#008080]">
+              {isSinhala ? 'උපකරණ පුවරුව' : 'Dashboard'}
+            </span>
+          </button>
+          <button
+            onClick={logout}
+            className="hidden sm:block text-sm font-black text-slate-500 hover:text-red-500 transition-colors"
+          >
+            {isSinhala ? 'ඉවත් වන්න' : 'Sign out'}
+          </button>
+        </div>
+      ) : (
+        <>
+          <Link to="/login" className="hidden sm:block text-sm font-black text-slate-900 hover:text-[#008080] drop-shadow-sm">
+            {isSinhala ? 'පිවිසෙන්න' : 'Sign in'}
+          </Link>
+          <Link to="/register">
+            <Button size="sm" className="bg-[#008080] hover:bg-[#006666] font-bold shadow-lg shadow-teal-500/10 px-8 h-10">
+              {isSinhala ? 'ලියාපදිංචි වන්න' : 'Get started'}
+            </Button>
+          </Link>
+        </>
+      )}
+    </div>
+  );
 }
 
 // ─── Immersive 3D Hero ─────────────────────────────────────────────────────────

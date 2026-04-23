@@ -265,7 +265,6 @@ const bookAppointment = async (req, res) => {
 const getMyAppointments = async (req, res) => {
   try {
     const { role, id, email } = req.user;
-    console.log('getMyAppointments req.user:', req.user);
     const { status, page = 1, limit = 10 } = req.query
 
     const filter = {}

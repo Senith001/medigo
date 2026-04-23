@@ -63,7 +63,7 @@ router.post(
 router.get('/', authenticate, getMyAppointments);
 
 // Admin: get all appointments
-router.get('/admin/all', authenticate, authorize('admin'), getAllAppointments);
+router.get('/admin/all', authenticate, authorize('admin', 'superadmin'), getAllAppointments);
 
 // Get a specific appointment
 router.get('/:id', authenticate, getAppointmentById);

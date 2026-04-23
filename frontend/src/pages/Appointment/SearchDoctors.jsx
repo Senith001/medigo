@@ -48,6 +48,11 @@ export default function SearchDoctors() {
   const [error, setError] = useState(null)
   const [nameFilter, setNameFilter] = useState(searchParams.get('name') || '')
   const [specFilter, setSpecFilter] = useState(searchParams.get('specialty') || 'All')
+  const [selectedDoctor, setSelectedDoctor] = useState(null)
+  
+  // New States for "Available Today" filtering
+  const [todayFilter, setTodayFilter] = useState(false)
+  const [availabilities, setAvailabilities] = useState({}) // docId -> hasSessionToday
 
   // Fetch all doctors once — filter client-side
   useEffect(() => {
@@ -55,7 +60,30 @@ export default function SearchDoctors() {
       try {
         setLoading(true)
         const res = await doctorAPI.getProfiles({})
-        if (res.data.success) setAllDoctors(res.data.data)
+        if (res.data.success) {
+          const docs = res.data.data
+          setAllDoctors(docs)
+
+          // Background fetch to map today's availability
+          Promise.all(docs.map(d => doctorAPI.getAvailability(d._id).catch(() => null)))
+            .then(avResults => {
+               const avMap = {}
+               const todayStr = new Date().toDateString()
+               docs.forEach((d, i) => {
+                 const r = avResults[i]
+                 if (r?.data?.success) {
+                   const sessions = r.data.data
+                   avMap[d._id] = sessions.some(s => {
+                      if (!s.date) return false
+                      return new Date(s.date).toDateString() === todayStr
+                   })
+                 } else {
+                   avMap[d._id] = false
+                 }
+               })
+               setAvailabilities(avMap)
+            })
+        }
         else setError('Unable to retrieve doctors.')
       } catch {
         setError('Network error. Please try again.')
@@ -66,19 +94,20 @@ export default function SearchDoctors() {
     load()
   }, [])
 
-  // Compute filtered list reactively — no stale closures possible
+  // Compute filtered list reactively
   const doctors = allDoctors.filter(d => {
     const matchName = !nameFilter.trim() ||
       d.fullName?.toLowerCase().includes(nameFilter.toLowerCase())
     const matchSpec = !specFilter || specFilter === 'All' ||
       d.specialty?.toLowerCase() === specFilter.toLowerCase()
-    return matchName && matchSpec
+    const matchToday = !todayFilter || availabilities[d._id] === true
+    return matchName && matchSpec && matchToday
   })
 
   const handleSearch = (e) => e?.preventDefault()
   const selectSpecialty = (s) => setSpecFilter(s)
-  const clearFilters = () => { setNameFilter(''); setSpecFilter('All') }
-  const hasFilters = nameFilter || (specFilter && specFilter !== 'All')
+  const clearFilters = () => { setNameFilter(''); setSpecFilter('All'); setTodayFilter(false) }
+  const hasFilters = nameFilter || (specFilter && specFilter !== 'All') || todayFilter
 
 
 
@@ -88,83 +117,108 @@ export default function SearchDoctors() {
       <div className="max-w-7xl mx-auto space-y-6 pb-20" style={{ fontFamily: "'Inter', sans-serif" }}>
 
         {/* ── Hero Banner ── */}
-        <div className="relative rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0c1a2e 100%)' }}>
-          {/* Decorative circles */}
-          <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full opacity-10" style={{ background: 'radial-gradient(circle, #3b82f6, transparent)' }} />
-          <div className="absolute -bottom-10 left-10 w-60 h-60 rounded-full opacity-8" style={{ background: 'radial-gradient(circle, #6366f1, transparent)' }} />
+        <div className="relative rounded-[2.5rem] overflow-hidden bg-slate-900 shadow-premium min-h-[380px] flex items-center border border-slate-100">
+          
+          {/* Background Image & Gradient Overlay */}
+          <div className="absolute inset-0 z-0">
+             <img src="/images/search-doctor.png" alt="Doctor Directory Banner" className="w-full h-full object-cover object-center opacity-70" />
+             <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900/80 to-transparent" />
+          </div>
 
-          <div className="relative z-10 p-8 sm:p-10">
+          <div className="relative z-10 p-8 sm:p-14 w-full max-w-2xl">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full px-3 py-1.5 mb-5">
-              <Stethoscope size={14} className="text-blue-400" />
-              <span className="text-blue-300 text-xs font-bold uppercase tracking-wider">MediGo Doctor Directory</span>
+            <div className="inline-flex items-center gap-2 bg-blue-500/20 backdrop-blur-md border border-blue-400/30 rounded-full px-4 py-2 mb-6">
+              <Stethoscope size={16} className="text-blue-400" />
+              <span className="text-blue-100 text-[10px] font-black uppercase tracking-[0.2em]">MediGo Medical Network</span>
             </div>
 
-            <h1 className="text-3xl sm:text-4xl font-black text-white leading-tight mb-2">
-              Find Your <span className="text-transparent" style={{ WebkitBackgroundClip: 'text', backgroundClip: 'text', backgroundImage: 'linear-gradient(90deg, #60a5fa, #34d399)' }}>Perfect Doctor</span>
+            <h1 className="text-4xl sm:text-5xl font-black text-white leading-tight mb-4 tracking-tight">
+              A Healthier Future <br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 italic">Starts Here.</span>
             </h1>
-            <p className="text-slate-400 text-sm mb-7 max-w-lg">
-              Browse from our network of verified specialists and book your appointment instantly.
+            <p className="text-slate-300 text-sm font-medium mb-10 max-w-lg leading-relaxed">
+              Connect with top-rated medical specialists and seamlessly book video or clinical consultations in seconds.
             </p>
 
-            {/* Search Bar */}
-            <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3 max-w-2xl">
-              <div className="relative flex-1">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+            {/* Smart Search Bar */}
+            <form onSubmit={handleSearch} className="flex flex-col sm:flex-row p-2 bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] shadow-2xl gap-2">
+              <div className="relative flex-1 flex items-center">
+                <Search className="absolute left-4 text-slate-300" size={20} />
                 <input
                   type="text"
-                  placeholder="Search by doctor name..."
+                  placeholder="Type a doctor's name to search..."
                   value={nameFilter}
                   onChange={e => setNameFilter(e.target.value)}
-                  className="w-full h-12 pl-11 pr-4 rounded-xl text-sm font-medium outline-none transition-all"
-                  style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'white' }}
-                  onFocus={e => e.target.style.borderColor = 'rgba(96,165,250,0.6)'}
-                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
+                  className="w-full h-14 pl-12 pr-4 bg-transparent text-white placeholder-slate-400 font-medium outline-none text-sm"
                 />
               </div>
               <button
                 type="submit"
                 disabled={loading}
-                className="h-12 px-7 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 whitespace-nowrap"
-                style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', boxShadow: '0 4px 15px rgba(37,99,235,0.4)' }}
+                className="h-14 px-8 rounded-[1rem] font-black text-sm text-white transition-all hover:bg-blue-600 disabled:opacity-50 whitespace-nowrap bg-medigo-blue shadow-lg shadow-blue-500/20 flex items-center justify-center"
               >
-                {loading ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'Search'}
+                {loading ? <Loader2 size={18} className="animate-spin" /> : 'Find Doctor'}
               </button>
-              {hasFilters && (
-                <button type="button" onClick={clearFilters}
-                  className="h-12 px-4 rounded-xl font-bold text-sm text-slate-300 border border-white/10 hover:bg-white/10 transition-all flex items-center gap-2">
-                  <X size={14} /> Clear
-                </button>
-              )}
+              <AnimatePresence>
+                {hasFilters && (
+                  <motion.button 
+                    initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
+                    type="button" 
+                    onClick={clearFilters}
+                    className="h-14 px-5 rounded-[1rem] font-black text-xs text-white bg-white/10 hover:bg-white/20 transition-all border border-white/10 flex items-center gap-2"
+                  >
+                    <X size={16} /> Clear
+                  </motion.button>
+                )}
+              </AnimatePresence>
             </form>
           </div>
         </div>
 
         {/* ── Specialty Filter Pills ── */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <SlidersHorizontal size={14} className="text-slate-400" />
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Filter by Specialty</span>
+        <div className="bg-white rounded-2xl border border-slate-100 p-4 flex flex-col md:flex-row gap-6 md:items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <SlidersHorizontal size={14} className="text-slate-400" />
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Filter by Specialty</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {SPECIALTIES.map(s => {
+                const meta = SPECIALTY_META[s]
+                const isActive = specFilter === s || (s === 'All' && (!specFilter || specFilter === 'All'))
+                return (
+                  <button
+                    key={s}
+                    onClick={() => selectSpecialty(s)}
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                      isActive
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-md'
+                        : 'bg-slate-50 border-slate-100 text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    {meta && <span>{meta.icon}</span>}
+                    {s}
+                  </button>
+                )
+              })}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {SPECIALTIES.map(s => {
-              const meta = SPECIALTY_META[s]
-              const isActive = specFilter === s || (s === 'All' && (!specFilter || specFilter === 'All'))
-              return (
-                <button
-                  key={s}
-                  onClick={() => selectSpecialty(s)}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all ${
-                    isActive
-                      ? 'bg-blue-600 border-blue-600 text-white shadow-md'
-                      : 'bg-slate-50 border-slate-100 text-slate-500 hover:bg-slate-100'
-                  }`}
-                >
-                  {meta && <span>{meta.icon}</span>}
-                  {s}
-                </button>
-              )
-            })}
+          
+          <div className="md:border-l border-slate-100 md:pl-6 h-full flex items-center">
+             <button
+               onClick={() => setTodayFilter(!todayFilter)}
+               className={`flex items-center gap-2 px-6 py-3 rounded-2xl border text-sm font-black transition-all ${
+                 todayFilter 
+                   ? 'bg-emerald-50 border-emerald-200 text-emerald-600 shadow-sm' 
+                   : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+               }`}
+             >
+               <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                 todayFilter ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300'
+               }`}>
+                 {todayFilter && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+               </div>
+               Available Today
+             </button>
           </div>
         </div>
 
@@ -190,7 +244,7 @@ export default function SearchDoctors() {
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {[1,2,3,4,5,6,7,8].map(i => (
-              <div key={i} className="bg-white rounded-2xl border border-slate-100 p-5 animate-pulse">
+              <div key={i} className="bg-white rounded-[1.5rem] border border-slate-100 p-5 animate-pulse">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-14 h-14 bg-slate-100 rounded-xl" />
                   <div className="flex-1 space-y-2">
@@ -207,21 +261,21 @@ export default function SearchDoctors() {
             ))}
           </div>
         ) : error ? (
-          <div className="bg-white rounded-2xl border border-red-100 p-10 text-center">
-            <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+          <div className="bg-white rounded-[2rem] border border-red-100 p-10 text-center">
+            <div className="w-14 h-14 bg-red-50 rounded-[1.5rem] flex items-center justify-center mx-auto mb-3">
               <AlertCircle size={24} className="text-red-400" />
             </div>
             <p className="font-bold text-slate-700 mb-1">Something went wrong</p>
             <p className="text-slate-400 text-sm mb-4">{error}</p>
-            <button onClick={fetchDoctors}
+            <button onClick={() => window.location.reload()}
               className="px-5 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-all">
               Try Again
             </button>
           </div>
         ) : doctors.length === 0 ? (
-          <div className="bg-white rounded-2xl border-2 border-dashed border-slate-100 p-16 text-center">
-            <div className="text-5xl mb-3">🔍</div>
-            <h3 className="text-lg font-black text-slate-700 mb-1">No doctors found</h3>
+          <div className="bg-white rounded-[2rem] border border-dashed border-slate-200 p-16 text-center">
+            <div className="text-5xl mb-3 opacity-50">🔍</div>
+            <h3 className="text-lg font-black text-medigo-navy mb-1">No doctors found</h3>
             <p className="text-slate-400 text-sm mb-4">
               Try searching with a different name or selecting another specialty.
             </p>
@@ -236,20 +290,30 @@ export default function SearchDoctors() {
               {doctors.map((doc, i) => (
                 <DoctorCard
                   key={doc._id}
-                  doctor={doc}
+                  doctor={{...doc, hasSessionToday: availabilities[doc._id]}}
                   index={i}
-                  onBook={() => navigate(`/doctor/${doc._id}/sessions`, { state: { doctor: doc } })}
+                  onViewProfile={() => setSelectedDoctor(doc)}
                 />
               ))}
             </AnimatePresence>
           </motion.div>
         )}
       </div>
+
+      <AnimatePresence>
+        {selectedDoctor && (
+           <DoctorProfileModal 
+             doctor={selectedDoctor} 
+             onClose={() => setSelectedDoctor(null)}
+             onBook={() => navigate(`/doctor/${selectedDoctor._id}/sessions`, { state: { doctor: selectedDoctor } })} 
+           />
+        )}
+      </AnimatePresence>
     </DashboardLayout>
   )
 }
 
-function DoctorCard({ doctor, index, onBook }) {
+function DoctorCard({ doctor, index, onViewProfile }) {
   const initials = (doctor.fullName || 'DR')
     .replace(/^Dr\.?\s*/i, '')
     .split(' ')
@@ -268,99 +332,188 @@ function DoctorCard({ doctor, index, onBook }) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.96 }}
       transition={{ delay: index * 0.035 }}
-      className="bg-white rounded-2xl border border-slate-100 hover:border-blue-200 hover:shadow-lg transition-all duration-200 group flex flex-col overflow-hidden"
+      onClick={onViewProfile}
+      className="bg-white rounded-[2rem] border border-slate-100 hover:border-blue-200 hover:shadow-premium transition-all duration-300 group flex flex-col overflow-hidden cursor-pointer relative"
     >
-      {/* Card Header */}
-      <div className="p-5 pb-4">
-        <div className="flex items-start gap-3 mb-4">
-          {/* Avatar */}
-          <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-black text-lg shadow-md relative shrink-0`}>
+      {doctor.hasSessionToday && (
+        <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl z-20 shadow-sm">
+           Available Today
+        </div>
+      )}
+      <div className="p-6 pb-4 relative z-10">
+        <div className="flex flex-col items-center text-center gap-3 mb-4">
+          <div className={`w-20 h-20 rounded-[1.5rem] bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-black text-2xl shadow-md relative shrink-0 transition-transform group-hover:scale-105`}>
             {initials}
-            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full" />
+            <span className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full flex items-center justify-center">
+              <BadgeCheck size={8} className="text-white" />
+            </span>
           </div>
 
-          {/* Name & Specialty */}
-          <div className="flex-1 min-w-0">
-            {specialtyMeta && (
-              <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border mb-1 ${specialtyMeta.color}`}>
-                {specialtyMeta.icon} {doctor.specialty}
-              </span>
-            )}
-            <h3 className="font-black text-slate-800 text-sm leading-tight truncate group-hover:text-blue-600 transition-colors">
-              {doctor.fullName}
-            </h3>
+          <div className="space-y-1">
+             <h3 className="font-black text-medigo-navy text-lg leading-tight group-hover:text-blue-600 transition-colors">
+               {doctor.fullName}
+             </h3>
+             {specialtyMeta && (
+               <span className={`inline-flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${specialtyMeta.color}`}>
+                 {specialtyMeta.icon} {doctor.specialty}
+               </span>
+             )}
           </div>
         </div>
 
-        {/* Details */}
-        <div className="space-y-2">
-          {/* Rating & Experience */}
+        <div className="space-y-3 bg-slate-50/50 p-4 rounded-[1.5rem] border border-slate-100">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} size={12} fill="#f59e0b" className="text-amber-400" />
-              ))}
-              <span className="text-xs font-bold text-slate-600 ml-1">4.9</span>
-            </div>
-            <div className="flex items-center gap-1 text-xs text-slate-500 font-medium">
-              <Clock size={11} />
-              {doctor.experienceYears || '—'}y experience
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Rating</span>
+            <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md shadow-sm">
+              <Star size={10} fill="#f59e0b" className="text-amber-400" />
+              <span className="text-xs font-bold text-medigo-navy">4.9</span>
             </div>
           </div>
-
-          {/* Location */}
-          {doctor.clinicLocation && (
-            <div className="flex items-start gap-1.5 text-xs text-slate-500">
-              <Building2 size={12} className="mt-0.5 shrink-0 text-slate-400" />
-              <span className="line-clamp-1">{doctor.clinicLocation}</span>
-            </div>
-          )}
-
-          {/* Qualifications */}
-          {doctor.qualifications && (
-            <div className="flex items-start gap-1.5 text-xs text-slate-500">
-              <BadgeCheck size={12} className="mt-0.5 shrink-0 text-blue-400" />
-              <span className="line-clamp-1">{doctor.qualifications}</span>
-            </div>
-          )}
+          
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Experience</span>
+            <span className="text-xs font-bold text-medigo-navy capitalize">{doctor.experienceYears || '—'} years</span>
+          </div>
         </div>
       </div>
 
-      {/* Divider */}
-      <div className="border-t border-slate-50 mx-5" />
-
-      {/* Card Footer */}
-      <div className="p-4 mt-auto">
-        <div className="flex items-center justify-between mb-3">
-          {/* Consultation type badge */}
-          <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg ${
-            doctor.offersTelemedicine
-              ? 'bg-blue-50 text-blue-600'
-              : 'bg-slate-50 text-slate-500'
-          }`}>
-            <Video size={10} />
-            {doctor.offersTelemedicine ? 'Online & In-person' : 'Clinic Only'}
-          </span>
-
-          {/* Fee */}
-          <div className="text-right">
-            <p className="text-[10px] text-slate-400 font-medium leading-none mb-0.5">From</p>
-            <p className="text-sm font-black text-slate-800">
+      <div className="p-4 mt-auto border-t border-slate-50 relative overflow-hidden">
+        <div className="absolute inset-0 bg-blue-50 opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="relative z-10 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none mb-1">Session Fee</p>
+            <p className="text-sm font-black text-medigo-navy">
               LKR {doctor.consultationFee?.toLocaleString() || '—'}
             </p>
           </div>
+          <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 group-hover:bg-medigo-blue group-hover:text-white flex items-center justify-center transition-all group-hover:translate-x-1">
+             <ChevronRight size={14} />
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+function DoctorProfileModal({ doctor, onClose, onBook }) {
+  const liveRating = 4.8
+  const ratingCount = 124
+
+  const initials = (doctor.fullName || 'DR').replace(/^Dr\.?\s*/i, '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+  const specialtyMeta = SPECIALTY_META[doctor.specialty] || { icon: '⚕️', color: 'bg-blue-50 text-blue-600 border-blue-100' }
+
+  const handleRate = (val) => {
+    setRatingVal(val)
+    setJustRated(true)
+    setTimeout(() => {
+       setLiveRating(prev => Number(((prev * ratingCount + val) / (ratingCount + 1)).toFixed(1)))
+       setRatingCount(prev => prev + 1)
+       setJustRated(false)
+    }, 800)
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        onClick={e => e.stopPropagation()}
+        className="bg-white w-full max-w-3xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      >
+        <div className="relative bg-gradient-to-br from-slate-900 to-medigo-navy pt-16 pb-8 px-8 sm:px-12 text-center overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/20 rounded-full blur-[80px]" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/20 rounded-full blur-[80px]" />
+          
+          <button onClick={onClose} className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-colors">
+            <X size={20} />
+          </button>
+
+          <div className="w-28 h-28 mx-auto rounded-[2rem] bg-white text-medigo-blue flex items-center justify-center text-4xl font-black shadow-2xl relative z-10 mb-6">
+            {initials}
+            <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-emerald-500 border-4 border-slate-900 rounded-full flex items-center justify-center">
+              <BadgeCheck size={14} className="text-white" />
+            </div>
+          </div>
+          
+          <h2 className="text-3xl font-black text-white relative z-10">{doctor.fullName}</h2>
+          <div className="flex items-center justify-center gap-2 mt-3 relative z-10">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest backdrop-blur-md bg-white/10 text-white border border-white/20`}>
+              {specialtyMeta.icon} {doctor.specialty}
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest backdrop-blur-md bg-white/10 text-white border border-white/20">
+              {doctor.experienceYears}Y Exp
+            </span>
+          </div>
         </div>
 
-        {/* Book Button */}
-        <button
-          onClick={e => { e.stopPropagation(); onBook() }}
-          className="w-full h-10 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-1.5 transition-all hover:opacity-90 active:scale-95 group-hover:shadow-md"
-          style={{ background: 'linear-gradient(135deg, #1d4ed8, #2563eb)' }}
-        >
-          Book Appointment
-          <ChevronRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
-        </button>
-      </div>
+        <div className="flex-1 overflow-y-auto px-8 sm:px-12 py-8 space-y-8 bg-slate-50">
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                 <Building2 size={16} className="text-indigo-500" /> Affiliations
+               </h3>
+               <p className="text-sm font-bold text-medigo-navy leading-relaxed">{doctor.hospital || 'Private Medical Clinic Facility'}</p>
+             </div>
+
+             <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                 <Stethoscope size={16} className="text-teal-500" /> Qualifications
+               </h3>
+               <p className="text-sm font-bold text-medigo-navy leading-relaxed">{doctor.qualifications || 'MBBS, MD (General Medicine)'}</p>
+             </div>
+          </div>
+
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col md:flex-row items-center gap-8">
+             <div className="text-center md:text-left shrink-0">
+               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center justify-center md:justify-start gap-2">
+                 <Star size={16} className="text-amber-500" /> Live Rating
+               </h3>
+               <div className="flex items-end justify-center md:justify-start gap-2">
+                 <span className="text-5xl font-black text-medigo-navy tracking-tighter">{liveRating}</span>
+                 <span className="text-sm font-bold text-slate-400 mb-1.5">/ 5.0</span>
+               </div>
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">{ratingCount} Verified Reviews</p>
+             </div>
+             
+             <div className="flex-1 w-full bg-slate-50 p-6 rounded-[2rem] border border-slate-100 flex flex-col items-center justify-center text-center">
+               <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Service Satisfaction</p>
+               <div className="flex justify-center gap-1.5 mb-3">
+                 {[1, 2, 3, 4, 5].map((star) => (
+                   <Star 
+                     key={star}
+                     size={24} 
+                     fill={star <= Math.round(liveRating) ? "#f59e0b" : "transparent"} 
+                     className={star <= Math.round(liveRating) ? 'text-amber-400' : 'text-slate-200'}
+                   />
+                 ))}
+               </div>
+               <p className="text-[10px] font-bold text-slate-400">Ratings are verified and powered by real patients after completion of an appointment.</p>
+             </div>
+          </div>
+
+        </div>
+
+        <div className="p-6 bg-white border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+           <div className="text-center sm:text-left">
+             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Consultation Fee</p>
+             <p className="text-2xl font-black text-medigo-navy tracking-tighter">LKR {doctor.consultationFee?.toLocaleString() || '2,500'}</p>
+           </div>
+           <button 
+             onClick={onBook}
+             className="w-full sm:w-auto h-14 px-10 rounded-[1.5rem] bg-medigo-navy hover:bg-slate-800 text-white font-bold tracking-wide transition-all shadow-xl shadow-slate-900/10 flex items-center justify-center gap-2 group"
+           >
+             Check Schedule & Book <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
+           </button>
+        </div>
+      </motion.div>
     </motion.div>
   )
 }

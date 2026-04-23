@@ -9,6 +9,7 @@ import {
   getPaymentById,
   getPaymentsByPatient,
   getPendingBankTransfers,
+  getAllBankTransfers,
   approveBankTransferPayment,
   rejectBankTransferPayment,
   refundPayment,
@@ -57,6 +58,14 @@ router.get(
   protect,
   authorize("admin", "superadmin"),
   getPendingBankTransfers
+)
+
+// Admin — all bank transfers (history)
+router.get(
+  "/all",
+  protect,
+  authorize("admin", "superadmin"),
+  getAllBankTransfers
 )
 
 // Admin approve

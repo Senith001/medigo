@@ -6,7 +6,7 @@ import {
   ChevronRight, ArrowRight, CheckCircle2,
   XCircle, AlertCircle, RefreshCw,
   Info, Plus, History, CalendarClock,
-  Stethoscope, Users
+  Stethoscope, Users, X, CreditCard, FileText, Hash, Star
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { appointmentAPI } from '../../services/api'
@@ -50,6 +50,8 @@ export default function MyAppointments() {
   const [historyFilter, setHistoryFilter] = useState('all')
   const [cancelling, setCancelling] = useState(null)
   const [selectedClinic, setSelectedClinic] = useState(null)
+  const [selectedAppt, setSelectedAppt] = useState(null)
+  const [ratingAppt, setRatingAppt] = useState(null)
 
   const fetchAll = () => {
     setLoading(true)
@@ -219,7 +221,9 @@ export default function MyAppointments() {
                       isPast={tab === 'past'}
                       onCancel={() => handleCancel(appt._id)}
                       onShowClinic={setSelectedClinic}
+                      onViewDetail={() => setSelectedAppt(appt)}
                       cancelling={cancelling === appt._id}
+                      onRateClick={() => setRatingAppt(appt)}
                     />
                   ))}
                 </AnimatePresence>
@@ -241,6 +245,21 @@ export default function MyAppointments() {
         <AnimatePresence>
           {selectedClinic && (
             <ClinicDetailsModal appt={selectedClinic} onClose={() => setSelectedClinic(null)} />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {selectedAppt && (
+            <AppointmentDetailModal
+              appt={selectedAppt}
+              onClose={() => setSelectedAppt(null)}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {ratingAppt && (
+            <RatingModal appt={ratingAppt} onClose={() => setRatingAppt(null)} />
           )}
         </AnimatePresence>
       </motion.div>
@@ -279,7 +298,7 @@ function EmptyState({ tab, historyFilter, navigate }) {
 }
 
 // ─── Appointment Card ──────────────────────────────────────────────────────────
-function AppointmentCard({ appt, index, isPast, onCancel, cancelling, onShowClinic }) {
+function AppointmentCard({ appt, index, isPast, onCancel, onShowClinic, onViewDetail, cancelling, onRateClick }) {
   const navigate = useNavigate()
   const apptDate = new Date(appt.appointmentDate)
   const dayBadge = !isPast ? getDayLabel(appt.appointmentDate) : null
@@ -291,7 +310,8 @@ function AppointmentCard({ appt, index, isPast, onCancel, cancelling, onShowClin
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.97 }}
       transition={{ delay: index * 0.04 }}
-      className={`bg-white rounded-[2.5rem] border shadow-sm group transition-all relative overflow-hidden
+      onClick={onViewDetail}
+      className={`bg-white rounded-[2.5rem] border shadow-sm group transition-all relative overflow-hidden cursor-pointer
         ${isPast
           ? 'border-slate-100 hover:border-slate-200 hover:shadow-md opacity-90 hover:opacity-100'
           : 'border-slate-100 hover:border-blue-100 hover:shadow-premium'
@@ -404,7 +424,7 @@ function AppointmentCard({ appt, index, isPast, onCancel, cancelling, onShowClin
         </div>
 
         {/* Actions */}
-        <div className="shrink-0 lg:border-l lg:border-slate-100 lg:pl-7 flex flex-row lg:flex-col items-center gap-2.5 justify-end lg:justify-center lg:min-w-[160px]">
+        <div className="shrink-0 lg:border-l lg:border-slate-100 lg:pl-7 flex flex-row lg:flex-col items-center gap-2.5 justify-end lg:justify-center lg:min-w-[160px]" onClick={e => e.stopPropagation()}>
           {!isPast && appt.status === 'confirmed' && (
             appt.type === 'telemedicine' ? (
               <Button
@@ -443,12 +463,20 @@ function AppointmentCard({ appt, index, isPast, onCancel, cancelling, onShowClin
           )}
 
           {isPast && appt.status === 'completed' && (
-            <button
-              onClick={() => navigate('/search')}
-              className="flex items-center gap-1.5 text-[11px] font-black text-medigo-blue uppercase tracking-widest hover:underline whitespace-nowrap"
-            >
-              Book Follow-up <ChevronRight size={13} />
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={(e) => { e.stopPropagation(); onRateClick && onRateClick() }}
+                className="flex items-center gap-1.5 text-[11px] font-black text-amber-500 uppercase tracking-widest hover:bg-amber-50 px-3 py-1.5 rounded-xl transition-colors"
+              >
+                <Star size={14} fill="currentColor" /> Rate Experience
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); navigate('/search') }}
+                className="flex items-center gap-1.5 text-[11px] font-black text-medigo-blue uppercase tracking-widest hover:underline whitespace-nowrap"
+              >
+                Book Follow-up <ChevronRight size={13} />
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -511,6 +539,253 @@ function ClinicDetailsModal({ appt, onClose }) {
               Get Directions
             </Button>
           </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+// ─── Appointment Detail Modal ──────────────────────────────────────────────────
+function AppointmentDetailModal({ appt, onClose }) {
+  const navigate = useNavigate()
+  const apptDate = appt.appointmentDate ? new Date(appt.appointmentDate) : null
+
+  const statusColors = {
+    confirmed: 'bg-blue-100 text-blue-700',
+    pending:   'bg-amber-100 text-amber-700',
+    completed: 'bg-emerald-100 text-emerald-700',
+    cancelled: 'bg-red-100 text-red-700',
+    'no-show': 'bg-slate-100 text-slate-600',
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.93, y: 24 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.93, y: 24 }}
+        transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+        className="bg-white max-w-lg w-full rounded-[2.5rem] shadow-2xl overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="bg-gradient-to-br from-medigo-navy to-[#0d3b6e] p-8 text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-56 h-56 bg-medigo-blue/20 rounded-full blur-[60px] translate-x-1/2 -translate-y-1/2" />
+          <button
+            onClick={onClose}
+            className="absolute top-6 right-6 w-9 h-9 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors z-10"
+          >
+            <X size={18} />
+          </button>
+          <div className="relative z-10 space-y-3">
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-50">Appointment Details</span>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center border border-white/10">
+                {appt.type === 'telemedicine'
+                  ? <Video size={22} className="text-cyan-300" />
+                  : <MapPin size={22} className="text-emerald-300" />
+                }
+              </div>
+              <div>
+                <h2 className="text-2xl font-black tracking-tight leading-tight">{appt.doctorName || 'Unknown Doctor'}</h2>
+                <p className="text-sm opacity-60 font-medium">{appt.specialty || 'General Physician'}</p>
+              </div>
+            </div>
+            <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${statusColors[appt.status] || statusColors.pending}`}>
+              {appt.status}
+            </span>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="p-8 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <ApptDetailRow icon={Calendar} label="Date"
+              value={apptDate ? format(apptDate, 'EEE, dd MMM yyyy') : '—'} />
+            <ApptDetailRow icon={Clock} label="Time" value={appt.timeSlot || '—'} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <ApptDetailRow
+              icon={appt.type === 'telemedicine' ? Video : MapPin}
+              label="Consultation Type"
+              value={appt.type === 'telemedicine' ? 'Video Call' : 'In-person'}
+            />
+            <ApptDetailRow
+              icon={CreditCard}
+              label="Fee"
+              value={appt.fee ? `LKR ${appt.fee.toLocaleString()}` : '—'}
+            />
+          </div>
+
+          {appt.hospital && (
+            <ApptDetailRow icon={Stethoscope} label="Hospital / Clinic" value={appt.hospital} full />
+          )}
+
+          <ApptDetailRow
+            icon={Hash}
+            label="Appointment ID"
+            value={`APT_${appt._id?.slice(-6).toUpperCase()}`}
+            full
+          />
+
+          {appt.patientNumber && appt.maxPatients && (
+            <ApptDetailRow
+              icon={Users}
+              label="Queue Position"
+              value={`Patient #${appt.patientNumber} of ${appt.maxPatients}`}
+              full
+            />
+          )}
+
+          {appt.reason && (
+            <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 flex items-center gap-1.5">
+                <FileText size={11} /> Reason for Visit
+              </p>
+              <p className="text-sm font-medium text-slate-600 italic">"{appt.reason}"</p>
+            </div>
+          )}
+
+          {appt.meetingLink && (
+            <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl">
+              <p className="text-[10px] font-black uppercase tracking-widest text-medigo-blue mb-1">Meeting Link</p>
+              <a href={appt.meetingLink} target="_blank" rel="noopener noreferrer"
+                className="text-sm font-bold text-medigo-blue hover:underline break-all">
+                {appt.meetingLink}
+              </a>
+            </div>
+          )}
+
+          {appt.cancellationReason && (
+            <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-100 rounded-2xl">
+              <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-1">Reason for Cancellation</p>
+                <p className="text-sm font-medium text-red-600">{appt.cancellationReason}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Footer actions */}
+          <div className="flex gap-3 pt-2">
+            <Button onClick={onClose} variant="outline" className="flex-1 h-12 rounded-2xl border-slate-200">
+              Close
+            </Button>
+            {appt.type === 'telemedicine' && appt.status === 'confirmed' && (
+              <Button
+                onClick={() => { onClose(); navigate(`/telemedicine/lobby/${appt._id}`) }}
+                className="flex-1 h-12 rounded-2xl bg-medigo-blue shadow-lg shadow-blue-500/20"
+              >
+                <Video size={15} className="mr-2" /> Join Session
+              </Button>
+            )}
+            {['pending', 'confirmed'].includes(appt.status) && (
+              <Button
+                onClick={() => { onClose(); navigate(`/appointments/${appt._id}/reschedule`) }}
+                variant="outline"
+                className="flex-1 h-12 rounded-2xl border-slate-200"
+              >
+                <RefreshCw size={14} className="mr-2" /> Reschedule
+              </Button>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function ApptDetailRow({ icon: Icon, label, value, full }) {
+  return (
+    <div className={`p-4 bg-slate-50 border border-slate-100 rounded-2xl ${full ? 'col-span-2' : ''}`}>
+      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 flex items-center gap-1.5">
+        <Icon size={11} /> {label}
+      </p>
+      <p className="text-sm font-bold text-medigo-navy">{value}</p>
+    </div>
+  )
+}
+
+// ─── Rating Modal ──────────────────────────────────────────────────────────────
+function RatingModal({ appt, onClose }) {
+  const [ratingVal, setRatingVal] = useState(0)
+  const [hoveredStar, setHoveredStar] = useState(0)
+  const [justRated, setJustRated] = useState(false)
+
+  const handleRate = (val) => {
+    setRatingVal(val)
+    setJustRated(true)
+    setTimeout(() => {
+       setJustRated(false)
+       onClose()
+    }, 1500)
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md"
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={e => e.stopPropagation()}
+        className="bg-white max-w-md w-full rounded-[3rem] overflow-hidden shadow-2xl relative"
+      >
+        <button onClick={onClose} className="absolute top-6 right-6 p-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-full transition-colors z-10">
+          <X size={16} />
+        </button>
+
+        <div className="p-10 text-center space-y-6">
+           <div className="w-20 h-20 mx-auto rounded-full bg-slate-50 flex items-center justify-center">
+             <Star size={32} className="text-amber-400" fill="currentColor" />
+           </div>
+           <div>
+             <h2 className="text-2xl font-black text-medigo-navy tracking-tight mb-2">Rate your Visit</h2>
+             <p className="text-slate-500 text-sm font-medium">How was your medical consultation with {appt.doctorName}?</p>
+           </div>
+           
+           <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+             <div className="flex justify-center gap-2">
+                 {[1, 2, 3, 4, 5].map((star) => (
+                   <button 
+                     key={star}
+                     disabled={justRated || ratingVal > 0}
+                     onMouseEnter={() => setHoveredStar(star)}
+                     onMouseLeave={() => setHoveredStar(0)}
+                     onClick={() => handleRate(star)}
+                     className="transition-transform hover:scale-110 disabled:hover:scale-100"
+                   >
+                     <Star 
+                       size={40} 
+                       fill={(hoveredStar || ratingVal) >= star ? "#f59e0b" : "transparent"} 
+                       className={`${(hoveredStar || ratingVal) >= star ? 'text-amber-400 drop-shadow-lg' : 'text-slate-200'} transition-all`}
+                     />
+                   </button>
+                 ))}
+             </div>
+             <AnimatePresence>
+               {justRated && (
+                 <motion.p 
+                   initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
+                   className="text-xs font-black text-emerald-600 uppercase tracking-widest mt-6"
+                 >
+                   Thank you for submitting your feedback!
+                 </motion.p>
+               )}
+             </AnimatePresence>
+           </div>
         </div>
       </motion.div>
     </motion.div>

@@ -29,7 +29,7 @@ const Sidebar = ({ isPatient, isDoctor, isAdmin }) => {
   const doctorLinks = [
     { name: 'Medical Hub', icon: Home, path: '/doctor/dashboard' },
     { name: 'Clinical Sessions', icon: CalendarDays, path: '/doctor/availability' },
-    { name: 'Consultations', icon: Calendar, path: '/doctor/dashboard' },
+    { name: 'Consultations', icon: Calendar, path: '/doctor/appointments' },
     { name: 'Telemedicine', icon: Video, path: '/telemedicine' },
     { name: 'Prescriptions', icon: Pill, path: '/doctor/prescriptions' },
     { name: 'Patient Files', icon: FileText, path: '/doctor/records' },
