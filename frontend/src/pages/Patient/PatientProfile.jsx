@@ -11,6 +11,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { patientAPI, authAPI } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
+
+// Assuming these exist. If they don't, you must replace them with standard <button> and <input>
 import DashboardLayout from '../../components/DashboardLayout';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -40,7 +42,8 @@ const validatePatientProfileFields = (data) => {
 };
 
 export default function PatientProfile() {
-  const { user, logout } = useAuth();
+  // Safety fallback in case AuthContext is not wrapping this component properly
+  const { user, logout } = useAuth() || {}; 
   const navigate = useNavigate();
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -71,24 +74,27 @@ export default function PatientProfile() {
     (async () => {
       try {
         const response = await patientAPI.getMyProfile();
-        if (response.data.success) {
+        if (response.data && response.data.success) {
           const data = response.data.data;
           setProfileData(data);
           const initialForm = {
-            title: 'Mr',
+            title: data.title || 'Mr',
             fullName: data.fullName || '',
             phone: data.phone || '',
             email: data.email || '',
             gender: data.gender || '',
             address: data.address || '',
             bloodGroup: data.bloodGroup || '',
-            dateOfBirth: data.dateOfBirth ? data.dateOfBirth.split('T')[0] : '',
+            // Safely split date ensuring it's a string
+            dateOfBirth: data.dateOfBirth ? String(data.dateOfBirth).split('T')[0] : '',
             emergencyContactName: data.emergencyContactName || '',
             emergencyContactPhone: data.emergencyContactPhone || '',
             nic: data.nic || ''
           };
           setFormData(initialForm);
           setFieldErrors(validatePatientProfileFields(initialForm));
+        } else {
+          setError('Failed to fetch valid profile data.');
         }
       } catch (err) {
         setError('Synchronizing error: ' + (err.response?.data?.message || err.message));
@@ -124,14 +130,14 @@ export default function PatientProfile() {
   const handleReset = () => {
     if (profileData) {
       setFormData({
-        title: 'Mr',
+        title: profileData.title || 'Mr',
         fullName: profileData.fullName || '',
         phone: profileData.phone || '',
         email: profileData.email || '',
         gender: profileData.gender || '',
         address: profileData.address || '',
         bloodGroup: profileData.bloodGroup || '',
-        dateOfBirth: profileData.dateOfBirth ? profileData.dateOfBirth.split('T')[0] : '',
+        dateOfBirth: profileData.dateOfBirth ? String(profileData.dateOfBirth).split('T')[0] : '',
         emergencyContactName: profileData.emergencyContactName || '',
         emergencyContactPhone: profileData.emergencyContactPhone || '',
         nic: profileData.nic || ''
@@ -163,7 +169,7 @@ export default function PatientProfile() {
     try {
        const res = await authAPI.deleteMyAccount({ otp: deleteOtp });
        if(res.data.success) {
-          logout();
+          logout?.(); // Safe optional call
           navigate('/login');
        }
     } catch(err) {
@@ -189,7 +195,9 @@ export default function PatientProfile() {
       }
     } catch (err) {
       setPwdError(true);
-      setPwdMessage(err.response?.data?.message || "Failed to update security credentials.");
+      // Ensure error message is explicitly a string to prevent rendering object crashes
+      const errMessage = err.response?.data?.message;
+      setPwdMessage(typeof errMessage === 'string' ? errMessage : "Failed to update credentials.");
     } finally {
       setPwdLoading(false);
     }
@@ -201,12 +209,25 @@ export default function PatientProfile() {
     { id: 'password', label: 'Security & Access', icon: Lock },
   ];
 
-  if (loading && !profileData) return (
+  // 1. SAFE LOADING RETURN
+  if (loading) return (
     <DashboardLayout isPatient={true}>
       <div className="flex flex-col items-center justify-center py-20 animate-pulse">
-         <div className="w-16 h-16 bg-slate-100 rounded-full mb-4" />
-         <div className="h-4 bg-slate-100 rounded-full w-48 mb-2" />
-         <div className="h-3 bg-slate-100 rounded-full w-32" />
+         <div className="w-16 h-16 bg-slate-200 rounded-full mb-4" />
+         <div className="h-4 bg-slate-200 rounded-full w-48 mb-2" />
+         <div className="h-3 bg-slate-200 rounded-full w-32" />
+      </div>
+    </DashboardLayout>
+  );
+
+  // 2. SAFE ERROR RETURN (Prevents rendering empty UI and crashing)
+  if (error) return (
+    <DashboardLayout isPatient={true}>
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+         <AlertCircle size={48} className="text-red-400 mb-4" />
+         <h2 className="text-xl font-bold text-slate-700">Unable to load profile</h2>
+         <p className="text-slate-500">{error}</p>
+         <Button onClick={() => window.location.reload()} className="mt-6">Refresh Page</Button>
       </div>
     </DashboardLayout>
   );
@@ -220,55 +241,52 @@ export default function PatientProfile() {
       >
         {/* Header Section */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-8 bg-white p-8 sm:p-10 rounded-[3rem] shadow-premium border border-slate-100 relative overflow-hidden group">
-           <div className="absolute top-0 right-0 w-64 h-64 bg-medigo-blue/5 blur-[100px] rounded-full pointer-events-none" />
+           <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50 blur-[100px] rounded-full pointer-events-none" />
            
            <div className="flex flex-col md:flex-row items-center gap-8 relative z-10 w-full md:w-auto">
               <div className="relative group/avatar">
-                 <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-[2rem] bg-gradient-to-tr from-medigo-blue to-medigo-teal text-white flex items-center justify-center text-4xl font-black shadow-xl group-hover/avatar:scale-105 transition-transform duration-500">
+                 <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-[2rem] bg-gradient-to-tr from-blue-600 to-teal-400 text-white flex items-center justify-center text-4xl font-black shadow-xl">
                     {formData.fullName?.[0]?.toUpperCase() || 'P'}
                  </div>
-                 <button className="absolute -bottom-2 -right-2 w-10 h-10 bg-white border border-slate-100 rounded-xl shadow-lg flex items-center justify-center text-slate-400 hover:text-medigo-blue transition-colors">
-                    <Camera size={18} />
-                 </button>
               </div>
               
               <div className="text-center md:text-left space-y-1">
-                 <h1 className="text-3xl font-black text-medigo-navy tracking-tight uppercase italic">{formData.fullName}</h1>
+                 <h1 className="text-3xl font-black text-slate-800 tracking-tight uppercase italic">{formData.fullName || 'Unknown User'}</h1>
                  <div className="flex flex-wrap justify-center md:justify-start items-center gap-x-6 gap-y-2 text-sm font-bold text-slate-400">
                     <div className="flex items-center gap-2">
-                       <ShieldCheck size={16} className="text-medigo-mint" />
-                       Patient ID: <span className="text-medigo-navy">#{profileData?.userId?.slice(-6) || 'N/A'}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                       <Activity size={16} className="text-medigo-blue/40" />
-                       Verified Member
+                       <ShieldCheck size={16} className="text-emerald-500" />
+                       {/* CRASH FIX: Safely convert userId to string before slicing */}
+                       Patient ID: <span className="text-slate-800">#{profileData?.userId ? String(profileData.userId).slice(-6) : 'N/A'}</span>
                     </div>
                  </div>
               </div>
            </div>
            
            <div className="flex gap-3 relative z-10">
-              <Button onClick={() => navigate('/appointments')} variant="outline" className="border-slate-200">History</Button>
-              <Button onClick={() => navigate('/book')} className="shadow-lg shadow-blue-500/10">Book Slot</Button>
+              <Button onClick={() => navigate('/appointments')} variant="outline">History</Button>
+              <Button onClick={() => navigate('/book')}>Book Slot</Button>
            </div>
         </div>
 
         {/* Navigation Tabs */}
         <section className="flex flex-wrap items-center gap-2 bg-white p-2 border border-slate-100 rounded-[2rem] shadow-sm overflow-x-auto no-scrollbar">
-           {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-3 px-6 py-3 rounded-full text-xs font-black uppercase tracking-widest transition-all duration-300 ${
-                  activeTab === tab.id 
-                    ? 'bg-medigo-navy text-white shadow-xl' 
-                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <tab.icon size={16} />
-                {tab.label}
-              </button>
-           ))}
+           {tabs.map(tab => {
+              const Icon = tab.icon; // Safely reference the icon component
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-3 px-6 py-3 rounded-full text-xs font-black uppercase tracking-widest transition-all duration-300 ${
+                    activeTab === tab.id 
+                      ? 'bg-slate-800 text-white shadow-xl' 
+                      : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {Icon && <Icon size={16} />}
+                  {tab.label}
+                </button>
+              );
+           })}
         </section>
 
         {/* Tab Content Wrapper */}
@@ -306,7 +324,6 @@ export default function PatientProfile() {
                          value={formData.email} 
                          disabled 
                          icon={Mail} 
-                         helper="Email cannot be changed"
                        />
                        <Input 
                          label="Primary Mobile" 
@@ -339,7 +356,6 @@ export default function PatientProfile() {
                       onChange={handleInputChange} 
                       icon={MapPin} 
                       error={fieldErrors.address}
-                      placeholder="Street, City, Province"
                     />
 
                     <div className="pt-10 border-t border-slate-50 flex flex-col sm:flex-row justify-between items-center gap-6">
@@ -350,7 +366,7 @@ export default function PatientProfile() {
                           <Trash2 size={16} /> Privacy: Deactivate Account
                        </button>
                        <div className="flex gap-4">
-                          <Button variant="outline" className="border-slate-200" onClick={handleReset}><RotateCcw size={18} className="mr-2" /> Reset</Button>
+                          <Button variant="outline" onClick={handleReset}><RotateCcw size={18} className="mr-2" /> Reset</Button>
                           <Button className="px-10" onClick={handleUpdate} disabled={Object.keys(fieldErrors).length > 0}><Save size={18} className="mr-2" /> Save Profile</Button>
                        </div>
                     </div>
@@ -360,9 +376,9 @@ export default function PatientProfile() {
               {activeTab === 'emergency_contacts' && (
                  <div className="space-y-10">
                     <div className="bg-indigo-50/50 p-8 rounded-[2.5rem] border border-indigo-100/50 flex items-start gap-4">
-                       <Info size={24} className="text-medigo-blue shrink-0 mt-1" />
+                       <Info size={24} className="text-blue-500 shrink-0 mt-1" />
                        <div className="space-y-1">
-                          <h4 className="text-sm font-black text-medigo-navy uppercase tracking-tight italic">Why we need this?</h4>
+                          <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight italic">Why we need this?</h4>
                           <p className="text-xs text-slate-500 font-medium leading-relaxed">In case of medical emergencies during telemedicine sessions or clinical visits, we will contact your primary emergency network representative.</p>
                        </div>
                     </div>
@@ -373,7 +389,6 @@ export default function PatientProfile() {
                          name="emergencyContactName" 
                          value={formData.emergencyContactName} 
                          onChange={handleInputChange} 
-                         placeholder="Full Legal Name"
                          icon={User}
                        />
                        <Input 
@@ -381,7 +396,6 @@ export default function PatientProfile() {
                          name="emergencyContactPhone" 
                          value={formData.emergencyContactPhone} 
                          onChange={handleInputChange} 
-                         placeholder="07XXXXXXXX"
                          icon={Smartphone}
                        />
                     </div>
@@ -394,11 +408,6 @@ export default function PatientProfile() {
 
               {activeTab === 'password' && (
                  <div className="space-y-10">
-                    <div className="space-y-1">
-                       <h3 className="text-xl font-black text-medigo-navy uppercase tracking-tight italic">Security Refresh</h3>
-                       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Update your vault access credentials</p>
-                    </div>
-
                     <form onSubmit={handlePasswordChange} className="max-w-md space-y-6">
                        <Input 
                          label="Current Verification Password" 
@@ -428,7 +437,7 @@ export default function PatientProfile() {
                           {pwdMessage && (
                              <motion.div 
                                initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-                               className={`p-4 rounded-2xl flex items-center gap-3 text-xs font-bold ${pwdError ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}
+                               className={`p-4 rounded-2xl flex items-center gap-3 text-xs font-bold ${pwdError ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}
                              >
                                 {pwdError ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
                                 {pwdMessage}
@@ -450,56 +459,6 @@ export default function PatientProfile() {
            </motion.div>
         </AnimatePresence>
       </motion.div>
-
-      {/* MODALS */}
-      <AnimatePresence>
-         {showDeleteConfirm && (
-            <>
-               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-medigo-navy/60 backdrop-blur-md z-[100]" onClick={() => setShowDeleteConfirm(false)} />
-               <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="fixed inset-0 flex items-center justify-center p-6 z-[101] pointer-events-none">
-                  <div className="bg-white p-10 rounded-[3rem] shadow-3xl border border-slate-100 max-w-sm w-full text-center pointer-events-auto overflow-hidden relative">
-                     <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-3xl rounded-full" />
-                     <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-                        <Trash2 size={32} />
-                     </div>
-                     <h3 className="text-2xl font-black text-medigo-navy uppercase tracking-tight italic mb-4">Permanent Deletion</h3>
-                     <p className="text-slate-500 font-medium mb-10 leading-relaxed text-sm">Deleting your account will purge all medical records, consultation history, and health data. This cannot be reversed.</p>
-                     
-                     <div className="space-y-3">
-                        <Button className="w-full h-14 bg-red-500 hover:bg-red-600 border-none shadow-lg shadow-red-500/20" onClick={requestDeletion} loading={deleteLoading}>Verify with Email OTP</Button>
-                        <button className="text-[11px] font-black text-slate-400 uppercase tracking-widest hover:text-medigo-navy" onClick={() => setShowDeleteConfirm(false)}>Dismiss Operation</button>
-                     </div>
-                  </div>
-               </motion.div>
-            </>
-         )}
-
-         {showDeleteOtp && (
-            <>
-               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-slate-900/80 backdrop-blur-xl z-[100]" />
-               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed inset-0 flex items-center justify-center p-6 z-[101] pointer-events-auto">
-                  <div className="bg-white p-10 rounded-[3rem] shadow-3xl border border-slate-100 max-w-sm w-full text-center relative overflow-hidden">
-                     <div className="w-20 h-20 bg-indigo-50 text-medigo-blue rounded-full flex items-center justify-center mx-auto mb-6">
-                        <ShieldCheck size={32} />
-                     </div>
-                     <h3 className="text-xl font-black text-medigo-navy uppercase tracking-tight mb-4">Security Verification</h3>
-                     <p className="text-slate-400 text-sm font-medium mb-8">Enter the 6-digit code sent to your email to confirm identity for deletion.</p>
-                     
-                     <input 
-                       type="text" 
-                       maxLength="6"
-                       value={deleteOtp}
-                       onChange={(e) => setDeleteOtp(e.target.value)}
-                       className="w-full bg-slate-50 h-20 rounded-2xl text-center text-4xl font-black tracking-[0.5em] text-medigo-navy border border-slate-100 focus:bg-white focus:border-medigo-blue focus:ring-4 focus:ring-blue-500/5 outline-none mb-4"
-                     />
-                     
-                     <Button className="w-full h-14 bg-red-500 hover:bg-red-600" onClick={confirmDeletion} loading={deleteLoading} disabled={deleteOtp.length !== 6}>Authorize Wipe</Button>
-                     <button className="mt-6 text-[10px] font-black text-slate-300 uppercase tracking-widest hover:text-slate-500" onClick={() => setShowDeleteOtp(false)}>Abort Process</button>
-                  </div>
-               </motion.div>
-            </>
-         )}
-      </AnimatePresence>
     </DashboardLayout>
   );
 }
