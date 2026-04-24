@@ -31,6 +31,12 @@ docker build -t medigo-telemedicine-service:latest backend/services/telemedicine
 echo "Building Payment Service..."
 docker build -t medigo-payment-service:latest backend/services/payment-service
 
+echo "Building Medical Report Service..."
+docker build -t medigo-medicalreport-service:latest backend/services/medicalreport-service
+
+echo "Building Notification Service..."
+docker build -t medigo-notification-service:latest backend/services/notification-service
+
 # --- DEPLOY PHASE ---
 echo "========================================="
 echo "☸️  PHASE 2: Restarting Kubernetes Pods..."
@@ -49,7 +55,9 @@ kubectl rollout restart deployment \
   appointment-service-deployment \
   admin-service-deployment \
   telemedicine-service-deployment \
-  payment-service-deployment
+  payment-service-deployment \
+  medicalreport-service-deployment \
+  notification-service-deployment
 
 echo "========================================="
 echo "✅ Deployment complete! Run 'kubectl get pods -w' to watch them spin up."
