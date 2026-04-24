@@ -749,23 +749,23 @@ export const deleteInternalIdentity = async (req, res) => {
 export const updateInternalUser = async (req, res) => {
   try {
     const { fullName, phone } = req.body;
-
+    
     // Check if the param is a Mongo ID or a custom userId (like P001)
     const isMongoId = /^[0-9a-fA-F]{24}$/.test(req.params.id);
     const query = isMongoId ? { _id: req.params.id } : { userId: req.params.id };
 
     const user = await User.findOne(query);
-
+    
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found in Auth DB" });
     }
 
     // Only update the fields that were actually provided
     if (fullName) user.fullName = fullName;
-    if (phone !== undefined) user.phone = phone;
+    if (phone !== undefined) user.phone = phone; 
 
     await user.save();
-
+    
     res.status(200).json({ success: true, message: "Auth profile synced successfully", data: user });
   } catch (error) {
     console.error("Sync Error:", error.message);

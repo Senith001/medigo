@@ -8,7 +8,12 @@
     "start:patient": "cd services/patient-service && npm run dev",
     "start:admin": "cd services/admin-service && npm run dev",
     "start:doctor": "cd services/doctor-service && npm run dev",
-    "dev": "concurrently -n \"AUTH,PATIENT,ADMIN,DOCTOR\" -c \"cyan,green,magenta,blue\" \"npm run start:auth\" \"npm run start:patient\" \"npm run start:admin\" \"npm run start:doctor\""
+    "start:appointment": "cd services/appointment-service && npm run dev",
+    "start:notification": "cd services/notification-service && npm run dev",
+    "start:payment": "cd services/payment-service && npm run dev",
+    "start:telemedicine": "cd services/telemedicine-service && npm run dev",
+    "start:mediaclreport": "cd services/mediaclreport-service && npm run dev",
+    "dev": "concurrently -n \"AUTH,PATIENT,ADMIN,DOCTOR,APPOINTMENT,NOTIFICATION,PAYMENT,TELEMEDICINE,REPORT\" -c \"cyan,green,magenta,blue,yellow,red,white,gray,cyan\" \"npm run start:auth\" \"npm run start:patient\" \"npm run start:admin\" \"npm run start:doctor\" \"npm run start:appointment\" \"npm run start:notification\" \"npm run start:payment\" \"npm run start:telemedicine\" \"npm run start:mediaclreport\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
