@@ -6,6 +6,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+
       // API routes — most specific first
       '/api/appointments':     { target: 'http://localhost:5005', changeOrigin: true },
       '/api/payments':         { target: 'http://localhost:5007', changeOrigin: true },
@@ -22,4 +23,14 @@ export default defineConfig({
       '/uploads':               { target: 'http://localhost:5006', changeOrigin: true },
     }
   }
+
+      '/api/auth':         { target: 'http://localhost:30001', changeOrigin: true },
+      '/api/admin':        { target: 'http://localhost:30002', changeOrigin: true },
+      '/api/patients':     { target: 'http://localhost:30003', changeOrigin: true },
+      '/api/doctors':      { target: 'http://localhost:30004', changeOrigin: true },  
+      '/api/appointments': { target: 'http://localhost:30005', changeOrigin: true },
+      '/api/notifications':{ target: 'http://localhost:30009', changeOrigin: true },
+    },
+  },
+
 })

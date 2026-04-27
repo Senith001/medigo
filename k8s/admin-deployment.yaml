@@ -38,3 +38,5 @@ spec:
           value: "http://auth-service-network:5001"
         - name: PATIENT_SERVICE_URL
           value: "http://patient-service-network:5002"
+        - name: DOCTOR_SERVICE_URL
+          value: "http://doctor-service-network:5004"

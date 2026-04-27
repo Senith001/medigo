@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mediaclreport-service-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mediaclreport-service
+  template:
+    metadata:
+      labels:
+        app: mediaclreport-service
+    spec:
+      containers:
+      - name: mediaclreport-service
+        image: medigo-mediaclreport-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5006
+        env:
+        # --- Core Settings ---
+        - name: PORT
+          value: "5006"
+        - name: MONGO_URI
+          value: "mongodb+srv://medigoAdmin:mediGo%40SE127@medigo-cluster.ega902t.mongodb.net/medicalreport_db?retryWrites=true&w=majority"
+
+        # --- Secrets & Keys ---
+        - name: JWT_SECRET
+          value: "medigo_super_secret_key"
+        - name: SERVICE_SECRET
+          value: "medigo_super_secret_key"
+
+        # --- K8s Internal Networking ---
+        - name: PATIENT_SERVICE_URL
+          value: "http://patient-service-network:5002"
+        - name: AUTH_SERVICE_URL
+          value: "http://auth-service-network:5001"

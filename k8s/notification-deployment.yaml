@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+      - name: notification-service
+        image: medigo-notification-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5009
+        env:
+        - name: PORT
+          value: "5009"
+        - name: MONGO_URI
+          value: "mongodb+srv://medigoAdmin:mediGo%40SE127@medigo-cluster.ega902t.mongodb.net/notification_db?retryWrites=true&w=majority"
+        - name: JWT_SECRET
+          value: "medigo_super_secret_key"
+        - name: SERVICE_SECRET
+          value: "medigo_super_secret_key"
+        - name: RABBITMQ_URL
+          value: "amqps://txppjdic:apkpOqg1MddQ59pGNGrEbKYlzZw9O5yy@raccoon.lmq.cloudamqp.com/txppjdic"
+        - name: EMAIL_HOST
+          value: "smtp.gmail.com"
+        - name: EMAIL_PORT
+          value: "587"
+        - name: EMAIL_USER
+          value: "prabashmihiranga@gmail.com"
+        - name: EMAIL_PASS
+          value: "nloi wuam adrw ghdu"
+        - name: EMAIL_FROM
+          value: "\"MEDIGO\" <noreply@medigo.com>"
+        - name: TWILIO_ACCOUNT_SID
+          value: "your_twilio_account_sid"
+        - name: TWILIO_AUTH_TOKEN
+          value: "your_twilio_auth_token"
+        - name: TWILIO_PHONE_NUMBER
+          value: "+1234567890"

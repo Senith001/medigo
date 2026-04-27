@@ -313,8 +313,16 @@ export const getPatientById = async (req, res) => {
 
 export const getDoctors = async (req, res) => {
   try {
+    const doctorServiceUrl = process.env.DOCTOR_SERVICE_URL;
+    if (!doctorServiceUrl) {
+      return res.status(500).json({
+        success: false,
+        message: "Admin service misconfiguration: DOCTOR_SERVICE_URL is not defined."
+      });
+    }
+
     const response = await httpClient.get(
-      `${process.env.DOCTOR_SERVICE_URL}/api/doctors`
+      `${doctorServiceUrl}/api/doctors`
     );
     res.status(200).json(response.data);
   } catch (error) {
