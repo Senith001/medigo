@@ -1,11 +1,7 @@
-FROM node:18-alpine AS builder
+FROM node:18-slim
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production
-
-FROM node:18-alpine
-WORKDIR /app
-COPY --from=builder /app/node_modules ./node_modules
+RUN npm install
 COPY . .
 EXPOSE 5006
-CMD ["node", "src/server.js"]
+CMD ["npm", "run", "dev"]

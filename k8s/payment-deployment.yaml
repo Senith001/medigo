@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+    spec:
+      containers:
+      - name: payment-service
+        image: medigo-payment-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5007
+        env:
+        - name: PORT
+          value: "5007"
+        - name: MONGO_URI
+          value: "mongodb+srv://medigoAdmin:mediGo%40SE127@medigo-cluster.ega902t.mongodb.net/payment_db?retryWrites=true&w=majority"
+        - name: STRIPE_SECRET_KEY
+          value: "sk_test_51TFBupKvuaCTEmnPvIG9gZgovD0FKiVlLeW1unmYZGotcVPsjbPNHHoi0fKSPbIe9rObAuDZGrc9sB83FwNUqAyh00Dmbmb4Mo"
+        - name: JWT_SECRET
+          value: "medigo_super_secret_key"
+        - name: JWT_EXPIRES_IN
+          value: "7d"
+        - name: STRIPE_SUCCESS_URL
+          value: "http://localhost:30007/api/payments/success"
+        - name: STRIPE_CANCEL_URL
+          value: "http://localhost:30007/api/payments/cancel"
+        - name: APPOINTMENT_SERVICE_URL
+          value: "http://appointment-service-network:5005"
+        - name: NOTIFICATION_SERVICE_URL
+          value: "http://notification-service-network:5009"
+        - name: SERVICE_SECRET
+          value: "medigo_super_secret_key"
