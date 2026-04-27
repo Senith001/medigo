@@ -28,7 +28,7 @@ export default function Checkout() {
     email: '',
     phone: '',
     nic: '',
-    city: '',
+    patientNote: '',
     idType: 'NIC'
   })
   
@@ -48,7 +48,6 @@ export default function Checkout() {
             email: profile.email || user?.email || '',
             phone: profile.phone?.replace('+94', '') || '',
             nic: profile.nic || '',
-            city: profile.address || ''
           }))
         }
       } catch (err) {
@@ -87,10 +86,9 @@ export default function Checkout() {
         fee: total,
         hospital: session.hospital || 'MediGo Central Clinic',
         type: selectedMode || session.consultationType || 'telemedicine',
-        reason: 'General Consultation',
+        reason: form.patientNote.trim() || null,
         metadata: {
           patientNic: form.nic,
-          patientCity: form.city,
           patientPhone: form.phone
         }
       })
@@ -107,11 +105,10 @@ export default function Checkout() {
 
   const feeDetails = {
     doctor: session?.fee || 2500,
-    hospital: 800,
     service: 199,
     discount: 0
   }
-  const total = feeDetails.doctor + feeDetails.hospital + feeDetails.service - feeDetails.discount
+  const total = feeDetails.doctor + feeDetails.service - feeDetails.discount
 
   if (!doctor || !session) return (
     <DashboardLayout isPatient={true}>
@@ -287,19 +284,23 @@ export default function Checkout() {
                         </div>
                      </div>
 
-                     {/* Area */}
+                     {/* Message for Doctor */}
                      <div className="md:col-span-2 space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] italic ml-1">Closest City / Area</label>
-                        <div className="relative group">
-                           <input 
-                             name="city"
-                             value={form.city}
-                             onChange={handleInputChange}
-                             placeholder="Please enter your closest city" 
-                             className="w-full h-14 bg-slate-50 border border-slate-100 rounded-2xl pl-12 pr-6 outline-none focus:border-medigo-blue transition-colors text-xs font-bold"
-                           />
-                           <MapPin className="absolute left-4 top-4 text-slate-300 group-focus-within:text-medigo-blue transition-colors" size={18} />
-                        </div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] italic ml-1 flex items-center gap-2">
+                          <span className="w-4 h-4 bg-teal-50 text-teal-600 rounded flex items-center justify-center"><Stethoscope size={10} /></span>
+                          Message for Doctor (Optional)
+                        </label>
+                        <textarea
+                          name="patientNote"
+                          value={form.patientNote}
+                          onChange={handleInputChange}
+                          rows={4}
+                          placeholder="Describe your symptoms, concerns, or anything you'd like the doctor to know before the appointment…"
+                          className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-5 pr-5 py-4 outline-none focus:border-medigo-blue focus:bg-white transition-colors text-xs font-bold resize-none placeholder:text-slate-300"
+                        />
+                        <p className="text-[10px] text-slate-300 font-bold px-1 flex items-center gap-1.5">
+                          <Info size={11} /> This message will be visible to your doctor before the appointment.
+                        </p>
                      </div>
 
                      {/* ID Verification */}
@@ -385,10 +386,6 @@ export default function Checkout() {
                      <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 italic uppercase">
                         <span>Doctor fee</span>
                         <span>Rs {feeDetails.doctor.toLocaleString()}.00</span>
-                     </div>
-                     <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 italic uppercase">
-                        <span>Hospital fee</span>
-                        <span>Rs {feeDetails.hospital.toLocaleString()}.00</span>
                      </div>
                      <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 italic uppercase">
                         <span>MediGo Surcharge</span>

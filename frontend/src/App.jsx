@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -14,6 +14,7 @@ import ManageAvailability from './pages/Doctor/ManageAvailability'
 import PatientDashboard from './pages/Patient/PatientDashboard'
 import PatientProfile from './pages/Patient/PatientProfile'
 import DoctorDashboard from './pages/Doctor/DoctorDashboard'
+import DoctorAppointments from './pages/Doctor/DoctorAppointments'
 import DoctorProfile from './pages/Doctor/DoctorProfile'
 import AdminLayout from './pages/Admin/AdminLayout'
 import AdminDashboard from './pages/Admin/AdminDashboard'
@@ -35,11 +36,17 @@ import AdminPayments from './pages/Payment/AdminPayments'
 import Lobby from './pages/Telemedicine/Lobby'
 import VideoRoom from './pages/Telemedicine/VideoRoom'
 import Telemedicine from './pages/Telemedicine/Telemedicine'
+import PatientRecords from './pages/Doctor/PatientRecords'
 import ReportCenter from './pages/Report/ReportCenter'
+import PaymentHistory from './pages/Patient/PaymentHistory'
+import MyPrescriptions from './pages/Patient/MyPrescriptions'
+import DoctorPrescriptions from './pages/Doctor/Prescriptions'
 
 function Layout() {
   const { token, user } = useAuth()
-  const showStandardNavbar = token && !['admin', 'superadmin'].includes(user?.role)
+  const location = useLocation()
+  const isLandingPage = location.pathname === '/'
+  const showStandardNavbar = token && user?.role === 'patient' && !isLandingPage
 
   return (
     <>
@@ -71,8 +78,10 @@ function Layout() {
         {/* Doctor Protected */}
         <Route path="/doctor" element={<ProtectedRoute roles={['doctor']}><DoctorDashboard /></ProtectedRoute>} />
         <Route path="/doctor/dashboard" element={<ProtectedRoute roles={['doctor']}><DoctorDashboard /></ProtectedRoute>} />
+        <Route path="/doctor/appointments" element={<ProtectedRoute roles={['doctor']}><DoctorAppointments /></ProtectedRoute>} />
         <Route path="/doctor/availability" element={<ProtectedRoute roles={['doctor']}><ManageAvailability /></ProtectedRoute>} />
         <Route path="/doctor/profile" element={<ProtectedRoute roles={['doctor']}><DoctorProfile /></ProtectedRoute>} />
+        <Route path="/doctor/records" element={<ProtectedRoute roles={['doctor']}><PatientRecords /></ProtectedRoute>} />
 
         {/* Patient Protected */}
         <Route path="/dashboard" element={<ProtectedRoute roles={['patient']}><PatientDashboard /></ProtectedRoute>} />
@@ -86,6 +95,13 @@ function Layout() {
         {/* Reports */}
         <Route path="/reports" element={<ProtectedRoute roles={['patient']}><ReportCenter /></ProtectedRoute>} />
 
+        {/* Payment History */}
+        <Route path="/payments" element={<ProtectedRoute roles={['patient']}><PaymentHistory /></ProtectedRoute>} />
+
+        {/* Prescriptions */}
+        <Route path="/prescriptions" element={<ProtectedRoute roles={['patient']}><MyPrescriptions /></ProtectedRoute>} />
+        <Route path="/doctor/prescriptions" element={<ProtectedRoute roles={['doctor']}><DoctorPrescriptions /></ProtectedRoute>} />
+
         {/* Payment */}
         <Route path="/payment/:appointmentId" element={<ProtectedRoute roles={['patient']}><PaymentSelector /></ProtectedRoute>} />
         <Route path="/payment/bank-transfer/:appointmentId" element={<ProtectedRoute roles={['patient']}><BankTransferForm /></ProtectedRoute>} />
@@ -93,7 +109,7 @@ function Layout() {
         <Route path="/payment/cancel" element={<StripeCallback status="cancel" />} />
 
         {/* Telemedicine */}
-        <Route path="/telemedicine" element={<ProtectedRoute roles={['patient']}><Telemedicine /></ProtectedRoute>} />
+        <Route path="/telemedicine" element={<ProtectedRoute roles={['patient', 'doctor']}><Telemedicine /></ProtectedRoute>} />
         <Route path="/telemedicine/lobby/:appointmentId" element={<ProtectedRoute roles={['patient', 'doctor']}><Lobby /></ProtectedRoute>} />
         <Route path="/telemedicine/room/:sessionId" element={<ProtectedRoute roles={['patient', 'doctor']}><VideoRoom /></ProtectedRoute>} />
 

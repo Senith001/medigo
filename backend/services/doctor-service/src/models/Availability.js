@@ -45,8 +45,8 @@ const availabilitySchema = new mongoose.Schema(
     },
     consultationType: {
       type: String,
-      enum: ['telemedicine', 'in-person'],
-      default: 'in-person'
+      enum: ['in-person', 'telemedicine', 'both'],
+      default: 'in-person',
     },
     isAvailable: {
       type: Boolean,

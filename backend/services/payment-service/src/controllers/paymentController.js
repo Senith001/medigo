@@ -26,10 +26,12 @@ const syncAppointmentPayment = async (appointmentId, paymentStatus) => {
 };
 
 // Helper: trigger notification-service for payment-related messages
+// paymentController.js — sendNotification helper
 const sendNotification = async (payment, type) => {
   try {
     await axios.post(
-      `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/internal/payment-status`,
+      // ✅ FIX: /payment-status → /payment-confirmed
+      `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/internal/payment-confirmed`,
       {
         appointmentId: payment.appointmentId,
         patientName: payment.patientName,
@@ -42,9 +44,7 @@ const sendNotification = async (payment, type) => {
         type,
       },
       {
-        headers: {
-          "x-service-secret": process.env.SERVICE_SECRET,
-        },
+        headers: { 'x-service-secret': process.env.SERVICE_SECRET },
       }
     );
   } catch (err) {
@@ -647,6 +647,27 @@ const refundPayment = async (req, res) => {
   }
 };
 
+// Admin — get all payments (history: paid, rejected, refunded - includes stripe and bank_transfer)
+const getAllPaymentsForAdmin = async (req, res) => {
+  try {
+    const payments = await Payment.find({
+      status: { $nin: ['verification_pending', 'pending'] },
+    }).sort({ updatedAt: -1 }).limit(200)
+
+    res.status(200).json({
+      total: payments.length,
+      payments: payments.map(p => ({
+        ...p.toObject(),
+        // Normalise field names for frontend compatibility
+        paymentStatus: p.status,
+      })),
+    })
+  } catch (error) {
+    console.error('getAllPaymentsForAdmin error:', error.message)
+    res.status(500).json({ message: 'Server error fetching payment history.' })
+  }
+}
+
 export {
   createPayment,
   createBankTransferPayment,
@@ -655,7 +676,8 @@ export {
   getPaymentById,
   getPaymentsByPatient,
   getPendingBankTransfers,
+  getAllPaymentsForAdmin as getAllBankTransfers, // Keeping export name same so we don't break routes
   approveBankTransferPayment,
   rejectBankTransferPayment,
   refundPayment,
-};
+}

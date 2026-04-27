@@ -1,159 +1,163 @@
-import React from 'react';
-import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import React from 'react'
+import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
+import {
+  LayoutDashboard, Users, Stethoscope,
+  CreditCard, ShieldCheck, LogOut,
+  Bell, Search, Settings, User
+} from 'lucide-react'
+import { useAuth } from '../../context/AuthContext'
 
 export default function AdminLayout() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
 
   const handleLogout = () => {
-    logout();
-    navigate('/admin-login');
-  };
+    logout()
+    navigate('/admin-login')
+  }
 
-  const navItemStyle = ({ isActive }) => ({
-    display: 'flex',
-    alignItems: 'center',
-    padding: '12px 20px',
-    margin: '4px 16px',
-    borderRadius: '12px',
-    backgroundColor: isActive ? '#1a1a1a' : 'transparent',
-    color: isActive ? '#ffffff' : '#64748b',
-    fontWeight: '600',
-    fontSize: '0.95rem',
-    textDecoration: 'none',
-    transition: 'all 0.2s ease'
-  });
+  const navLinks = [
+    { to: '/admin', end: true, icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/admin/doctors', icon: Stethoscope, label: 'Doctors' },
+    { to: '/admin/patients', icon: Users, label: 'Patients' },
+    // ✅ Payment Approvals link add
+    { to: '/admin/payments', icon: CreditCard, label: 'Payment Approvals' },
+    { to: '/admin/profile', icon: User, label: 'Profile' },
+  ]
+
+  // ✅ superadmin only
+  const superAdminLinks = [
+    { to: '/admin/admins', icon: ShieldCheck, label: 'Admins' },
+  ]
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#e2e8f0', backgroundImage: 'linear-gradient(to right, #e2e8f0, #f1f5f9)' }}>
-      {/* Sidebar */}
-      <div style={{ 
-        width: '260px', 
-        backgroundColor: '#ffffff', 
-        display: 'flex', 
-        flexDirection: 'column', 
-        borderRight: '1px solid #e2e8f0',
-        borderRadius: '0 24px 24px 0',
-        boxShadow: '4px 0 10px rgba(0,0,0,0.02)',
-        margin: '16px 0 16px 16px'
-      }}>
+    <div className="flex min-h-screen bg-slate-100 font-inter">
+
+      {/* ── Sidebar ── */}
+      <div className="w-[220px] shrink-0 bg-white border-r border-slate-100 flex flex-col sticky top-0 h-screen">
         {/* Brand */}
-        <div style={{ padding: '30px 24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ padding: '6px', backgroundColor: '#1a1a1a', borderRadius: '8px', color: 'white' }}>
-            <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>♡</span>
-          </div>
-          <span style={{ fontSize: '1.4rem', fontWeight: '800', color: '#1a1a1a' }}>MediGo</span>
+        <div className="p-6 border-b border-slate-50">
+          <Link to="/admin" className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-medigo-blue rounded-lg flex items-center justify-center text-white font-black text-xs shadow">
+              M
+            </div>
+            <span className="text-lg font-black tracking-tighter text-medigo-navy">
+              Medi<span className="text-medigo-blue">Go</span>
+            </span>
+          </Link>
         </div>
 
-        {/* Links */}
-        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <NavLink to="/admin" end style={navItemStyle}>
-            <span style={{ marginRight: '16px', fontSize: '1.2rem' }}>⊞</span> Dashboard
-          </NavLink>
-          {user?.role === 'superadmin' && (
-            <NavLink to="/admin/admins" style={navItemStyle}>
-              <span style={{ marginRight: '16px', fontSize: '1.2rem' }}>🛡️</span> Admins
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {navLinks.map(link => (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              end={link.end}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${isActive
+                  ? 'bg-medigo-navy text-white shadow-sm'
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-medigo-navy'
+                }`
+              }
+            >
+              <link.icon size={17} />
+              {link.label}
             </NavLink>
+          ))}
+
+          {/* Superadmin only */}
+          {user?.role === 'superadmin' && (
+            <>
+              <div className="pt-4 pb-1 px-4">
+                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                  Super Admin
+                </p>
+              </div>
+              {superAdminLinks.map(link => (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${isActive
+                      ? 'bg-medigo-navy text-white shadow-sm'
+                      : 'text-slate-500 hover:bg-slate-50 hover:text-medigo-navy'
+                    }`
+                  }
+                >
+                  <link.icon size={17} />
+                  {link.label}
+                </NavLink>
+              ))}
+            </>
           )}
-          <NavLink to="/admin/patients" style={navItemStyle}>
-            <span style={{ marginRight: '16px', fontSize: '1.2rem' }}>👥</span> Patients
-          </NavLink>
-          <NavLink to="/admin/doctors" style={navItemStyle}>
-            <span style={{ marginRight: '16px', fontSize: '1.2rem' }}>👨‍⚕️</span> Doctors
-          </NavLink>
-          <div style={{ padding: '12px 20px', margin: '4px 16px', color: '#64748b', fontWeight: '600', fontSize: '0.95rem', display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-            <span style={{ marginRight: '16px', fontSize: '1.2rem' }}>📅</span> Appointment
-          </div>
-          <div style={{ padding: '12px 20px', margin: '4px 16px', color: '#64748b', fontWeight: '600', fontSize: '0.95rem', display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-            <span style={{ marginRight: '16px', fontSize: '1.2rem' }}>⏱</span> Schedule
-          </div>
-          <div style={{ padding: '12px 20px', margin: '4px 16px', color: '#64748b', fontWeight: '600', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <span style={{ marginRight: '16px', fontSize: '1.2rem' }}>💬</span> Chats
-            </div>
-            <div style={{ backgroundColor: '#1a1a1a', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 'bold' }}>2</div>
-          </div>
-          <div style={{ padding: '12px 20px', margin: '4px 16px', color: '#64748b', fontWeight: '600', fontSize: '0.95rem', display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-            <span style={{ marginRight: '16px', fontSize: '1.2rem' }}>📄</span> Documents
-          </div>
-          <div style={{ padding: '12px 20px', margin: '4px 16px', color: '#64748b', fontWeight: '600', fontSize: '0.95rem', display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-            <span style={{ marginRight: '16px', fontSize: '1.2rem' }}>⚙</span> Setting
-          </div>
         </nav>
 
-        {/* Logout */}
-        <div style={{ padding: '20px' }}>
-          <button onClick={handleLogout} style={{ 
-            width: '100%', 
-            padding: '12px', 
-            borderRadius: '12px', 
-            backgroundColor: '#f1f5f9', 
-            color: '#1a1a1a', 
-            border: 'none', 
-            fontWeight: '600', 
-            fontSize: '0.95rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer'
-          }}>
-            <span style={{ marginRight: '10px' }}>↪</span> Logout
+        {/* Footer */}
+        <div className="p-4 border-t border-slate-50 space-y-3">
+          <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 rounded-xl">
+            <div className="w-8 h-8 rounded-full bg-medigo-blue text-white flex items-center justify-center text-xs font-black shrink-0">
+              {user?.name?.[0]?.toUpperCase()}
+            </div>
+            <div className="overflow-hidden">
+              <p className="text-xs font-black text-medigo-navy truncate leading-none">
+                {user?.name}
+              </p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                {user?.role === 'superadmin' ? 'Super Admin' : 'Admin'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-500 hover:bg-red-50 hover:text-red-500 transition-all"
+          >
+            <LogOut size={16} /> Logout
           </button>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '16px' }}>
-        {/* Header Bar */}
-        <header style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          marginBottom: '20px',
-          padding: '10px 20px',
-          backgroundColor: '#ffffff',
-          borderRadius: '16px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.02)'
-        }}>
-          {/* Search */}
-          <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: '12px', padding: '8px 16px', width: '300px' }}>
-            <span style={{ color: '#94a3b8', marginRight: '10px' }}>🔍</span>
-            <input type="text" placeholder="Search..." style={{ border: 'none', backgroundColor: 'transparent', outline: 'none', width: '100%', color: '#1e293b' }} />
+      {/* ── Main Content ── */}
+      <div className="flex-1 flex flex-col min-w-0">
+
+        {/* Header */}
+        <header className="h-16 bg-white border-b border-slate-100 sticky top-0 z-30 flex items-center justify-between px-6">
+          <div className="flex items-center gap-3 flex-1 max-w-sm">
+            <Search size={16} className="text-slate-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Search..."
+              className="w-full bg-transparent outline-none text-sm font-medium text-medigo-navy placeholder:text-slate-300"
+            />
           </div>
 
-          {/* Right Header Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <button style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#f8fafc', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', cursor: 'pointer', color: '#64748b' }}>
-              🔔
+          <div className="flex items-center gap-3">
+            <button className="relative w-9 h-9 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-slate-400 hover:text-medigo-blue transition-colors">
+              <Bell size={17} />
+              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full" />
             </button>
-            <button style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#f8fafc', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', cursor: 'pointer', color: '#64748b' }}>
-              ⚙
-            </button>
-            <Link 
+            <Link
               to="/admin/profile"
-              style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#1a1a1a', padding: '6px 16px 6px 6px', borderRadius: '99px', color: 'white', cursor: 'pointer', transition: 'all 0.2s ease' }}
-              onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-              onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              className="flex items-center gap-2 bg-medigo-navy text-white px-3 py-1.5 rounded-xl hover:bg-slate-800 transition-colors"
             >
-              <div style={{ width: '30px', height: '30px', borderRadius: '50%', backgroundColor: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.8rem' }}>
+              <div className="w-6 h-6 rounded-full bg-medigo-blue flex items-center justify-center text-[10px] font-black">
                 {user?.name?.[0]?.toUpperCase()}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: '600', lineHeight: 1.2 }}>{user?.name || "Admin"}</span>
-                <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>
+              <div className="hidden sm:block">
+                <p className="text-xs font-black leading-none">{user?.name}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">
                   {user?.role === 'superadmin' ? 'System Super Admin' : 'System Admin'}
-                </span>
+                </p>
               </div>
             </Link>
           </div>
         </header>
 
-        {/* Page Content Outlet */}
-        <main style={{ flex: 1, overflowY: 'auto' }}>
+        {/* Page Content */}
+        <main className="flex-1 p-6 overflow-y-auto">
           <Outlet />
         </main>
       </div>
     </div>
-  );
+  )
 }

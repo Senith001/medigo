@@ -27,7 +27,7 @@ export const loginAdmin = async (req, res) => {
     }
 
     const adminCheck = await Admin.findOne({ email: email.toLowerCase() });
-    
+
     if (!adminCheck) {
       return res.status(403).json({
         success: false,
@@ -92,8 +92,8 @@ export const bootstrapSuperAdmin = async (req, res) => {
       data: superadmin
     });
   } catch (error) {
-      return res.status(500).json({ success: false, message: error.message });
-    }
+    return res.status(500).json({ success: false, message: error.message });
+  }
 };
 
 export const createAdmin = async (req, res) => {
@@ -159,7 +159,7 @@ export const getAdmins = async (req, res) => {
   try {
     // Added the filter to only match documents where role is "admin"
     const admins = await Admin.find({ role: "admin" });
-    
+
     res.status(200).json({
       success: true,
       count: admins.length,
@@ -335,43 +335,71 @@ export const getDoctors = async (req, res) => {
 
 export const updateDoctorStatus = async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status } = req.body
+    console.log("=== updateDoctorStatus ===")
+    console.log("Doctor ID:", req.params.id)
+    console.log("Status:", status)
+    console.log("DOCTOR_SERVICE_URL:", process.env.DOCTOR_SERVICE_URL)
+    console.log("SERVICE_SECRET set?", !!process.env.SERVICE_SECRET)
+
     if (!['pending', 'verified', 'rejected'].includes(status)) {
-      return res.status(400).json({ success: false, message: "Invalid status value. Must be pending, verified, or rejected." });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status."
+      })
     }
 
-    // Step 1: Update the doctor's status in doctor-service
-    const doctorResponse = await httpClient.patch(
-      `${process.env.DOCTOR_SERVICE_URL}/api/doctors/${req.params.id}/status`,
-      { status },
-      internalHeaders  // service secret
-    );
+    let doctorResponse
+    try {
+      doctorResponse = await httpClient.patch(
+        `${process.env.DOCTOR_SERVICE_URL}/api/doctors/${req.params.id}/status`,
+        { status },
+        internalHeaders
+      )
+      console.log("Doctor-service response:", JSON.stringify(doctorResponse.data))
+    } catch (doctorErr) {
+      console.error("❌ Doctor-service call failed:")
+      console.error("  Status:", doctorErr.response?.status)
+      console.error("  Message:", doctorErr.response?.data)
+      console.error("  URL:", `${process.env.DOCTOR_SERVICE_URL}/api/doctors/${req.params.id}/status`)
+      return res.status(doctorErr.response?.status || 502).json({
+        success: false,
+        message: doctorErr.response?.data?.message || "Doctor service unreachable."
+      })
+    }
 
-    const doctor = doctorResponse.data?.data;
+    const doctorData = doctorResponse.data?.data?.doctor
+      || doctorResponse.data?.data
+      || doctorResponse.data?.doctor
+      || doctorResponse.data
+    const authUserId = doctorData?.authUserId || req.params.id
+    console.log("Doctor data:", doctorData)
+    console.log("authUserId:", authUserId)
 
-    // Step 2: Sync isVerified in auth-service and fire email
-    // Only act on terminal states
     if (status === 'verified' || status === 'rejected') {
       try {
         await httpClient.patch(
-          `${process.env.AUTH_SERVICE_URL}/api/auth/internal/doctors/${doctor?.authUserId || req.params.id}/verify`,
+          `${process.env.AUTH_SERVICE_URL}/api/auth/internal/doctors/${authUserId}/verify`,
           { approve: status === 'verified' },
           internalHeaders
-        );
+        )
+        console.log("✅ Auth-service sync success")
       } catch (authErr) {
-        console.error("Failed to sync doctor verification in auth-service:", authErr.message);
-        // Non-fatal — status is updated in doctor-service, admin can retry
+        console.error("⚠️ Auth-service sync failed (non-fatal):", authErr.message)
       }
     }
 
-    res.status(200).json(doctorResponse.data);
+    res.status(200).json(doctorResponse.data)
+
   } catch (error) {
-    res.status(error.response?.status || 500).json({
+    console.error("❌ updateDoctorStatus crash:", error.message)
+    console.error(error.stack)
+    res.status(500).json({
       success: false,
-      message: error.response?.data?.message || "Failed to update doctor status"
-    });
+      message: error.message || "Failed to update doctor status"
+    })
   }
-};
+}
 
 // ==========================================
 // DELETION ORCHESTRATORS

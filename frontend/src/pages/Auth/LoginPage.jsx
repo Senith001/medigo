@@ -12,35 +12,45 @@ export default function LoginPage() {
   const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   const navigate = useNavigate();
   const { login } = useAuth();
 
   const handleChange = (e) => setCredentials({ ...credentials, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+    e.preventDefault()
+    setError('')
+    setLoading(true)
 
     try {
-      const res = await authAPI.login(credentials);
-      login(res.data.token, res.data.data);
-      
-      const role = res.data.data?.role;
-      if (role === 'doctor') navigate('/doctor');
-      else if (['admin', 'superadmin'].includes(role)) navigate('/admin');
-      else navigate('/dashboard');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email or password. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+      const res = await authAPI.login(credentials)
+      const data = res.data.data
+      const tok = res.data.token
 
+
+      login(tok, data)
+
+
+      await new Promise(r => setTimeout(r, 50))
+
+      const role = data?.role
+      if (role === 'doctor') {
+        navigate('/doctor', { replace: true })
+      } else if (['admin', 'superadmin'].includes(role)) {
+        navigate('/admin', { replace: true })
+      } else {
+        navigate('/dashboard', { replace: true })
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Invalid email or password.')
+    } finally {
+      setLoading(false)
+    }
+  }
   return (
-    <AuthLayout 
-      title="Welcome Back" 
+    <AuthLayout
+      title="Welcome Back"
       subtitle="Sign in to your account to manage your health and consultations."
       image="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1600&q=80&fit=crop"
     >
@@ -51,7 +61,7 @@ export default function LoginPage() {
       >
         <form onSubmit={handleSubmit} className="space-y-5">
           {error && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               className="p-4 bg-red-50 border border-red-100 rounded-xl flex gap-3 text-red-600"
@@ -61,15 +71,15 @@ export default function LoginPage() {
             </motion.div>
           )}
 
-          <Input 
-            label="Email Address" 
-            name="email" 
-            type="email" 
-            placeholder="name@example.com" 
-            icon={Mail} 
+          <Input
+            label="Email Address"
+            name="email"
+            type="email"
+            placeholder="name@example.com"
+            icon={Mail}
             value={credentials.email}
             onChange={handleChange}
-            required 
+            required
           />
 
           <div className="space-y-1">
@@ -81,27 +91,27 @@ export default function LoginPage() {
                 Forgot password?
               </Link>
             </div>
-            <Input 
-              name="password" 
-              type="password" 
-              placeholder="••••••••" 
-              icon={Lock} 
+            <Input
+              name="password"
+              type="password"
+              placeholder="••••••••"
+              icon={Lock}
               value={credentials.password}
               onChange={handleChange}
-              required 
+              required
             />
           </div>
 
           <div className="flex items-center gap-2 px-1">
-             <input type="checkbox" id="remember" className="w-4 h-4 rounded border-slate-300 text-medigo-blue focus:ring-medigo-blue" />
-             <label htmlFor="remember" className="text-sm text-slate-500 font-medium cursor-pointer select-none">
-                Stay signed in for 30 days
-             </label>
+            <input type="checkbox" id="remember" className="w-4 h-4 rounded border-slate-300 text-medigo-blue focus:ring-medigo-blue" />
+            <label htmlFor="remember" className="text-sm text-slate-500 font-medium cursor-pointer select-none">
+              Stay signed in for 30 days
+            </label>
           </div>
 
-          <Button 
-            type="submit" 
-            className="w-full h-12" 
+          <Button
+            type="submit"
+            className="w-full h-12"
             loading={loading}
           >
             <LogIn size={18} className="mr-2" />
@@ -116,11 +126,11 @@ export default function LoginPage() {
               Create a patient account <ChevronRight size={16} />
             </Link>
           </p>
-          
+
           <div className="mt-4">
-             <Link to="/doctor-register" className="text-xs text-slate-400 font-bold hover:text-slate-600 transition-colors uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-full">
-               Are you a doctor? Join our network
-             </Link>
+            <Link to="/doctor-register" className="text-xs text-slate-400 font-bold hover:text-slate-600 transition-colors uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-full">
+              Are you a doctor? Join our network
+            </Link>
           </div>
         </div>
       </motion.div>
