@@ -40,17 +40,21 @@ export default function Telemedicine() {
   const fetchTeleAppointments = async () => {
     try {
       setLoading(true)
+      console.log('Fetching telemedicine sessions. User role:', user?.role, 'User ID:', user?.id)
       const res = await telemedicineAPI.getAll()
 
+      console.log('API response:', res.data)
       if (res.data?.sessions) {
         const tele = res.data.sessions
           .sort((a, b) => new Date(a.scheduledAt || a.createdAt) - new Date(b.scheduledAt || b.createdAt))
+        console.log('Sessions loaded:', tele.length)
         setAppointments(tele)
       } else {
+        console.log('No sessions in response')
         setAppointments([])
       }
     } catch (err) {
-      console.error(err)
+      console.error('Fetch error:', err)
       setAppointments([])
     } finally {
       setLoading(false)
@@ -100,7 +104,9 @@ export default function Telemedicine() {
             </div>
             <h1 className="text-3xl font-black text-medigo-navy tracking-tight uppercase italic">Tele<span className="text-medigo-blue">medicine</span></h1>
           </div>
-          <p className="text-slate-500 font-medium italic">Video consultations with your doctors</p>
+          <p className="text-slate-500 font-medium italic">
+            {isDoctor ? 'Manage your upcoming consultation sessions' : 'Video consultations with your doctors'}
+          </p>
         </div>
 
         {/* Live Session Alert */}
@@ -152,9 +158,15 @@ export default function Telemedicine() {
               </div>
               <div className="space-y-2">
                 <h3 className="text-xl font-black text-medigo-navy uppercase italic">No Virtual Sessions Scheduled</h3>
-                <p className="text-slate-400 font-medium max-w-sm mx-auto italic">Start a digital consultation by selecting the Telemedicine option when booking a specialist.</p>
+                <p className="text-slate-400 font-medium max-w-sm mx-auto italic">
+                  {isDoctor 
+                    ? 'You have no upcoming consultation sessions. Patients will see your availability and book with you.' 
+                    : 'Start a digital consultation by selecting the Telemedicine option when booking a specialist.'}
+                </p>
               </div>
-              <Button onClick={() => navigate('/search')} variant="outline" className="rounded-2xl h-12">Search Doctors</Button>
+              <Button onClick={() => navigate(isDoctor ? '/doctor/availability' : '/search')} variant="outline" className="rounded-2xl h-12">
+                {isDoctor ? 'Manage Availability' : 'Search Doctors'}
+              </Button>
             </div>
           ) : (
             <div className="grid gap-4">

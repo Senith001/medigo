@@ -113,8 +113,10 @@ export const telemedicineAPI = {
   create: (data) => api.post('/api/telemedicine', data),
   getAll: (params) => api.get('/api/telemedicine', { params }),
   getAllAdmin: (params) => api.get('/api/telemedicine/admin/all', { params }),
+  getById: (id) => api.get(`/api/telemedicine/${id}`),
   getByAppt: (apptId) => api.get(`/api/telemedicine/appointment/${apptId}`),
   join: (id) => api.put(`/api/telemedicine/${id}/join`),
+  getJitsiToken: (id) => api.get(`/api/telemedicine/${id}/jitsi-token`),
   updateStatus: (id, status) => api.put(`/api/telemedicine/${id}/status`, { status })
 }
 

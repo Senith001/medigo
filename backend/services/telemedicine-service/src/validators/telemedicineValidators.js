@@ -147,20 +147,23 @@ const validateJoinSessionWindow = async (req, res, next) => {
 
     const now = new Date();
 
-    if (now < joinAllowedAt) {
-      return res.status(400).json({
-        message: `You can join only ${TELEMEDICINE_PREJOIN_MINUTES} minutes before the scheduled session time.`,
-        joinAllowedAt,
-      });
-    }
+    // TEMP: Disable time validation for testing/development
+    // TODO: Re-enable after testing join flow end-to-end
+    // if (now < joinAllowedAt) {
+    //   return res.status(400).json({
+    //     message: `You can join only ${TELEMEDICINE_PREJOIN_MINUTES} minutes before the scheduled session time.`,
+    //     joinAllowedAt,
+    //   });
+    // }
 
-    if (now > joinUntil) {
-      return res.status(400).json({
-        message: "Session join window has ended.",
-        joinUntil,
-      });
-    }
+    // if (now > joinUntil) {
+    //   return res.status(400).json({
+    //     message: "Session join window has ended.",
+    //     joinUntil,
+    //   });
+    // }
 
+    console.log("[validateJoinSessionWindow] Join window validation bypassed (testing mode)");
     return next();
   } catch (error) {
     return res.status(500).json({

@@ -24,6 +24,7 @@ import {
   deleteSession,
   syncAppointmentUpdate,
 } from "../controllers/telemedicineController.js";
+import { getJitsiToken } from "../controllers/telemedicineController.js";
 import { protect, authorize } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -113,6 +114,16 @@ router.put(
   validateObjectId("id"),
   validateJoinSessionWindow,
   joinSession
+);
+
+// Generate Jitsi JWT token for a session (short lived)
+router.get(
+  "/:id/jitsi-token",
+  protect,
+  authorize("patient", "doctor", "admin"),
+  sessionIdValidation,
+  validateObjectId("id"),
+  getJitsiToken
 );
 
 // Update basic session details before the session starts.

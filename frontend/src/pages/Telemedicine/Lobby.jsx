@@ -18,6 +18,7 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { telemedicineAPI, appointmentAPI } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 import Button from "../../components/ui/Button";
 
 const formatSessionTime = (scheduledAt) => {
@@ -38,6 +39,7 @@ const formatSessionTime = (scheduledAt) => {
 const Lobby = () => {
   const { appointmentId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [session, setSession] = useState(null);
   const [appointment, setAppointment] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -50,8 +52,6 @@ const Lobby = () => {
   useEffect(() => {
     const initLobby = async () => {
       try {
-        const user = JSON.parse(localStorage.getItem("user") || "{}");
-
         try {
           const { data: tele } = await telemedicineAPI.getByAppt(appointmentId);
           setSession(tele);
@@ -60,7 +60,7 @@ const Lobby = () => {
           const { data: appt } = await appointmentAPI.getById(appointmentId);
           setAppointment(appt);
 
-          if (user.role === "doctor") {
+          if (user?.role === "doctor") {
             const { data: newSession } = await telemedicineAPI.create({
               appointmentId: appt._id
             });
@@ -85,9 +85,12 @@ const Lobby = () => {
 
   const handleJoin = async () => {
     try {
-      await telemedicineAPI.join(session._id);
+      console.log("[Lobby] handleJoin: Attempting to join session", session._id);
+      const response = await telemedicineAPI.join(session._id);
+      console.log("[Lobby] handleJoin: Join successful", response.data);
       navigate(`/telemedicine/room/${session._id}`);
     } catch (err) {
+      console.error("[Lobby] handleJoin: Join failed", err?.response?.data || err?.message);
       setError("Failed to join the room. Please try again.");
     }
   };
@@ -99,11 +102,14 @@ const Lobby = () => {
     </div>
   );
 
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  console.log("[Lobby] User object:", user);
+  console.log("[Lobby] User role:", user?.role);
   const doctorName = session?.doctorName || appointment?.doctorName;
   const patientName = session?.patientName || appointment?.patientName;
   const sessionTime =
     formatSessionTime(session?.scheduledAt) || appointment?.timeSlot || "scheduled time";
+  const isDoctor = user?.role === "doctor";
+  console.log("[Lobby] isDoctor:", isDoctor);
 
   return (
     <div className="min-h-screen bg-slate-950 text-white font-inter flex flex-col items-center justify-center p-6 relative overflow-hidden">
@@ -225,7 +231,15 @@ const Lobby = () => {
               <div className="space-y-4">
                  <h1 className="text-5xl font-black tracking-tighter leading-none italic uppercase">Virtual Consultation</h1>
                  <p className="text-slate-400 text-lg font-medium leading-relaxed max-w-md">
-                    Dr. <span className="text-white font-bold">{doctorName}</span> is ready for your <span className="text-white font-bold">{sessionTime}</span> session. Join now to enter the secure diagnostic room.
+                    {isDoctor ? (
+                      <>
+                        You are the provider for this consultation with <span className="text-white font-bold">{patientName}</span> at <span className="text-white font-bold">{sessionTime}</span>. Join now to enter the secure diagnostic room.
+                      </>
+                    ) : (
+                      <>
+                        Dr. <span className="text-white font-bold">{doctorName}</span> is ready for your <span className="text-white font-bold">{sessionTime}</span> session. Join now to enter the secure diagnostic room.
+                      </>
+                    )}
                  </p>
               </div>
            </div>
@@ -243,7 +257,9 @@ const Lobby = () => {
                  </div>
                  <div className="space-y-1">
                     <p className="text-sm font-black uppercase tracking-widest leading-none">Safe-Room Active</p>
-                    <p className="text-xs text-slate-500 font-bold leading-none">2 Participants Expected</p>
+                    <p className="text-xs text-slate-500 font-bold leading-none">
+                      {isDoctor ? "1 Patient Expected" : "2 Participants Expected"}
+                    </p>
                  </div>
               </div>
               <CheckCircle2 size={24} className="text-emerald-500" />
