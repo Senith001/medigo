@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import {
   Users, Calendar, Clock, Video,
   CheckCircle2, XCircle, FileText, CheckCircle,
-  ClipboardList, AlertCircle, CalendarDays,
-  Stethoscope, MessageSquare, ShieldCheck, Mail, X, RefreshCw
+  ClipboardList, AlertCircle, CalendarDays, MapPin, Building2,
+  Stethoscope, MessageSquare, ShieldCheck, Mail, X, RefreshCw,
+  ChevronRight, Pill, Download, Plus
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../context/AuthContext'
-import { appointmentAPI } from '../../services/api'
+import { appointmentAPI, reportAPI, prescriptionAPI } from '../../services/api'
 import DashboardLayout from '../../components/DashboardLayout'
 import Button from '../../components/ui/Button'
 
@@ -22,6 +23,35 @@ export default function DoctorAppointments() {
   // Tabs: 'today', 'upcoming', 'past'
   const [tab, setTab] = useState('today')
   const [selectedAppt, setSelectedAppt] = useState(null)
+  const [history, setHistory] = useState({ reports: [], prescriptions: [] })
+  const [loadingHistory, setLoadingHistory] = useState(false)
+
+  const fetchHistory = async (patientId) => {
+    if (!patientId) return
+    setLoadingHistory(true)
+    try {
+      const [repRes, preRes] = await Promise.all([
+        reportAPI.getByPatient(patientId),
+        prescriptionAPI.getByPatient(patientId)
+      ])
+      setHistory({
+        reports: repRes.data.data || [],
+        prescriptions: preRes.data.data || []
+      })
+    } catch (err) {
+      console.error("Failed to fetch history:", err)
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+
+  useEffect(() => {
+    if (selectedAppt) {
+      fetchHistory(selectedAppt.patientId)
+    } else {
+      setHistory({ reports: [], prescriptions: [] })
+    }
+  }, [selectedAppt])
 
   const fetchApts = async () => {
     setLoading(true)
@@ -59,9 +89,17 @@ export default function DoctorAppointments() {
       const aptDate = new Date(a.appointmentDate)
       aptDate.setHours(0, 0, 0, 0)
       
-      if (tab === 'today') return aptDate.getTime() === today.getTime()
-      if (tab === 'upcoming') return aptDate.getTime() > today.getTime()
-      if (tab === 'past') return aptDate.getTime() < today.getTime()
+      const isCancelled = a.status === 'cancelled' || a.status === 'no-show';
+
+      if (tab === 'today') {
+        return aptDate.getTime() === today.getTime() && !isCancelled;
+      }
+      if (tab === 'upcoming') {
+        return aptDate.getTime() > today.getTime() && !isCancelled;
+      }
+      if (tab === 'past') {
+        return aptDate.getTime() < today.getTime() || (aptDate.getTime() >= today.getTime() && isCancelled);
+      }
       return true
     })
   }
@@ -73,14 +111,19 @@ export default function DoctorAppointments() {
 
     list.forEach(a => {
       const dateKey = new Date(a.appointmentDate).toISOString().split('T')[0]
-      const key = `${dateKey}_${a.timeSlot}_${a.type}`
+      // Use only the START time for grouping to catch overlapping sessions
+      const startTime = (a.timeSlot || '').split('-')[0].trim()
+      const key = `${dateKey}_${startTime}_${a.type}_${a.hospital || ''}`
       if (!groups[key]) {
         groups[key] = {
            id: key,
            date: a.appointmentDate,
-           timeSlot: a.timeSlot,
+           timeSlot: a.timeSlot, // Display the first one found
            type: a.type,
-           appointments: []
+           hospital: a.hospital,
+           location: a.location,
+           appointments: [],
+           totalCapacity: a.maxPatients || 0
         }
       }
       groups[key].appointments.push(a)
@@ -112,174 +155,255 @@ export default function DoctorAppointments() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-7xl mx-auto space-y-8 pb-20"
+        className="max-w-7xl mx-auto space-y-12 pb-20"
       >
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
-            <h1 className="text-3xl font-black text-medigo-navy tracking-tight">Consultations</h1>
-            <p className="text-slate-500 font-medium">Manage your daily clinic and virtual sessions.</p>
+            <div className="flex items-center gap-2 text-medigo-blue mb-2">
+              <ShieldCheck size={18} className="animate-pulse" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em]">Medical Verified</span>
+            </div>
+            <h1 className="text-4xl font-black text-medigo-navy tracking-tight leading-none">Consultations</h1>
+            <p className="text-slate-500 font-medium mt-3 max-w-md">Manage your clinical queue and telemedicine sessions with real-time patient tracking.</p>
           </div>
           <div className="flex items-center gap-3">
-             <Button variant="outline" size="sm" onClick={fetchApts} loading={loading}>
-                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Sync
+             <div className="hidden sm:flex flex-col items-end mr-4">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Last Synced</span>
+                <span className="text-xs font-bold text-medigo-navy">{new Date().toLocaleTimeString()}</span>
+             </div>
+             <Button 
+                variant="outline" 
+                size="md" 
+                onClick={fetchApts} 
+                loading={loading}
+                className="bg-white border-slate-200 hover:border-medigo-blue hover:text-medigo-blue shadow-sm rounded-2xl px-6"
+             >
+                <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} /> Sync Data
              </Button>
           </div>
         </div>
 
-        {/* Custom Tabs */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-2 inline-flex shadow-sm">
-           {['today', 'upcoming', 'past'].map((t) => (
-             <button
-               key={t}
-               onClick={() => setTab(t)}
-               className={`px-8 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
-                 tab === t
-                   ? 'bg-medigo-navy text-white shadow-md'
-                   : 'text-slate-400 hover:text-medigo-navy hover:bg-slate-50'
-               }`}
-             >
-               {t}
-             </button>
-           ))}
+        {/* Tab Selection */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/50 p-2 rounded-[2rem] border border-slate-100">
+          <div className="flex items-center gap-1 w-full sm:w-auto p-1 bg-white rounded-2xl shadow-sm border border-slate-100">
+             {[
+               { id: 'today', label: 'Today', icon: CalendarDays },
+               { id: 'upcoming', label: 'Upcoming', icon: Calendar },
+               { id: 'past', label: 'History', icon: Clock }
+             ].map((t) => (
+               <button
+                 key={t.id}
+                 onClick={() => setTab(t.id)}
+                 className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
+                   tab === t.id
+                     ? 'bg-medigo-navy text-white shadow-lg shadow-medigo-navy/20 scale-[1.02]'
+                     : 'text-slate-400 hover:text-medigo-navy hover:bg-slate-50'
+                 }`}
+               >
+                 <t.icon size={14} />
+                 {t.label}
+               </button>
+             ))}
+          </div>
+          
+          <div className="flex items-center gap-6 px-6">
+             <div className="flex flex-col items-center">
+                <span className="text-[10px] font-black text-slate-400 uppercase">Total Slots</span>
+                <span className="text-lg font-black text-medigo-navy">{appointments.length}</span>
+             </div>
+             <div className="w-px h-8 bg-slate-200" />
+             <div className="flex flex-col items-center">
+                <span className="text-[10px] font-black text-slate-400 uppercase">Active</span>
+                <span className="text-lg font-black text-emerald-600">{appointments.filter(a => a.status === 'confirmed').length}</span>
+             </div>
+          </div>
         </div>
 
         {loading ? (
-           <div className="space-y-6">
+           <div className="grid grid-cols-1 gap-8">
              {[...Array(3)].map((_, i) => (
-                <div key={i} className="bg-white rounded-[2.5rem] p-8 animate-pulse border border-slate-100 shadow-sm h-40" />
+                <div key={i} className="bg-white rounded-[3rem] p-10 animate-pulse border border-slate-100 shadow-premium h-64" />
              ))}
            </div>
         ) : sessions.length === 0 ? (
-           <div className="bg-white rounded-[2.5rem] border border-slate-100 p-20 text-center shadow-sm">
-             <div className="w-24 h-24 bg-slate-50 border border-slate-100 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6">
-                <AlertCircle size={40} className="text-slate-300" />
+           <motion.div 
+             initial={{ opacity: 0, scale: 0.98 }}
+             animate={{ opacity: 1, scale: 1 }}
+             className="bg-white rounded-[3rem] border border-slate-100 p-24 text-center shadow-premium relative overflow-hidden"
+           >
+             <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 rounded-full blur-3xl -mr-32 -mt-32 opacity-50" />
+             <div className="relative z-10">
+                <div className="w-28 h-28 bg-gradient-to-tr from-slate-50 to-slate-100 border border-slate-200 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
+                   <Calendar size={48} className="text-slate-300" />
+                </div>
+                <h3 className="text-3xl font-black text-medigo-navy mb-3 tracking-tight">No {tab} appointments</h3>
+                <p className="text-slate-400 font-medium max-w-sm mx-auto text-lg leading-relaxed">
+                   Your clinical schedule is clear for this period. Enjoy your downtime or sync to refresh.
+                </p>
+                <Button variant="outline" className="mt-8 rounded-2xl px-10 border-slate-200" onClick={fetchApts}>
+                  Refresh Schedule
+                </Button>
              </div>
-             <h3 className="text-2xl font-black text-medigo-navy mb-2">No {tab} sessions</h3>
-             <p className="text-slate-400 font-medium">You don't have any sessions scheduled for this period.</p>
-           </div>
+           </motion.div>
         ) : (
-           <div className="space-y-8">
+           <div className="space-y-12">
               {sessions.map((session, idx) => (
                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.05 }}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: idx * 0.1 }}
                     key={session.id}
-                    className="bg-white rounded-[2.5rem] border border-slate-100 shadow-premium overflow-hidden"
+                    className="bg-white rounded-[3rem] border border-slate-100 shadow-premium overflow-hidden group hover:border-medigo-blue/30 transition-all duration-500"
                  >
-                    {/* Session Header */}
-                    <div className="bg-gradient-to-r from-slate-50 to-white p-6 sm:p-8 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                       <div className="flex items-center gap-6">
-                          <div className={`w-16 h-16 rounded-[1.25rem] flex items-center justify-center border shadow-sm ${session.type === 'telemedicine' ? 'bg-blue-50 text-medigo-blue border-blue-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
-                             {session.type === 'telemedicine' ? <Video size={30} /> : <Stethoscope size={30} />}
+                     {/* Session Hero Header */}
+                    <div className="relative p-8 sm:p-10 flex flex-col md:flex-row md:items-center justify-between gap-8 bg-gradient-to-br from-slate-50/50 to-white">
+                       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-medigo-blue via-indigo-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                       
+                       <div className="flex items-center gap-8 relative z-10">
+                          <div className={`w-20 h-20 rounded-[1.75rem] flex items-center justify-center border-2 shadow-xl transform transition-transform group-hover:scale-105 duration-500 ${
+                            session.type === 'telemedicine' 
+                              ? 'bg-blue-600 text-white border-blue-400' 
+                              : 'bg-emerald-600 text-white border-emerald-400'
+                          }`}>
+                             {session.type === 'telemedicine' ? <Video size={36} /> : <Stethoscope size={36} />}
                           </div>
                           <div>
-                             <h2 className="text-2xl font-black text-medigo-navy tracking-tight flex items-center gap-2">
-                               {new Date(session.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                             <div className="flex items-center gap-3 mb-1.5">
+                                <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.15em] border ${
+                                  session.type === 'telemedicine' 
+                                    ? 'bg-blue-50 text-blue-600 border-blue-100' 
+                                    : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                }`}>
+                                  {session.type === 'telemedicine' ? 'Virtual Session' : 'In-Clinic Clinic'}
+                                </span>
+                                {session.hospital && (
+                                   <span className="px-3 py-1 bg-white border border-slate-100 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest shadow-sm flex items-center gap-1.5">
+                                      <MapPin size={10} className="text-medigo-blue" /> {session.hospital}
+                                   </span>
+                                )}
+                                {tab === 'today' && <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />}
+                             </div>
+                             <h2 className="text-3xl font-black text-medigo-navy tracking-tight">
+                               {new Date(session.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
                              </h2>
-                             <div className="flex items-center gap-4 mt-2">
-                                <span className="flex items-center gap-1.5 text-sm font-bold text-slate-500 uppercase tracking-widest">
+                             <div className="flex flex-wrap items-center gap-5 mt-3">
+                                <span className="flex items-center gap-2 text-[13px] font-black text-slate-500 uppercase tracking-wider bg-slate-100/80 px-4 py-1.5 rounded-xl border border-slate-200/50 shadow-sm">
                                    <Clock size={16} className="text-medigo-blue" /> {session.timeSlot}
                                 </span>
-                                <span className="w-1.5 h-1.5 bg-slate-300 rounded-full" />
-                                <span className="text-sm font-bold text-slate-500 flex items-center gap-1.5">
-                                   <Users size={16} /> {session.appointments.length} Patient{session.appointments.length !== 1 && 's'} Booked
-                                </span>
+                                {session.location && (
+                                   <span className="flex items-center gap-2 text-[11px] font-bold text-slate-400 uppercase tracking-[0.1em]">
+                                      <Building2 size={16} className="text-indigo-400" /> {session.location}
+                                   </span>
+                                )}
+                                <div className="flex -space-x-3 overflow-hidden">
+                                   {session.appointments.slice(0, 3).map((a, i) => (
+                                     <div key={i} className="inline-block h-8 w-8 rounded-full ring-4 ring-white bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-600 border border-indigo-200">
+                                       {a.patientName?.charAt(0)}
+                                     </div>
+                                   ))}
+                                   {session.appointments.length > 3 && (
+                                     <div className="inline-block h-8 w-8 rounded-full ring-4 ring-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500 border border-slate-200">
+                                       +{session.appointments.length - 3}
+                                     </div>
+                                   )}
+                                </div>
                              </div>
                           </div>
                        </div>
+                       
+                       <div className="bg-slate-50/80 border border-slate-100 rounded-[2rem] p-6 flex flex-col items-center min-w-[140px] shadow-inner relative z-10">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Queue Status</span>
+                          <span className="text-3xl font-black text-medigo-navy">{session.appointments.length}</span>
+                          <span className="text-[10px] font-bold text-slate-400">Total Booked</span>
+                       </div>
                     </div>
 
-                    {/* Patient List container */}
-                    <div className="divide-y divide-slate-50">
-                       {session.appointments.map(apt => (
-                          <div key={apt._id} className="p-6 sm:p-8 flex flex-col xl:flex-row items-center gap-6 hover:bg-slate-50/50 transition-colors">
-                             
-                             {/* Patient Info */}
-                             <div className="flex-1 flex items-center gap-5 w-full">
-                                <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-black text-lg shadow-sm shrink-0 cursor-pointer hover:bg-indigo-100 transition-colors" onClick={() => setSelectedAppt(apt)}>
-                                  {apt.patientName?.substring(0, 2).toUpperCase()}
-                                </div>
-                                <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setSelectedAppt(apt)}>
-                                  <div className="flex items-center gap-3">
-                                    {apt.patientNumber && (
-                                      <span className="shrink-0 px-2.5 py-1 rounded-[6px] text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 border border-slate-200 shadow-sm">
-                                        No. {apt.patientNumber}
-                                      </span>
-                                    )}
-                                    <h3 className="text-lg font-black text-medigo-navy truncate">{apt.patientName}</h3>
-                                    <span className={`shrink-0 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-widest border ${getStatusStyle(apt.status)}`}>
-                                      {apt.status}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-3 mt-1.5">
-                                     <p className="text-xs font-bold text-slate-400 truncate">Appt No: #{apt._id.slice(-6).toUpperCase()}</p>
-                                     {apt.reason && (
-                                       <>
-                                         <span className="w-1 h-1 bg-slate-300 rounded-full" />
-                                         <p className="text-xs font-bold text-medigo-blue flex items-center gap-1 truncate">
-                                            <MessageSquare size={12} /> Note Attached
+                    {/* Patient List - More compact and premium */}
+                    <div className="bg-white">
+                       <div className="grid grid-cols-1 divide-y divide-slate-50">
+                          {session.appointments.map((apt, aIdx) => (
+                             <motion.div 
+                                key={apt._id} 
+                                initial={{ opacity: 0 }}
+                                whileInView={{ opacity: 1 }}
+                                transition={{ delay: aIdx * 0.05 }}
+                                className="group/item p-8 sm:px-10 flex flex-col lg:flex-row items-center gap-8 hover:bg-slate-50/70 transition-all duration-300 relative"
+                             >
+                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-12 bg-medigo-blue rounded-r-full opacity-0 group-hover/item:opacity-100 transition-opacity" />
+                                
+                                {/* Patient Info Section */}
+                                <div className="flex-1 flex items-center gap-8 w-full min-w-0">
+                                   <div className="relative shrink-0">
+                                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-slate-50 to-slate-100 border border-slate-200 flex items-center justify-center text-medigo-navy font-black text-xl shadow-sm overflow-hidden group-hover/item:shadow-md transition-all">
+                                         {apt.patientName?.substring(0, 2).toUpperCase()}
+                                         <div className="absolute inset-0 bg-medigo-blue/5 opacity-0 group-hover/item:opacity-100 transition-opacity" />
+                                      </div>
+                                      {apt.patientNumber && (
+                                        <div className="absolute -top-3 -right-3 w-8 h-8 rounded-xl bg-medigo-navy text-white text-[10px] font-black flex items-center justify-center shadow-lg ring-4 ring-white">
+                                          {apt.patientNumber}
+                                        </div>
+                                      )}
+                                   </div>
+
+                                   <div className="min-w-0 flex-1">
+                                      <div className="flex flex-wrap items-center gap-3 mb-2">
+                                         <h3 className="text-xl font-black text-medigo-navy tracking-tight">{apt.patientName}</h3>
+                                         <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border shadow-sm ${getStatusStyle(apt.status)}`}>
+                                            {apt.status}
+                                         </span>
+                                      </div>
+                                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                                         <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                            <ShieldCheck size={14} className="text-indigo-400" /> ID: {apt._id.slice(-6).toUpperCase()}
                                          </p>
-                                       </>
-                                     )}
-                                  </div>
+                                         <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                            <Mail size={14} className="text-indigo-400" /> {apt.patientEmail || 'No Email'}
+                                         </p>
+                                         {apt.reason && (
+                                            <span className="px-3 py-1 bg-blue-50 text-medigo-blue text-[10px] font-black rounded-lg border border-blue-100 flex items-center gap-1.5 animate-pulse">
+                                               <MessageSquare size={12} /> Priority Note
+                                            </span>
+                                         )}
+                                      </div>
+                                   </div>
                                 </div>
-                             </div>
 
-                             {/* Quick Actions explicitly surfaced outside the modal */}
-                             <div className="flex items-center gap-3 w-full xl:w-auto overflow-x-auto pb-2 xl:pb-0 hide-scrollbar">
-                                {apt.status === 'pending' && (
-                                  <>
-                                    <Button 
-                                      variant="outline" 
-                                      className="border-red-200 text-red-600 hover:bg-red-50"
-                                      onClick={() => updateStatus(apt._id, 'cancelled')}
-                                      loading={updating === apt._id}
-                                    >
-                                      Decline
-                                    </Button>
-                                    <Button 
-                                      className="bg-emerald-500 hover:bg-emerald-600 text-white border-0"
-                                      onClick={() => updateStatus(apt._id, 'confirmed')}
-                                      loading={updating === apt._id}
-                                    >
-                                      <CheckCircle2 size={16} className="mr-1.5" /> Accept
-                                    </Button>
-                                  </>
-                                )}
+                                {/* Actions Section */}
+                                <div className="flex items-center gap-3 shrink-0 w-full lg:w-auto">
+                                   {apt.status === 'confirmed' && (
+                                     <>
+                                       {apt.type === 'telemedicine' && (
+                                         <Button 
+                                           className="flex-1 lg:flex-none h-12 rounded-xl bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/20 px-8"
+                                           onClick={() => navigate(`/telemedicine/lobby/${apt._id}`)}
+                                         >
+                                           <Video size={18} className="mr-2" /> Start Session
+                                         </Button>
+                                       )}
+                                       <Button 
+                                         variant="outline"
+                                         className="flex-1 lg:flex-none h-12 rounded-xl text-emerald-600 border-emerald-200 hover:bg-emerald-50 px-8"
+                                         onClick={() => updateStatus(apt._id, 'completed')}
+                                         loading={updating === apt._id}
+                                       >
+                                         <CheckCircle size={18} className="mr-2" /> Finish
+                                       </Button>
+                                     </>
+                                   )}
 
-                                {apt.status === 'confirmed' && (
-                                  <>
-                                    {apt.type === 'telemedicine' && (
-                                      <Button 
-                                        className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/30"
-                                        onClick={() => navigate(`/telemedicine/lobby/${apt._id}`)}
-                                      >
-                                        <Video size={16} className="mr-1.5" /> Join Video
-                                      </Button>
-                                    )}
-                                    <Button 
-                                      variant="outline"
-                                      className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                                      onClick={() => updateStatus(apt._id, 'completed')}
-                                      loading={updating === apt._id}
-                                    >
-                                      Mark Completed
-                                    </Button>
-                                  </>
-                                )}
-
-                                <Button 
-                                  variant="outline"
-                                  className="text-slate-500 hover:text-medigo-navy"
-                                  onClick={() => setSelectedAppt(apt)}
-                                >
-                                  Details
-                                </Button>
-                             </div>
-                          </div>
-                       ))}
+                                   <Button 
+                                     variant="outline"
+                                     className="flex-1 lg:flex-none h-12 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 px-8"
+                                     onClick={() => setSelectedAppt(apt)}
+                                   >
+                                     View Details
+                                   </Button>
+                                </div>
+                             </motion.div>
+                          ))}
+                       </div>
                     </div>
                  </motion.div>
               ))}
@@ -377,6 +501,67 @@ export default function DoctorAppointments() {
                     <p className="text-sm font-bold text-medigo-navy break-all">{selectedAppt.patientEmail || 'N/A'}</p>
                   </div>
                 </div>
+
+                {/* ── Patient History Section ── */}
+                <div className="space-y-6 pt-4 border-t border-slate-100">
+                   <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-black text-medigo-navy uppercase tracking-widest">Patient Medical Records</h3>
+                      <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
+                         {history.reports.length + history.prescriptions.length} Total Records
+                      </span>
+                   </div>
+
+                   {loadingHistory ? (
+                      <div className="flex items-center justify-center py-10">
+                         <RefreshCw size={24} className="text-medigo-blue animate-spin" />
+                      </div>
+                   ) : (history.reports.length === 0 && history.prescriptions.length === 0) ? (
+                      <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-8 text-center">
+                         <FileText size={32} className="text-slate-300 mx-auto mb-3" />
+                         <p className="text-sm font-bold text-slate-400 tracking-tight">No previous medical records found for this patient.</p>
+                      </div>
+                   ) : (
+                      <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                         {/* Reports */}
+                         {history.reports.map(report => (
+                            <div key={report._id} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-medigo-blue/30 hover:shadow-sm transition-all group">
+                               <div className="flex items-center gap-4">
+                                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-sm">
+                                     <FileText size={20} />
+                                  </div>
+                                  <div>
+                                     <h4 className="text-sm font-black text-medigo-navy group-hover:text-medigo-blue transition-colors">{report.title}</h4>
+                                     <p className="text-[10px] font-bold text-slate-400 uppercase">{new Date(report.date).toLocaleDateString()}</p>
+                                  </div>
+                               </div>
+                               <a href={`/${report.fileUrl}`} target="_blank" rel="noopener noreferrer">
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full text-slate-400 hover:text-medigo-blue hover:bg-blue-50">
+                                     <Download size={14} />
+                                  </Button>
+                               </a>
+                            </div>
+                         ))}
+
+                         {/* Prescriptions */}
+                         {history.prescriptions.map(prescription => (
+                            <div key={prescription._id} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-emerald-500/30 hover:shadow-sm transition-all group">
+                               <div className="flex items-center gap-4">
+                                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-sm">
+                                     <Pill size={20} />
+                                  </div>
+                                  <div>
+                                     <h4 className="text-sm font-black text-medigo-navy group-hover:text-emerald-600 transition-colors">{prescription.diagnosis || 'Prescription'}</h4>
+                                     <p className="text-[10px] font-bold text-slate-400 uppercase">{new Date(prescription.createdAt).toLocaleDateString()}</p>
+                                  </div>
+                               </div>
+                               <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full text-slate-400 hover:text-emerald-500 hover:bg-emerald-50">
+                                  <ChevronRight size={14} />
+                               </Button>
+                            </div>
+                         ))}
+                      </div>
+                   )}
+                </div>
                 
                 {selectedAppt.status === 'cancelled' && selectedAppt.cancellationReason && (
                   <div className="p-4 bg-red-50 border border-red-100 rounded-2xl">
@@ -387,7 +572,15 @@ export default function DoctorAppointments() {
               </div>
 
               <div className="p-6 border-t border-slate-100 bg-white flex flex-col sm:flex-row gap-3 justify-end">
-                 <Button className="w-full sm:w-auto" onClick={() => setSelectedAppt(null)}>Close Details</Button>
+                 {selectedAppt.status === 'confirmed' && (
+                    <Button 
+                      className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20"
+                      onClick={() => navigate('/doctor/prescriptions', { state: { patientId: selectedAppt.patientId, patientName: selectedAppt.patientName } })}
+                    >
+                       <Plus size={18} className="mr-2" /> Issue Prescription
+                    </Button>
+                 )}
+                 <Button variant="outline" className="w-full sm:w-auto border-slate-200" onClick={() => setSelectedAppt(null)}>Close</Button>
               </div>
             </motion.div>
           </motion.div>

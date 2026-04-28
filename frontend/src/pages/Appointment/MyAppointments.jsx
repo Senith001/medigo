@@ -361,7 +361,7 @@ function AppointmentCard({ appt, index, isPast, onCancel, onShowClinic, onViewDe
                 {appt.doctorName}
               </h3>
               <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${STATUS_STYLES[appt.status] || STATUS_STYLES.pending}`}>
-                {appt.status}
+                {appt.status === 'pending' ? 'Awaiting Payment' : appt.status}
               </span>
             </div>
 
@@ -425,40 +425,55 @@ function AppointmentCard({ appt, index, isPast, onCancel, onShowClinic, onViewDe
 
         {/* Actions */}
         <div className="shrink-0 lg:border-l lg:border-slate-100 lg:pl-7 flex flex-row lg:flex-col items-center gap-2.5 justify-end lg:justify-center lg:min-w-[160px]" onClick={e => e.stopPropagation()}>
-          {!isPast && appt.status === 'confirmed' && (
-            appt.type === 'telemedicine' ? (
-              <Button
-                onClick={() => navigate(`/telemedicine/lobby/${appt._id}`)}
-                className="w-full h-11 text-sm shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"
-              >
-                <Video size={15} /> Join Now
-              </Button>
-            ) : (
-              <Button
-                onClick={() => onShowClinic(appt)}
-                className="w-full h-11 text-sm bg-medigo-navy shadow-lg shadow-slate-500/10 flex items-center justify-center gap-2"
-              >
-                <MapPin size={15} /> Clinic Info
-              </Button>
-            )
-          )}
+          {!isPast && (
+            <div className="flex flex-col gap-2.5 w-full">
+              {/* Primary Action */}
+              {appt.status === 'confirmed' ? (
+                appt.type === 'telemedicine' ? (
+                  <Button
+                    onClick={() => navigate(`/telemedicine/lobby/${appt._id}`)}
+                    className="w-full h-11 text-sm shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"
+                  >
+                    <Video size={15} /> Join Now
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => onShowClinic(appt)}
+                    className="w-full h-11 text-sm bg-medigo-navy shadow-lg shadow-slate-500/10 flex items-center justify-center gap-2"
+                  >
+                    <MapPin size={15} /> Clinic Info
+                  </Button>
+                )
+              ) : (
+                appt.status === 'pending' && ['unpaid', 'processing'].includes(appt.paymentStatus) && (
+                  <Button
+                    onClick={() => navigate(`/payment/${appt._id}`)}
+                    className="w-full h-11 text-sm bg-medigo-blue shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"
+                  >
+                    <CreditCard size={15} /> Pay Now
+                  </Button>
+                )
+              )}
 
-          {!isPast && ['pending', 'confirmed'].includes(appt.status) && (
-            <div className="flex flex-row lg:flex-col gap-2 w-full">
-              <button
-                onClick={() => navigate(`/appointments/${appt._id}/reschedule`)}
-                className="flex-1 lg:w-full h-10 flex items-center justify-center gap-1.5 bg-slate-50 border border-slate-100 rounded-2xl text-[11px] font-black text-slate-500 uppercase tracking-widest hover:bg-white hover:border-medigo-blue hover:text-medigo-blue transition-all"
-              >
-                <RefreshCw size={13} /> Reschedule
-              </button>
-              <button
-                onClick={onCancel}
-                disabled={cancelling}
-                className="flex-1 lg:w-full h-10 flex items-center justify-center gap-1.5 border border-red-100 text-red-400 text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-40"
-              >
-                {cancelling ? <RefreshCw size={13} className="animate-spin" /> : <XCircle size={13} />}
-                Cancel
-              </button>
+              {/* Secondary Actions */}
+              {['pending', 'confirmed'].includes(appt.status) && (
+                <div className="flex flex-row lg:flex-col gap-2 w-full">
+                  <button
+                    onClick={() => navigate(`/appointments/${appt._id}/reschedule`)}
+                    className="flex-1 lg:w-full h-10 flex items-center justify-center gap-1.5 bg-slate-50 border border-slate-100 rounded-2xl text-[11px] font-black text-slate-500 uppercase tracking-widest hover:bg-white hover:border-medigo-blue hover:text-medigo-blue transition-all"
+                  >
+                    <RefreshCw size={13} /> Reschedule
+                  </button>
+                  <button
+                    onClick={onCancel}
+                    disabled={cancelling}
+                    className="flex-1 lg:w-full h-10 flex items-center justify-center gap-1.5 border border-red-100 text-red-400 text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-40"
+                  >
+                    {cancelling ? <RefreshCw size={13} className="animate-spin" /> : <XCircle size={13} />}
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -598,7 +613,7 @@ function AppointmentDetailModal({ appt, onClose }) {
               </div>
             </div>
             <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${statusColors[appt.status] || statusColors.pending}`}>
-              {appt.status}
+              {appt.status === 'pending' ? 'Awaiting Payment' : appt.status}
             </span>
           </div>
         </div>

@@ -16,12 +16,14 @@ import {
   Wallet
 } from "lucide-react";
 import { appointmentAPI, paymentAPI } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 import DashboardLayout from "../../components/DashboardLayout";
 import Button from "../../components/ui/Button";
 
 const PaymentSelector = () => {
   const { appointmentId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [appointment, setAppointment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [method, setMethod] = useState("stripe");
@@ -47,6 +49,29 @@ const PaymentSelector = () => {
     setError(null);
     try {
       if (method === "stripe") {
+        // ── FRONTEND AUTO-RECOVERY ──────────────────────────────────────────
+        // Check if there is an existing pending stripe payment for this appointment.
+        // If yes, cancel it first to avoid 409 error from backend.
+        try {
+          const patientId = user?.id || user?.userId;
+          if (patientId) {
+            const { data: payments } = await paymentAPI.getByPatient(patientId);
+            const existingPending = payments.find(p => 
+              p.appointmentId === appointmentId && 
+              p.paymentMethod === 'stripe' && 
+              p.status === 'pending'
+            );
+            
+            if (existingPending && existingPending.stripeSessionId) {
+              console.log("Found existing pending session, cancelling before retry...");
+              await paymentAPI.cancelSession(existingPending.stripeSessionId);
+            }
+          }
+        } catch (recoveryErr) {
+          console.warn("Auto-recovery check failed, attempting normal flow:", recoveryErr.message);
+        }
+        // ──────────────────────────────────────────────────────────────────
+
         const { data } = await paymentAPI.createSession({
           appointmentId: appointment._id,
           patientId: appointment.patientId,

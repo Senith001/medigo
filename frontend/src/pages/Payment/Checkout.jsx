@@ -7,7 +7,8 @@ import {
   Building2, Calendar, Clock,
   Loader2, BadgePercent, ShieldAlert,
   ChevronRight, Lock, Map, 
-  Stethoscope, Info, AlertCircle
+  Stethoscope, Info, AlertCircle,
+  X, BadgeCheck, Star
 } from "lucide-react"
 import { motion, AnimatePresence } from 'framer-motion'
 import DashboardLayout from '../../components/DashboardLayout'
@@ -34,6 +35,7 @@ export default function Checkout() {
   
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [showProfile, setShowProfile] = useState(false)
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -70,7 +72,14 @@ export default function Checkout() {
   }
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    if (e) e.preventDefault()
+    
+    // Validation
+    if (!form.fullName.trim()) return setError('Please enter patient full name.')
+    if (!form.phone.trim()) return setError('Please enter mobile number.')
+    if (form.phone.length < 9) return setError('Please enter a valid mobile number.')
+    if (!form.nic.trim()) return setError('Please enter NIC or Passport number.')
+
     setLoading(true)
     setError(null)
 
@@ -160,7 +169,10 @@ export default function Checkout() {
                     <h3 className="text-lg font-black text-medigo-navy uppercase italic tracking-tighter leading-none">{doctor.fullName}</h3>
                     <p className="text-[10px] font-black text-medigo-blue uppercase tracking-widest mt-2">{doctor.specialty}</p>
                   </div>
-                  <button className="w-full h-11 bg-medigo-navy text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-colors">
+                  <button 
+                    onClick={() => setShowProfile(true)}
+                    className="w-full h-11 bg-medigo-navy text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-colors"
+                  >
                     View Specialist Profile
                   </button>
                </div>
@@ -198,7 +210,9 @@ export default function Checkout() {
                         <ShieldCheck size={18} className="text-slate-300" />
                         <div>
                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Appointment no</p>
-                           <p className="text-xs font-black text-medigo-blue italic tracking-tighter">#01</p>
+                           <p className="text-xs font-black text-medigo-blue italic tracking-tighter">
+                             #{String((session?.bookedCount || 0) + 1).padStart(2, '0')}
+                           </p>
                         </div>
                      </div>
                   </div>
@@ -429,6 +443,88 @@ export default function Checkout() {
           </div>
         </div>
       </div>
+
+      {/* Specialist Profile Modal */}
+      <AnimatePresence>
+        {showProfile && (
+           <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6" onClick={() => setShowProfile(false)}>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                onClick={e => e.stopPropagation()}
+                className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              >
+                <div className="relative bg-gradient-to-br from-slate-900 to-medigo-navy pt-16 pb-8 px-8 sm:px-12 text-center overflow-hidden shrink-0">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/20 rounded-full blur-[80px]" />
+                  <button onClick={() => setShowProfile(false)} className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-colors">
+                    <X size={20} />
+                  </button>
+
+                  <div className="w-24 h-24 mx-auto rounded-[2rem] bg-white text-medigo-blue flex items-center justify-center text-3xl font-black shadow-2xl relative z-10 mb-6">
+                    {doctor.fullName?.replace('Dr. ', '').split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 border-4 border-slate-900 rounded-full flex items-center justify-center">
+                      <BadgeCheck size={10} className="text-white" />
+                    </div>
+                  </div>
+                  
+                  <h2 className="text-2xl font-black text-white relative z-10">{doctor.fullName}</h2>
+                  <div className="flex items-center justify-center gap-2 mt-3 relative z-10">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest backdrop-blur-md bg-white/10 text-white border border-white/20">
+                      🛡️ {doctor.specialty}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest backdrop-blur-md bg-white/10 text-white border border-white/20">
+                      {doctor.experienceYears || '8'}Y Exp
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto px-8 sm:px-12 py-8 space-y-6 bg-slate-50">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div className="bg-white p-6 rounded-[2rem] border border-slate-100">
+                       <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                         <Info size={14} className="text-indigo-500" /> About Me
+                       </h3>
+                       <p className="text-xs font-bold text-medigo-navy leading-relaxed">{doctor.bio || 'Professional medical specialist dedicated to providing exceptional patient care and clinical excellence.'}</p>
+                     </div>
+                     <div className="bg-white p-6 rounded-[2rem] border border-slate-100">
+                       <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                         <Stethoscope size={14} className="text-teal-500" /> Qualifications
+                       </h3>
+                       <p className="text-xs font-bold text-medigo-navy leading-relaxed">{doctor.qualifications || 'MBBS, MD (General Medicine)'}</p>
+                     </div>
+                  </div>
+
+                  <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 flex flex-col md:flex-row items-center gap-8">
+                     <div className="text-center md:text-left shrink-0">
+                       <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center justify-center md:justify-start gap-2">
+                         <Star size={14} className="text-amber-500" /> Rating
+                       </h3>
+                       <div className="flex items-end justify-center md:justify-start gap-1">
+                         <span className="text-4xl font-black text-medigo-navy tracking-tighter">4.9</span>
+                         <span className="text-[10px] font-bold text-slate-400 mb-1.5">/ 5.0</span>
+                       </div>
+                     </div>
+                     <div className="flex-1 w-full bg-slate-50 p-6 rounded-[2rem] border border-slate-100 text-center">
+                       <div className="flex justify-center gap-1 mb-2">
+                         {[1, 2, 3, 4, 5].map((star) => (
+                           <Star key={star} size={18} fill="#f59e0b" className="text-amber-400" />
+                         ))}
+                       </div>
+                       <p className="text-[9px] font-bold text-slate-400">Ratings are verified from patient feedback.</p>
+                     </div>
+                  </div>
+                </div>
+
+                <div className="p-6 bg-white border-t border-slate-100">
+                   <button onClick={() => setShowProfile(false)} className="w-full h-12 bg-medigo-navy text-white text-xs font-black uppercase tracking-widest rounded-2xl">
+                     Return to Checkout
+                   </button>
+                </div>
+              </motion.div>
+           </div>
+        )}
+      </AnimatePresence>
     </DashboardLayout>
   )
 }

@@ -109,7 +109,8 @@ export const paymentAPI = {
   getAllPayments: (params) => api.get('/api/payments/all', { params }),
   approve: (id) => api.put(`/api/payments/${id}/approve`),
   reject: (id, data) => api.put(`/api/payments/${id}/reject`, data),
-  refund: (id, data) => api.put(`/api/payments/${id}/refund`, data)
+  refund: (id, data) => api.put(`/api/payments/${id}/refund`, data),
+  cancelSession: (sessionId) => api.get('/api/payments/cancel', { params: { session_id: sessionId } }),
 }
 
 export const telemedicineAPI = {

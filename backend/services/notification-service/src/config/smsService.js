@@ -43,7 +43,7 @@ const sendSMS = async (to, body) => {
 // ── SMS Message Builders ───────────────────────────────────────
 
 const buildBookingSMS = (data) =>
-  `Healthcare Platform: Hi ${data.recipientName}, your appointment with ${data.doctorName} on ${new Date(data.appointmentDate).toDateString()} at ${data.timeSlot} is confirmed. ID: ${data.appointmentId}`;
+  `MEDIGO: Hi ${data.recipientName}, your appointment request with ${data.doctorName} on ${new Date(data.appointmentDate).toDateString()} at ${data.timeSlot} is received. ID: ${data.appointmentId.slice(-4).toUpperCase()}`;
 
 const buildCancellationSMS = (data) =>
   `Healthcare Platform: Hi ${data.recipientName}, your appointment on ${new Date(data.appointmentDate).toDateString()} at ${data.timeSlot} has been cancelled. Reason: ${data.cancellationReason}`;
@@ -54,4 +54,18 @@ const buildUpdateSMS = (data) =>
 const buildPaymentSMS = (data) =>
   `MEDIGO: Hi ${data.patientName}, your payment of ${data.currency || 'LKR'} ${data.amount} is confirmed. Appointment with ${data.doctorName} on ${data.appointmentDate ? new Date(data.appointmentDate).toDateString() : 'N/A'} at ${data.timeSlot || 'N/A'}. Invoice: ${data.invoiceNumber || 'N/A'}`;
 
-module.exports = { sendSMS, buildBookingSMS, buildCancellationSMS, buildUpdateSMS, buildPaymentSMS };
+const buildPendingPaymentSMS = (data) =>
+  `MEDIGO: Hi ${data.patientName}, your bank transfer of ${data.currency || 'LKR'} ${data.amount} for appointment with ${data.doctorName} is received and pending verification. Reference: ${data.appointmentId.slice(-4).toUpperCase()}`;
+
+const buildRejectedPaymentSMS = (data) =>
+  `MEDIGO: Hi ${data.patientName}, your payment for appointment with ${data.doctorName} was rejected. Reason: ${data.rejectionReason || 'Verification failed'}`;
+
+module.exports = { 
+  sendSMS, 
+  buildBookingSMS, 
+  buildCancellationSMS, 
+  buildUpdateSMS, 
+  buildPaymentSMS,
+  buildPendingPaymentSMS,
+  buildRejectedPaymentSMS
+};

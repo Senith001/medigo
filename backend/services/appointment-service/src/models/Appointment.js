@@ -107,7 +107,7 @@ appointmentSchema.index({ patientId: 1, appointmentDate: -1 });
 appointmentSchema.index({ doctorId: 1, appointmentDate: 1 });
 appointmentSchema.index({ status: 1 });
 appointmentSchema.index(
-  { appointmentDate: 1, doctorId: 1, timeSlot: 1 },
+  { appointmentDate: 1, doctorId: 1, timeSlot: 1, patientId: 1 },
   { unique: true, partialFilterExpression: { status: { $in: ['pending', 'confirmed'] } } }
 );
 

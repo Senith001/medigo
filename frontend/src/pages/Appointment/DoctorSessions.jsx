@@ -91,7 +91,37 @@ export default function DoctorSessions() {
     const matchesMode = selectedMode === null || mode === 'both' || mode === selectedMode;
 
     return upcoming && matchesHospital && matchesMode;
+  }).sort((a, b) => {
+    // Sort by Date
+    const dateA = new Date(a.date || 0);
+    const dateB = new Date(b.date || 0);
+    if (dateA - dateB !== 0) return dateA - dateB;
+    
+    // Sort by Start Time
+    return parseTime(a.startTime) - parseTime(b.startTime);
   });
+
+  // ✅ MERGE DUPLICATES: Group sessions by Date + StartTime + Hospital
+  const mergedSessions = filteredSessions.reduce((acc, s) => {
+    const dateKey = s.date?.split('T')[0] || s.day;
+    const startTime = (s.startTime || '').trim();
+    const key = `${dateKey}_${startTime}_${s.hospital}`;
+    
+    if (!acc[key]) {
+      acc[key] = { ...s };
+    } else {
+      // If we find a duplicate, sum up the counts
+      acc[key].bookedCount = (acc[key].bookedCount || 0) + (s.bookedCount || 0);
+      acc[key].maxPatients = (acc[key].maxPatients || 0) + (s.maxPatients || 0);
+      // Keep the longer end time if they differ
+      if (parseTime(s.endTime) > parseTime(acc[key].endTime)) {
+        acc[key].endTime = s.endTime;
+      }
+    }
+    return acc;
+  }, {});
+
+  const finalSessions = Object.values(mergedSessions);
 
   // Check if a session has already started (but not ended)
   const hasSessionStarted = (session) => {
@@ -186,10 +216,10 @@ export default function DoctorSessions() {
                
                <div className="w-full mt-6 space-y-4">
                  <div className="flex items-start gap-3 text-left bg-blue-50/50 p-4 rounded-xl border border-blue-100/50">
-                    <Hospital size={18} className="text-medigo-blue shrink-0 mt-0.5" />
+                    <Info size={18} className="text-medigo-blue shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Primary Affiliation</p>
-                      <p className="text-sm font-bold text-medigo-navy leading-snug">{hospitals.length > 1 ? hospitals[1] : (doctor.hospital || 'Private Clinical Practice')}</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">About Me</p>
+                      <p className="text-sm font-bold text-medigo-navy leading-snug">{doctor.bio || 'Dedicated medical specialist committed to providing high-quality healthcare and patient-centered service.'}</p>
                     </div>
                  </div>
                </div>
@@ -318,7 +348,7 @@ export default function DoctorSessions() {
                       ) : (
                         <div className="space-y-4">
                            <AnimatePresence mode="popLayout">
-                             {filteredSessions.map((session, i) => {
+                             {finalSessions.map((session, i) => {
                                const startMins = parseTime(session.startTime);
                                const endMins = parseTime(session.endTime);
                                const totalDuration = endMins - startMins;
@@ -363,7 +393,8 @@ export default function DoctorSessions() {
                                     <div className="flex sm:flex-col items-center sm:items-start gap-4 sm:gap-1 sm:w-32 shrink-0 border-b sm:border-b-0 sm:border-r border-slate-100 pb-4 sm:pb-0 sm:pr-8 mb-4 sm:mb-0">
                                        {(() => {
                                          if (session.date) {
-                                           const [y, m, d] = session.date.split('T')[0].split('-')
+                                           const datePart = session.date.split('T')[0]
+                                           const [y, m, d] = datePart.split('-')
                                            const dt = new Date(y, m - 1, d)
                                            return (
                                               <>
@@ -397,9 +428,14 @@ export default function DoctorSessions() {
                                        </div>
 
                                        <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest mt-2">
-                                          <span className={isTrulyFull ? 'text-red-500' : 'text-medigo-blue'}>{session.bookedCount || 0}</span>
+                                          <span className={isTrulyFull ? 'text-red-500' : 'text-medigo-blue'}>{session.bookedCount || 0} BOOKED</span>
                                           <span className="text-slate-300">/</span>
-                                          <span className="text-slate-400">{dynamicMax} {dynamicMax < maxPossible ? 'Time Limited Slots' : 'Total Slots'}</span>
+                                          <span className="text-slate-400">{maxPossible} TOTAL CAPACITY</span>
+                                          {dynamicMax < maxPossible && !isTrulyFull && (
+                                            <span className="ml-2 text-amber-500 text-[9px] animate-pulse">
+                                              (Time Limited: {dynamicMax} available)
+                                            </span>
+                                          )}
                                        </div>
 
                                        {!isFull && (

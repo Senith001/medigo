@@ -6,6 +6,7 @@ const {
   buildPendingPaymentEmail,
   buildRejectedPaymentEmail
 } = require('../config/emailService');
+const { sendSMS, buildPaymentSMS, buildPendingPaymentSMS, buildRejectedPaymentSMS } = require('../config/smsService');
 
 const sendPaymentNotification = async (req, res) => {
   try {
@@ -31,14 +32,28 @@ const sendPaymentNotification = async (req, res) => {
       console.warn(`Appointment-service unreachable: ${err.message}`);
     }
 
+    // ── Fetch patient details (if phone missing) ──────────────
+    let patientData = {};
+    if (!patientPhone && !appt.patientPhone && appt.patientId) {
+      try {
+        const patRes = await axios.get(
+          `${process.env.PATIENT_SERVICE_URL}/api/patients/${appt.patientId}`,
+          { headers: { 'x-service-secret': process.env.SERVICE_SECRET } }
+        );
+        patientData = patRes.data.data || patRes.data || {};
+      } catch (err) {
+        console.warn(`Patient-service unreachable: ${err.message}`);
+      }
+    }
+
     const appointmentRef = `#APT-${appointmentId.slice(-4).toUpperCase()}`;
 
     const data = {
       appointmentId,
       appointmentRef,
-      patientName: patientName || appt.patientName || 'Patient',
+      patientName: patientName || appt.patientName || patientData.fullName || 'Patient',
       patientEmail,
-      patientPhone: patientPhone || appt.patientPhone || null,
+      patientPhone: patientPhone || appt.patientPhone || patientData.phone || null,
       doctorName: doctorName || appt.doctorName || 'Doctor',
       amount: amount || appt.fee || 0,
       currency: currency || 'LKR',
@@ -46,6 +61,7 @@ const sendPaymentNotification = async (req, res) => {
       // ✅ FIXED: correctly pulled from appointment object
       appointmentDate: appt.appointmentDate || null,
       timeSlot: appt.timeSlot || null,
+      patientNumber: appt.patientNumber || null,
       rejectionReason: req.body.rejectionReason || null,
     };
 
@@ -96,6 +112,58 @@ const sendPaymentNotification = async (req, res) => {
         status: 'failed',
         errorMessage: err.message,
       });
+    }
+
+    // ── Send SMS (if phone exists) ────────────────────────────
+    if (data.patientPhone) {
+      try {
+        // Format phone to E.164 (assume Sri Lanka +94 if no + prefix)
+        let formattedPhone = data.patientPhone.trim();
+        if (!formattedPhone.startsWith('+')) {
+          if (formattedPhone.startsWith('0')) {
+            formattedPhone = formattedPhone.substring(1);
+          }
+          formattedPhone = `+94${formattedPhone}`;
+        }
+
+        let smsBody = null;
+        let smsType = null;
+
+        if (normType === 'paid') {
+          smsBody = buildPaymentSMS(data);
+          smsType = 'payment_success_sms';
+        } else if (normType === 'verification_pending') {
+          smsBody = buildPendingPaymentSMS(data);
+          smsType = 'payment_pending_sms';
+        } else if (normType === 'rejected') {
+          smsBody = buildRejectedPaymentSMS(data);
+          smsType = 'payment_rejected_sms';
+        }
+
+        if (smsBody) {
+          await sendSMS(formattedPhone, smsBody);
+          
+          await Notification.create({
+            appointmentId,
+            recipientPhone: formattedPhone,
+            recipientName: data.patientName,
+            type: smsType,
+            channel: 'sms',
+            status: 'sent',
+          });
+        }
+      } catch (smsErr) {
+        console.error('SMS notification failed:', smsErr.message);
+        await Notification.create({
+          appointmentId,
+          recipientPhone: data.patientPhone,
+          recipientName: data.patientName,
+          type: 'payment_sms_failed',
+          channel: 'sms',
+          status: 'failed',
+          errorMessage: smsErr.message,
+        });
+      }
     }
 
     res.status(200).json({ message: 'Payment notification processed.' });

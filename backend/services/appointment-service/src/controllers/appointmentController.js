@@ -102,7 +102,7 @@ const bookAppointment = async (req, res) => {
       doctorName = doctor.fullName || doctor.name || req.body.doctorName
       doctorEmail = doctor.email || req.body.doctorEmail
       specialty = doctor.specialty || req.body.specialty
-      hospital = doctor.hospital || req.body.hospital || null
+      hospital = doctor.clinicLocation || doctor.hospital || req.body.hospital || null
       fee = doctor.consultationFee || doctor.fee || req.body.fee || 0
     } catch (err) {
       console.warn('Doctor-service unavailable, using request body fallback.')
@@ -143,6 +143,12 @@ const bookAppointment = async (req, res) => {
           // Snapshot position: next patient number after current bookedCount
           patientNumber = (session.bookedCount || 0) + 1
           sessionMaxPatients = session.maxPatients || null
+          // Sync hospital/location metadata
+          if (session.hospital) {
+            hospital = session.location
+              ? `${session.hospital}, ${session.location}`
+              : session.hospital;
+          }
         }
       } catch (err) {
         console.warn('Could not verify session capacity, proceeding anyway.')
@@ -150,16 +156,19 @@ const bookAppointment = async (req, res) => {
     }
 
     // ── Step 2: Conflict check + smart slot logic ─────────────
+    // For multi-patient sessions, we allow multiple appointments with the same doctor/date/time.
+    // We only block if the SAME patient tries to book the same session again.
     const existing = await Appointment.findOne({
       doctorId,
       appointmentDate: new Date(`${appointmentDate}T00:00:00.000Z`),
       timeSlot,
+      patientId, // Only block if it's the SAME patient
       status: { $in: ['pending', 'confirmed'] },
     })
 
     if (existing) {
       // Case 1: Same patient + unpaid → redirect
-      if (existing.patientId === patientId && existing.paymentStatus === 'unpaid') {
+      if (existing.paymentStatus === 'unpaid') {
         return res.status(200).json({
           message: 'Redirecting to your existing pending reservation.',
           appointment: existing,
@@ -167,68 +176,71 @@ const bookAppointment = async (req, res) => {
       }
 
       // Case 2: Same patient + processing → redirect
-      if (existing.patientId === patientId && existing.paymentStatus === 'processing') {
+      if (existing.paymentStatus === 'processing') {
         return res.status(200).json({
           message: 'You already have a pending bank transfer for this slot.',
           appointment: existing,
         })
       }
 
-      // Case 3: Expired unpaid → free slot
-      const ageMs = Date.now() - new Date(existing.createdAt).getTime()
-      const holdMs = (parseInt(process.env.SLOT_HOLD_MINUTES) || 30) * 60 * 1000
-      const isExpired = existing.status === 'pending'
-        && existing.paymentStatus === 'unpaid'
-        && ageMs > holdMs
+      // Case 3: Confirmed or genuinely booked by this same patient
+      return res.status(409).json({
+        message: 'You have already booked an appointment for this time slot.',
+      })
+    }
 
-      if (isExpired) {
-        existing.status = 'cancelled'
-        existing.cancelledBy = 'admin'
-        existing.cancellationReason = 'Auto-cancelled: payment not completed within hold period.'
-        await existing.save()
-        if (existing.sessionId) await updateDoctorSessionOccupancy(existing.sessionId, -1)
-        console.log(`Auto-cancelled expired appointment ${existing._id} — slot freed.`)
+    // Special check for slot expiration (to free up space)
+    // We don't block the new booking here, but we could clean up old ones.
+    // However, the session capacity check (Step 1.5) is the primary source of truth now.
 
-      } else if (existing.paymentStatus === 'processing') {
-        // Case 4: Different patient + processing → block
-        return res.status(409).json({
-          message: 'This slot is held by a pending bank transfer. Please choose another slot.',
-        })
-      } else {
-        // Case 5: Confirmed or genuinely booked → block
-        return res.status(409).json({
-          message: 'This time slot is already booked.',
-        })
+
+
+    // ── Step 3: Atomic Occupancy Update + Appointment Creation ──────
+    // We increment occupancy FIRST to "reserve" the spot.
+    let occupancyUpdated = false;
+    if (sessionId) {
+      try {
+        await updateDoctorSessionOccupancy(sessionId, 1);
+        occupancyUpdated = true;
+      } catch (err) {
+        return res.status(500).json({
+          message: 'Failed to reserve a slot in this session. Please try again.',
+          error: err.message
+        });
       }
     }
 
-    // ── Step 3: Create appointment ────────────────────────────
-    const appointment = await Appointment.create({
-      patientId,
-      patientName,
-      patientEmail,
-      doctorId,
-      doctorName,
-      doctorEmail,
-      specialty,
-      hospital,
-      appointmentDate,
-      timeSlot,
-      type: type || 'telemedicine',
-      reason,
-      fee,
-      sessionId: sessionId || null,
-      patientNumber,
-      maxPatients: sessionMaxPatients,
-    })
-
-    // ── Step 3.5: Increment session occupancy ─────────────────
-    if (sessionId) {
-      await updateDoctorSessionOccupancy(sessionId, 1)
+    let appointment;
+    try {
+      // Now create the appointment
+      appointment = await Appointment.create({
+        patientId,
+        patientName,
+        patientEmail,
+        doctorId,
+        doctorName,
+        doctorEmail,
+        specialty,
+        hospital,
+        appointmentDate,
+        timeSlot,
+        type: type || 'telemedicine',
+        reason,
+        fee,
+        sessionId: sessionId || null,
+        patientNumber,
+        maxPatients: sessionMaxPatients,
+      })
+    } catch (createErr) {
+      // ROLLBACK: If appointment creation fails, decrement occupancy
+      if (occupancyUpdated) {
+        await updateDoctorSessionOccupancy(sessionId, -1);
+      }
+      throw createErr; // Pass to main catch block
     }
 
     // ── Step 4: Publish RabbitMQ event ────────────────────────
-    await publishEvent('appointment.booked', {
+    await publishEvent('appointment.booked.v2', {
       appointmentId: appointment._id,
       patientId,
       patientName,
@@ -243,6 +255,7 @@ const bookAppointment = async (req, res) => {
       appointmentDate,
       timeSlot,
       type: appointment.type,
+      patientNumber: appointment.patientNumber,
     })
 
     res.status(201).json({
@@ -252,7 +265,7 @@ const bookAppointment = async (req, res) => {
 
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(409).json({ message: 'This time slot is already booked.' })
+      return res.status(409).json({ message: 'You have already booked an appointment for this time slot.' })
     }
     console.error('bookAppointment error:', error)
     res.status(500).json({ message: 'Server error while booking appointment.' })
@@ -285,10 +298,14 @@ const getMyAppointments = async (req, res) => {
 
     const skip = (parseInt(page) - 1) * parseInt(limit)
     const total = await Appointment.countDocuments(filter)
+
+    // Default limit increased to 100 to ensure patients see all appointments without manual pagination
+    const finalLimit = req.query.limit ? parseInt(req.query.limit) : 100;
+
     const appointments = await Appointment.find(filter)
-      .sort({ appointmentDate: -1 })
+      .sort({ appointmentDate: 1 }) // Ascending: show nearest appointments first
       .skip(skip)
-      .limit(parseInt(limit))
+      .limit(finalLimit)
 
     res.status(200).json({
       total,
@@ -347,41 +364,78 @@ const modifyAppointment = async (req, res) => {
     const { appointmentDate, timeSlot, reason, sessionId } = req.body
     const dateOrTimeChanged = Boolean(appointmentDate || timeSlot)
 
-    // Handle session occupancy swap if sessionId changed
-    if (sessionId && sessionId !== appointment.sessionId) {
-      // Decrement occupancy for old session
-      if (appointment.sessionId) {
-        await updateDoctorSessionOccupancy(appointment.sessionId, -1)
-      }
-      // Increment occupancy for new session
-      await updateDoctorSessionOccupancy(sessionId, 1)
-      appointment.sessionId = sessionId
-    }
+    let newDate = appointment.appointmentDate
+    let newSlot = appointment.timeSlot
 
+    // ── Step 1: Validations ───────────────────────────────────
     if (appointmentDate || timeSlot) {
-      const newDate = appointmentDate
+      newDate = appointmentDate
         ? new Date(`${appointmentDate}T00:00:00.000Z`)
         : appointment.appointmentDate
-      const newSlot = timeSlot || appointment.timeSlot
+      newSlot = timeSlot || appointment.timeSlot
 
+      // Check for SAME patient conflict
       const conflict = await Appointment.findOne({
         _id: { $ne: appointment._id },
         doctorId: appointment.doctorId,
         appointmentDate: newDate,
         timeSlot: newSlot,
+        patientId: appointment.patientId,
         status: { $in: ['pending', 'confirmed'] },
       })
 
-      if (conflict) return res.status(409).json({ message: 'The new time slot is not available.' })
+      if (conflict) {
+        return res.status(409).json({ message: 'You already have an appointment for this time slot.' })
+      }
 
-      if (appointmentDate) appointment.appointmentDate = newDate
-      if (timeSlot) appointment.timeSlot = newSlot
+      // Check Capacity of new session & Sync Metadata
+      if (sessionId && sessionId !== appointment.sessionId) {
+        try {
+          const availRes = await axios.get(
+            `${process.env.DOCTOR_SERVICE_URL}/api/availability/doctor/${appointment.doctorId}`
+          )
+          const session = availRes.data.data?.find(s => s._id === sessionId)
+          if (session) {
+            if (session.bookedCount >= session.maxPatients) {
+              return res.status(400).json({
+                message: 'The selected target session is already full.',
+              })
+            }
+            // ✅ SYNC METADATA: Update hospital and patient positioning
+            const sessionLoc = session.hospital && session.location
+              ? `${session.hospital}, ${session.location}`
+              : (session.hospital || session.location || appointment.hospital);
+
+            appointment.hospital = sessionLoc;
+            appointment.maxPatients = session.maxPatients;
+            appointment.patientNumber = (session.bookedCount || 0) + 1;
+          }
+        } catch (err) {
+          console.warn('Metadata sync failed during modify, using fallbacks.')
+        }
+      }
     }
 
+    // ── Step 2: Atomic State Updates (Occupancy Swap) ─────────
+    const oldSessionId = appointment.sessionId
+    if (sessionId && sessionId !== oldSessionId) {
+      // Decrement old
+      if (oldSessionId) {
+        await updateDoctorSessionOccupancy(oldSessionId, -1)
+      }
+      // Increment new
+      await updateDoctorSessionOccupancy(sessionId, 1)
+      appointment.sessionId = sessionId
+    }
+
+    // ── Step 3: Save & Notify ────────────────────────────────
+    if (appointmentDate) appointment.appointmentDate = newDate
+    if (timeSlot) appointment.timeSlot = newSlot
     if (reason !== undefined) appointment.reason = reason
+
     await appointment.save()
 
-    await publishEvent('appointment.updated', {
+    await publishEvent('appointment.updated.v2', {
       appointmentId: appointment._id,
       patientEmail: appointment.patientEmail,
       doctorEmail: appointment.doctorEmail,
@@ -441,7 +495,7 @@ const cancelAppointment = async (req, res) => {
       await updateDoctorSessionOccupancy(appointment.sessionId, -1)
     }
 
-    await publishEvent('appointment.cancelled', {
+    await publishEvent('appointment.cancelled.v2', {
       appointmentId: appointment._id,
       patientEmail: appointment.patientEmail,
       doctorEmail: appointment.doctorEmail,
@@ -502,7 +556,7 @@ const updateAppointmentStatus = async (req, res) => {
     await appointment.save()
 
     if (status === 'confirmed') {
-      await publishEvent('appointment.updated', {
+      await publishEvent('appointment.updated.v2', {
         appointmentId: appointment._id,
         patientEmail: appointment.patientEmail,
         doctorEmail: appointment.doctorEmail,
@@ -652,6 +706,20 @@ const updatePaymentStatus = async (req, res) => {
     // ✅ Auto-confirm when payment completed
     if (paymentStatus === 'paid' && appointment.status === 'pending') {
       appointment.status = 'confirmed'
+
+      // Publish event so notification-service sends Confirmation Email
+      await publishEvent('appointment.updated.v2', {
+        appointmentId: appointment._id,
+        patientEmail: appointment.patientEmail,
+        doctorEmail: appointment.doctorEmail,
+        patientName: appointment.patientName,
+        doctorName: appointment.doctorName,
+        hospital: appointment.hospital,
+        appointmentDate: appointment.appointmentDate,
+        timeSlot: appointment.timeSlot,
+        patientNumber: appointment.patientNumber,
+        confirmed: true,
+      })
     }
 
     await appointment.save()

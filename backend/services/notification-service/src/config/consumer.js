@@ -6,6 +6,8 @@ const {
   buildConfirmationEmail,
   buildCancellationEmail,
   buildUpdateEmail,
+  buildDoctorBookingEmail,
+  buildDoctorConfirmationEmail,
 } = require('./emailService');
 const {
   sendSMS,
@@ -39,12 +41,14 @@ const logNotification = async (appointmentId, recipientEmail, recipientName, typ
  */
 const handleAppointmentBooked = async (data) => {
   const recipients = [
-    { name: data.patientName, email: data.patientEmail, phone: data.patientPhone || null },
-    { name: data.doctorName,  email: data.doctorEmail,  phone: data.doctorPhone  || null },
+    { name: data.patientName, email: data.patientEmail, phone: data.patientPhone || null, role: 'patient' },
+    { name: data.doctorName,  email: data.doctorEmail,  phone: data.doctorPhone  || null, role: 'doctor'  },
   ];
 
   for (const recipient of recipients) {
-    const emailPayload = buildBookingEmail({ ...data, recipientName: recipient.name });
+    const emailPayload = recipient.role === 'doctor'
+      ? buildDoctorBookingEmail({ ...data, recipientName: recipient.name })
+      : buildBookingEmail({ ...data, recipientName: recipient.name });
 
     // Email
     try {
@@ -110,9 +114,14 @@ const handleAppointmentUpdated = async (data) => {
   ];
 
   for (const recipient of recipients) {
-    const emailPayload = data.confirmed
-      ? buildConfirmationEmail({ ...data, recipientName: recipient.name })
-      : buildUpdateEmail({ ...data, recipientName: recipient.name });
+    let emailPayload;
+    if (data.confirmed) {
+      emailPayload = recipient.email === data.doctorEmail
+        ? buildDoctorConfirmationEmail({ ...data, recipientName: recipient.name })
+        : buildConfirmationEmail({ ...data, recipientName: recipient.name });
+    } else {
+      emailPayload = buildUpdateEmail({ ...data, recipientName: recipient.name });
+    }
 
     try {
       await sendEmail(recipient.email, emailPayload.subject, emailPayload.html);
@@ -145,14 +154,14 @@ const startConsumer = async () => {
     await channel.assertExchange('appointment_events', 'topic', { durable: true });
 
     const queues = [
-      { name: 'appointment.booked', handler: handleAppointmentBooked },
-      { name: 'appointment.cancelled', handler: handleAppointmentCancelled },
-      { name: 'appointment.updated', handler: handleAppointmentUpdated },
+      { name: 'appointment.booked.v2', handler: handleAppointmentBooked, topic: 'appointment.booked.v2' },
+      { name: 'appointment.cancelled.v2', handler: handleAppointmentCancelled, topic: 'appointment.cancelled.v2' },
+      { name: 'appointment.updated.v2', handler: handleAppointmentUpdated, topic: 'appointment.updated.v2' },
     ];
 
     for (const q of queues) {
       await channel.assertQueue(q.name, { durable: true });
-      await channel.bindQueue(q.name, 'appointment_events', q.name);
+      await channel.bindQueue(q.name, 'appointment_events', q.topic);
 
       channel.consume(q.name, async (msg) => {
         if (!msg) return;

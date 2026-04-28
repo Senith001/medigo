@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Pill, Plus, Trash2, Edit2, X,
@@ -195,6 +196,7 @@ function PrescriptionCard({ rx, onDelete, onEdit }) {
 
 export default function Prescriptions() {
   const { user } = useAuth()
+  const location = useLocation()
   const [prescriptions, setPrescriptions] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -218,7 +220,15 @@ export default function Prescriptions() {
     }
   }
 
-  useEffect(() => { fetchAll() }, [user?.doctorId])
+  useEffect(() => { 
+    fetchAll() 
+    
+    // Check if we came from Appointments with a patient
+    if (location.state?.patientId) {
+       setForm({ ...EMPTY_FORM, patientId: location.state.patientId })
+       setShowForm(true)
+    }
+  }, [user?.doctorId, location.state])
 
   const openCreate = () => {
     setEditTarget(null)

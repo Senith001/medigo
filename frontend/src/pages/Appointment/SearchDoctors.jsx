@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Search, Star, ChevronRight, Stethoscope,
   Loader2, AlertCircle, Video, Building2,
-  Clock, BadgeCheck, SlidersHorizontal, X, Users
+  Clock, BadgeCheck, SlidersHorizontal, X, Users, Info
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import DashboardLayout from '../../components/DashboardLayout'
@@ -458,9 +458,9 @@ function DoctorProfileModal({ doctor, onClose, onBook }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
              <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                 <Building2 size={16} className="text-indigo-500" /> Affiliations
+                 <Info size={16} className="text-indigo-500" /> About Me
                </h3>
-               <p className="text-sm font-bold text-medigo-navy leading-relaxed">{doctor.hospital || 'Private Medical Clinic Facility'}</p>
+               <p className="text-sm font-bold text-medigo-navy leading-relaxed">{doctor.bio || 'Professional medical specialist dedicated to providing exceptional patient care and clinical excellence.'}</p>
              </div>
 
              <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
