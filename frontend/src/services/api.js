@@ -103,12 +103,16 @@ export const paymentAPI = {
   getPendingTransfers: () => api.get('/api/payments/pending-transfers'),
   getAllPayments: (params) => api.get('/api/payments/all', { params }),
   approve: (id) => api.put(`/api/payments/${id}/approve`),
+  // Verify Stripe session (frontend calls backend success endpoint)
+  verifyStripeSession: (sessionId) => api.get('/api/payments/success', { params: { session_id: sessionId } }),
   reject: (id, data) => api.put(`/api/payments/${id}/reject`, data),
   refund: (id, data) => api.put(`/api/payments/${id}/refund`, data)
 }
 
 export const telemedicineAPI = {
   create: (data) => api.post('/api/telemedicine', data),
+  getAll: (params) => api.get('/api/telemedicine', { params }),
+  getAllAdmin: (params) => api.get('/api/telemedicine/admin/all', { params }),
   getByAppt: (apptId) => api.get(`/api/telemedicine/appointment/${apptId}`),
   join: (id) => api.put(`/api/telemedicine/${id}/join`),
   updateStatus: (id, status) => api.put(`/api/telemedicine/${id}/status`, { status })

@@ -466,6 +466,47 @@ const getAllSessions = async (req, res) => {
   }
 };
 
+const getMySessions = async (req, res) => {
+  try {
+    const { status, appointmentId, page = 1, limit = 20 } = req.query;
+    const parsedPage = Math.max(1, parseInt(page, 10) || 1);
+    const parsedLimit = Math.max(1, parseInt(limit, 10) || 20);
+    const skip = (parsedPage - 1) * parsedLimit;
+    const filter = {};
+    const userId = getUserIdentity(req.user);
+
+    if (req.user.role === "patient") {
+      filter.patientId = userId;
+    } else if (req.user.role === "doctor") {
+      filter.doctorId = userId;
+    } else if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied." });
+    }
+
+    if (status) filter.status = status;
+    if (appointmentId) filter.appointmentId = appointmentId;
+
+    const total = await TelemedicineSession.countDocuments(filter);
+    const sessions = await TelemedicineSession.find(filter)
+      .sort({ scheduledAt: 1, createdAt: -1 })
+      .skip(skip)
+      .limit(parsedLimit);
+
+    return res.status(200).json({
+      total,
+      page: parsedPage,
+      totalPages: Math.ceil(total / parsedLimit),
+      sessions: sessions.map(toSessionResponse),
+    });
+  } catch (error) {
+    console.error("getMySessions error:", error.message);
+
+    return res.status(500).json({
+      message: "Server error fetching your telemedicine sessions.",
+    });
+  }
+};
+
 const getSessionById = async (req, res) => {
   try {
     const session = await TelemedicineSession.findById(req.params.id);
@@ -786,6 +827,7 @@ const syncAppointmentUpdate = async (req, res) => {
 export {
   createSession,
   createSessionFromAppointment,
+  getMySessions,
   getAllSessions,
   getSessionById,
   getSessionByAppointmentId,

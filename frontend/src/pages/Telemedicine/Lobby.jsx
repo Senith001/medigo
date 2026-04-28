@@ -20,6 +20,21 @@ import {
 import { telemedicineAPI, appointmentAPI } from "../../services/api";
 import Button from "../../components/ui/Button";
 
+const formatSessionTime = (scheduledAt) => {
+  if (!scheduledAt) return null;
+
+  const date = new Date(scheduledAt);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 const Lobby = () => {
   const { appointmentId } = useParams();
   const navigate = useNavigate();
@@ -35,24 +50,25 @@ const Lobby = () => {
   useEffect(() => {
     const initLobby = async () => {
       try {
-        const { data: appt } = await appointmentAPI.getById(appointmentId);
-        setAppointment(appt);
+        const user = JSON.parse(localStorage.getItem("user") || "{}");
 
         try {
           const { data: tele } = await telemedicineAPI.getByAppt(appointmentId);
           setSession(tele);
+          return;
         } catch (teleErr) {
-          const user = JSON.parse(localStorage.getItem("user") || "{}");
+          const { data: appt } = await appointmentAPI.getById(appointmentId);
+          setAppointment(appt);
+
           if (user.role === "doctor") {
             const { data: newSession } = await telemedicineAPI.create({
-              appointmentId: appt._id,
-              patientId: appt.patientId,
-              patientName: appt.patientName,
-              doctorId: appt.doctorId,
-              doctorName: appt.doctorName,
-              scheduledAt: appt.date + " " + appt.timeSlot
+              appointmentId: appt._id
             });
             setSession(newSession.session);
+          } else if (appt.status !== "confirmed") {
+            setError("Consultation room will open after the appointment is confirmed.");
+          } else if (appt.paymentStatus !== "paid") {
+            setError("Consultation room will open after the payment is completed.");
           } else {
             setError("Consultation room hasn't been opened by the doctor yet.");
           }
@@ -84,6 +100,10 @@ const Lobby = () => {
   );
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const doctorName = session?.doctorName || appointment?.doctorName;
+  const patientName = session?.patientName || appointment?.patientName;
+  const sessionTime =
+    formatSessionTime(session?.scheduledAt) || appointment?.timeSlot || "scheduled time";
 
   return (
     <div className="min-h-screen bg-slate-950 text-white font-inter flex flex-col items-center justify-center p-6 relative overflow-hidden">
@@ -205,7 +225,7 @@ const Lobby = () => {
               <div className="space-y-4">
                  <h1 className="text-5xl font-black tracking-tighter leading-none italic uppercase">Virtual Consultation</h1>
                  <p className="text-slate-400 text-lg font-medium leading-relaxed max-w-md">
-                    Dr. <span className="text-white font-bold">{appointment?.doctorName}</span> is ready for your <span className="text-white font-bold">{appointment?.timeSlot}</span> session. Join now to enter the secure diagnostic room.
+                    Dr. <span className="text-white font-bold">{doctorName}</span> is ready for your <span className="text-white font-bold">{sessionTime}</span> session. Join now to enter the secure diagnostic room.
                  </p>
               </div>
            </div>
@@ -215,10 +235,10 @@ const Lobby = () => {
               <div className="flex items-center gap-6">
                  <div className="flex -space-x-4">
                     <div className="w-14 h-14 rounded-2xl bg-medigo-navy border-4 border-slate-950 flex items-center justify-center font-black shadow-2xl overflow-hidden relative group-hover:-translate-x-2 transition-transform capitalize">
-                       {appointment?.doctorName?.[0]}
+                       {doctorName?.[0]}
                     </div>
                     <div className="w-14 h-14 rounded-2xl bg-medigo-mint border-4 border-slate-950 flex items-center justify-center font-black shadow-2xl overflow-hidden relative group-hover:translate-x-2 transition-transform capitalize">
-                       {appointment?.patientName?.[0]}
+                       {patientName?.[0]}
                     </div>
                  </div>
                  <div className="space-y-1">

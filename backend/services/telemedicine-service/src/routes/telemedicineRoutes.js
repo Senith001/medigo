@@ -14,6 +14,7 @@ import {
 import {
   createSession,
   createSessionFromAppointment,
+  getMySessions,
   getAllSessions,
   getSessionById,
   getSessionByAppointmentId,
@@ -73,6 +74,14 @@ router.get(
   protect,
   authorize("admin"),
   getAllSessions
+);
+
+// Patient/doctor/admin gets sessions from telemedicine DB for the current account.
+router.get(
+  "/",
+  protect,
+  authorize("patient", "doctor", "admin"),
+  getMySessions
 );
 
 // Check whether a session exists for a given appointment.

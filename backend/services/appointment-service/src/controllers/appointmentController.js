@@ -656,6 +656,15 @@ const updatePaymentStatus = async (req, res) => {
 
     await appointment.save()
 
+    // If card/bank verification completes a telemedicine appointment, create the session immediately.
+    if (
+      appointment.type === 'telemedicine' &&
+      appointment.status === 'confirmed' &&
+      appointment.paymentStatus === 'paid'
+    ) {
+      await syncTelemedicineAppointmentConfirmation(appointment)
+    }
+
     res.status(200).json({
       message: `Payment status updated to ${paymentStatus}.`,
       appointment,
