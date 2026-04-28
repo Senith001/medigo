@@ -376,7 +376,7 @@ export const updateDoctorStatus = async (req, res) => {
     console.log("Doctor data:", doctorData)
     console.log("authUserId:", authUserId)
 
-    if (status === 'verified' || status === 'rejected') {
+    if (authUserId) {
       try {
         await httpClient.patch(
           `${process.env.AUTH_SERVICE_URL}/api/auth/internal/doctors/${authUserId}/verify`,

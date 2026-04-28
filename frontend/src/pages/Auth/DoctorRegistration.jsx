@@ -7,10 +7,11 @@ import {
   ChevronRight, ArrowRight, IdCard, BadgeCheck
 } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { doctorAPI } from '../../services/api'
+import { authAPI } from '../../services/api'
 import AuthLayout from '../../components/AuthLayout'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import { Lock } from 'lucide-react'
 
 const SPECIALTIES = [
   'General Medicine', 'Cardiology', 'Dermatology', 'Neurology',
@@ -57,6 +58,12 @@ const validateDoctorForm = (data) => {
     errors.email = 'Email is required'
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())) {
     errors.email = 'Invalid email format'
+  }
+
+  if (!data.password) {
+    errors.password = 'Password is required'
+  } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/.test(data.password)) {
+    errors.password = 'Password must be 8+ chars, with uppercase, lowercase, number and special char'
   }
 
   if (!data.phone.trim()) {
@@ -127,7 +134,8 @@ export default function DoctorRegistration() {
     experienceYears: '',
     clinicLocation: '',
     consultationFee: '',
-    bio: ''
+    bio: '',
+    password: ''
   })
 
   const [fieldErrors, setFieldErrors] = useState({})
@@ -184,7 +192,7 @@ export default function DoctorRegistration() {
     }
 
     try {
-      await doctorAPI.register(payload)
+      await authAPI.registerDoctor(payload)
       setSuccess(true)
       setTimeout(() => navigate('/login'), 5000)
     } catch (err) {
@@ -297,6 +305,22 @@ export default function DoctorRegistration() {
               />
               {shouldShowError('phone') && (
                 <p className="mt-1 text-xs font-medium text-red-500">{fieldErrors.phone}</p>
+              )}
+            </div>
+
+            <div>
+              <Input
+                label="Login Password"
+                type="password"
+                required
+                placeholder="••••••••"
+                icon={Lock}
+                value={form.password}
+                onChange={(e) => handleChange('password', e.target.value)}
+                onBlur={() => handleBlur('password')}
+              />
+              {shouldShowError('password') && (
+                <p className="mt-1 text-xs font-medium text-red-500">{fieldErrors.password}</p>
               )}
             </div>
 
