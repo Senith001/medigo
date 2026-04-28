@@ -1,303 +1,363 @@
 import React, { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  Stethoscope, CheckCircle2, XCircle, Clock, Loader2,
+  Mail, Phone, MapPin, GraduationCap, Briefcase, DollarSign,
+  Copy, Check, ExternalLink, X, RefreshCw, Search,
+  User, ShieldCheck, AlertCircle
+} from 'lucide-react'
 import { adminAPI } from '../../services/api'
+import Button from '../../components/ui/Button'
 
-const STATUS_STYLES = {
-  pending:  { bg: '#fff7ed', color: '#c2410c', activeBg: '#ea580c', label: 'Pending' },
-  verified: { bg: '#f0fdf4', color: '#15803d', activeBg: '#16a34a', label: 'Verified' },
-  rejected: { bg: '#fef2f2', color: '#b91c1c', activeBg: '#dc2626', label: 'Rejected' },
-};
+const STATUS_CONFIG = {
+  pending:  { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-100', label: 'Pending', icon: Clock },
+  verified: { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100', label: 'Verified', icon: CheckCircle2 },
+  rejected: { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-100', label: 'Rejected', icon: XCircle },
+}
 
 export default function DoctorManagement() {
-  const [doctors, setDoctors] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [doctors, setDoctors] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   // Modal state
-  const [selectedDoctor, setSelectedDoctor] = useState(null);
-  const [updatingId, setUpdatingId] = useState(null);
+  const [selectedDoctor, setSelectedDoctor] = useState(null)
+  const [updatingId, setUpdatingId] = useState(null)
 
   const fetchDoctors = async () => {
     try {
-      setLoading(true);
-      const res = await adminAPI.getDoctors();
+      setLoading(true)
+      const res = await adminAPI.getDoctors()
       if (res.data.success) {
-        setDoctors(res.data.data);
+        setDoctors(res.data.data)
       } else {
-        setError('Failed to fetch doctors.');
+        setError('Failed to fetch doctors.')
       }
     } catch (err) {
-      setError('Error loading doctors. ' + (err.response?.data?.message || err.message));
+      setError('Error loading doctors. ' + (err.response?.data?.message || err.message))
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  useEffect(() => { fetchDoctors(); }, []);
+  useEffect(() => { fetchDoctors() }, [])
 
   const handleStatusChange = async (id, newStatus) => {
-    setUpdatingId(id);
+    setUpdatingId(id)
     try {
-      const res = await adminAPI.updateDoctorStatus(id, newStatus);
+      const res = await adminAPI.updateDoctorStatus(id, newStatus)
       if (res.data.success) {
-        setDoctors(prev => prev.map(d => d._id === id ? { ...d, status: newStatus } : d));
+        setDoctors(prev => prev.map(d => d._id === id ? { ...d, status: newStatus } : d))
         if (selectedDoctor?._id === id) {
-          setSelectedDoctor(prev => ({ ...prev, status: newStatus }));
+          setSelectedDoctor(prev => ({ ...prev, status: newStatus }))
         }
       }
     } catch (err) {
-      alert('Failed to update status: ' + (err.response?.data?.message || err.message));
+      alert('Failed to update status: ' + (err.response?.data?.message || err.message))
     } finally {
-      setUpdatingId(null);
+      setUpdatingId(null)
     }
-  };
+  }
+
+  const getStatusBadge = (status) => {
+    const config = STATUS_CONFIG[status] || STATUS_CONFIG.pending
+    const Icon = config.icon
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider ${config.bg} ${config.text} border ${config.border}`}>
+        <Icon size={12} />
+        {config.label}
+      </span>
+    )
+  }
 
   return (
-    <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', minHeight: '100%', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-
+    <div className="max-w-7xl mx-auto space-y-8 pb-20">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 style={{ margin: '0 0 8px 0', color: '#1e293b', fontSize: '1.5rem' }}>Doctor Management</h2>
-          <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>Review and manage doctor verification status.</p>
+          <p className="text-[11px] font-black text-[#008080] uppercase tracking-widest mb-1">Management</p>
+          <h1 className="text-3xl font-black text-medigo-navy tracking-tight">
+            Doctor <span className="text-[#008080]">Management</span>
+          </h1>
+          <p className="text-slate-400 text-sm font-medium mt-1">
+            Review and manage doctor verification status
+          </p>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          {Object.entries(STATUS_STYLES).map(([key, st]) => (
-            <div key={key} style={{ backgroundColor: st.bg, color: st.color, padding: '6px 14px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '700' }}>
-              {st.label}: {doctors.filter(d => d.status === key).length}
-            </div>
-          ))}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={fetchDoctors}
+            className="flex items-center gap-2 px-5 py-3 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-[#008080] hover:border-[#008080]/30 transition-all shadow-sm text-sm font-bold"
+          >
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
         </div>
       </div>
 
+      {/* Status Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {Object.entries(STATUS_CONFIG).map(([key, config], i) => {
+          const Icon = config.icon
+          const count = doctors.filter(d => d.status === key).length
+          return (
+            <motion.div
+              key={key}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className={`bg-white rounded-2xl border ${config.border} p-5 shadow-sm flex items-center justify-between`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl ${config.bg} flex items-center justify-center ${config.text}`}>
+                  <Icon size={20} />
+                </div>
+                <div>
+                  <p className="text-2xl font-black text-medigo-navy">{count}</p>
+                  <p className={`text-[10px] font-black uppercase tracking-wider ${config.text}`}>{config.label}</p>
+                </div>
+              </div>
+            </motion.div>
+          )
+        })}
+      </div>
+
+      {/* Error */}
       {error && (
-        <div style={{ padding: '12px 16px', marginBottom: '20px', backgroundColor: '#fef2f2', color: '#b91c1c', borderRadius: '8px', border: '1px solid #fca5a5' }}>
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-semibold"
+        >
+          <AlertCircle size={18} />
           {error}
-        </div>
+        </motion.div>
       )}
 
-      {loading ? (
-        <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Loading doctors...</div>
-      ) : doctors.length === 0 ? (
-        <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
-          No doctors found in the system.
-        </div>
-      ) : (
-        <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                <th style={th}>Doctor</th>
-                <th style={th}>Specialty</th>
-                <th style={th}>Experience</th>
-                <th style={th}>Fee</th>
-                <th style={th}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {doctors.map(doctor => {
-                const st = STATUS_STYLES[doctor.status] || STATUS_STYLES.pending;
-                return (
+      {/* Doctors Table */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden"
+      >
+        {loading ? (
+          <div className="flex items-center justify-center py-20 text-slate-400">
+            <Loader2 size={32} className="animate-spin text-[#008080] mr-3" />
+            <span className="text-sm font-bold">Loading doctors...</span>
+          </div>
+        ) : doctors.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+            <Stethoscope size={48} className="mb-4 text-slate-200" />
+            <p className="text-sm font-bold">No doctors found in the system.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/60">
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Doctor</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Specialty</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Experience</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Fee</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {doctors.map(doctor => (
                   <tr
                     key={doctor._id}
                     onClick={() => setSelectedDoctor(doctor)}
-                    style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background-color 0.15s ease' }}
-                    onMouseOver={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                    onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    className="hover:bg-slate-50/50 transition-colors cursor-pointer"
                   >
-                    <td style={td}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#e0e7ff', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1rem', flexShrink: 0 }}>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">
                           {doctor.fullName?.[0]?.toUpperCase()}
                         </div>
                         <div>
-                          <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '0.95rem' }}>{doctor.fullName}</div>
-                          <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>{doctor.email}</div>
+                          <p className="text-sm font-black text-medigo-navy">{doctor.fullName}</p>
+                          <p className="text-[10px] text-slate-400">{doctor.email}</p>
                         </div>
                       </div>
                     </td>
-                    <td style={td}>{doctor.specialty}</td>
-                    <td style={td}>{doctor.experienceYears} yr{doctor.experienceYears !== 1 ? 's' : ''}</td>
-                    <td style={td}>${doctor.consultationFee}</td>
-                    <td style={td}>
-                      <span style={{ backgroundColor: st.bg, color: st.color, padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '700' }}>
-                        {st.label}
-                      </span>
-                    </td>
+                    <td className="px-6 py-4 text-sm font-bold text-slate-600">{doctor.specialty}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-slate-500">{doctor.experienceYears} yr{doctor.experienceYears !== 1 ? 's' : ''}</td>
+                    <td className="px-6 py-4 text-sm font-black text-medigo-navy">LKR {doctor.consultationFee}</td>
+                    <td className="px-6 py-4">{getStatusBadge(doctor.status)}</td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </motion.div>
 
       {/* Doctor Detail Modal */}
-      {selectedDoctor && (
-        <div
-          onClick={() => setSelectedDoctor(null)}
-          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
-        >
+      <AnimatePresence>
+        {selectedDoctor && (
           <div
-            onClick={e => e.stopPropagation()}
-            style={{ backgroundColor: '#ffffff', borderRadius: '20px', width: '100%', maxWidth: '750px', maxHeight: '90vh', overflowY: 'auto', padding: '32px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)' }}
+            onClick={() => setSelectedDoctor(null)}
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           >
-            {/* 1. Modal Header & Top Section (Name, ID, Status, Bio) */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
-                <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: '#4f46e5', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', fontWeight: 'bold', flexShrink: 0 }}>
-                  {selectedDoctor.fullName?.[0]?.toUpperCase()}
-                </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-                    <h3 style={{ margin: '0', color: '#0f172a', fontSize: '1.3rem' }}>{selectedDoctor.fullName}</h3>
-                    <span style={{
-                      backgroundColor: STATUS_STYLES[selectedDoctor.status]?.bg,
-                      color: STATUS_STYLES[selectedDoctor.status]?.color,
-                      padding: '3px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '700'
-                    }}>
-                      {STATUS_STYLES[selectedDoctor.status]?.label}
-                    </span>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-white rounded-[2rem] w-full max-w-3xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden"
+            >
+              {/* Modal Header - Fixed */}
+              <div className="p-8 border-b border-slate-100 shrink-0">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-[#008080] text-white flex items-center justify-center text-2xl font-black">
+                      {selectedDoctor.fullName?.[0]?.toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-3 mb-1">
+                        <h3 className="text-xl font-black text-medigo-navy">{selectedDoctor.fullName}</h3>
+                        {getStatusBadge(selectedDoctor.status)}
+                      </div>
+                      <p className="text-sm text-slate-500">ID: {selectedDoctor.userId || selectedDoctor._id}</p>
+                    </div>
                   </div>
-                  <div style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '6px' }}>
-                    <strong>Doctor ID:</strong> {selectedDoctor.userId || selectedDoctor._id}
-                  </div>
-                  {selectedDoctor.bio && (
-                    <p style={{ margin: '8px 0 0 0', fontSize: '0.9rem', color: '#475569', lineHeight: '1.5', fontStyle: 'italic' }}>
-                      "{selectedDoctor.bio}"
-                    </p>
-                  )}
+                  <button
+                    onClick={() => setSelectedDoctor(null)}
+                    className="w-10 h-10 rounded-xl bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-400 transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
                 </div>
-              </div>
-              <button onClick={() => setSelectedDoctor(null)} style={{ background: 'none', border: 'none', fontSize: '1.6rem', color: '#94a3b8', cursor: 'pointer', lineHeight: 1 }}>&times;</button>
-            </div>
-
-            {/* 2. Inline Copyable Fields Row */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', backgroundColor: '#f8fafc', padding: '16px', borderRadius: '12px', marginBottom: '24px', border: '1px solid #e2e8f0' }}>
-              <CopyableField label="Full Name" value={selectedDoctor.fullName} />
-              <CopyableField label="NIC Number" value={selectedDoctor.nicNumber} />
-              <CopyableField label="SLMC License" value={selectedDoctor.medicalLicenseNumber} />
-              <CopyableField label="Specialty" value={selectedDoctor.specialty} />
-              <CopyableField label="Category" value={selectedDoctor.category} />
-            </div>
-
-            {/* 3. Remaining Standard Fields Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-              <ModalField label="Email" value={selectedDoctor.email} />
-              <ModalField label="Phone" value={selectedDoctor.phone} />
-              <ModalField label="Qualifications" value={selectedDoctor.qualifications} />
-              <ModalField label="Experience" value={`${selectedDoctor.experienceYears} years`} />
-              <ModalField label="Consultation Fee" value={`$${selectedDoctor.consultationFee}`} />
-              <ModalField label="Clinic Location" value={selectedDoctor.clinicLocation} />
-              <ModalField label="Registered" value={new Date(selectedDoctor.createdAt).toLocaleDateString()} />
-              <ModalField label="Last Updated" value={new Date(selectedDoctor.updatedAt).toLocaleDateString()} />
-            </div>
-
-            {/* 4. Status Toggle Section & Verification Link */}
-            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Verification Decision
-                </p>
-                <a 
-                  href="https://slmc.gov.lk/en/public/registers" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#4f46e5', textDecoration: 'none', fontSize: '0.85rem', fontWeight: '600' }}
-                >
-                  Verify via Official SLMC Registry
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line>
-                  </svg>
-                </a>
+                {selectedDoctor.bio && (
+                  <p className="mt-4 text-sm text-slate-600 italic bg-slate-50 rounded-xl p-4 border border-slate-100">
+                    "{selectedDoctor.bio}"
+                  </p>
+                )}
               </div>
 
-              <div style={{ display: 'flex', gap: '10px' }}>
-                {Object.entries(STATUS_STYLES)
-                  .filter(([key]) => key !== 'pending')
-                  .map(([key, st]) => {
-                    const isActive = selectedDoctor.status === key;
-                    const isUpdating = updatingId === selectedDoctor._id;
-                    return (
-                      <button
-                        key={key}
-                        disabled={isActive || isUpdating}
-                        onClick={() => handleStatusChange(selectedDoctor._id, key)}
-                        style={{
-                          flex: 1,
-                          padding: '10px',
-                          borderRadius: '10px',
-                          border: `2px solid ${isActive ? st.activeBg : 'transparent'}`,
-                          cursor: isActive || isUpdating ? 'not-allowed' : 'pointer',
-                          fontWeight: '700',
-                          fontSize: '0.9rem',
-                          backgroundColor: isActive ? st.activeBg : st.bg,
-                          color: isActive ? '#ffffff' : st.color,
-                          opacity: !isActive && isUpdating ? 0.5 : 1,
-                          transition: 'all 0.2s ease'
-                        }}
+              {/* Modal Body - Scrollable */}
+              <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+                <div className="p-8 space-y-6">
+                  {/* Copyable Fields */}
+                  <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Quick Copy Fields</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      <CopyableField label="Full Name" value={selectedDoctor.fullName} />
+                      <CopyableField label="NIC Number" value={selectedDoctor.nicNumber} />
+                      <CopyableField label="SLMC License" value={selectedDoctor.medicalLicenseNumber} />
+                      <CopyableField label="Specialty" value={selectedDoctor.specialty} />
+                      <CopyableField label="Category" value={selectedDoctor.category} />
+                    </div>
+                  </div>
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <DetailField icon={Mail} label="Email" value={selectedDoctor.email} />
+                    <DetailField icon={Phone} label="Phone" value={selectedDoctor.phone} />
+                    <DetailField icon={GraduationCap} label="Qualifications" value={selectedDoctor.qualifications} />
+                    <DetailField icon={Briefcase} label="Experience" value={`${selectedDoctor.experienceYears} years`} />
+                    <DetailField icon={DollarSign} label="Consultation Fee" value={`LKR ${selectedDoctor.consultationFee}`} />
+                    <DetailField icon={MapPin} label="Clinic Location" value={selectedDoctor.clinicLocation} />
+                  </div>
+
+                  {/* Verification Section */}
+                  <div className="border-t border-slate-100 pt-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                      <p className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Verification Decision</p>
+                      <a
+                        href="https://slmc.gov.lk/en/public/registers"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-[#008080] text-sm font-semibold hover:underline"
                       >
-                        {isUpdating && !isActive ? 'Processing...' : st.label}
-                      </button>
-                    );
-                })}
-              </div>
-            </div>
+                        Verify via SLMC Registry
+                        <ExternalLink size={14} />
+                      </a>
+                    </div>
 
+                    <div className="grid grid-cols-2 gap-3">
+                      {Object.entries(STATUS_CONFIG)
+                        .filter(([key]) => key !== 'pending')
+                        .map(([key, config]) => {
+                          const isActive = selectedDoctor.status === key
+                          const isUpdating = updatingId === selectedDoctor._id
+                          const Icon = config.icon
+                          return (
+                            <button
+                              key={key}
+                              disabled={isActive || isUpdating}
+                              onClick={() => handleStatusChange(selectedDoctor._id, key)}
+                              className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm transition-all ${
+                                isActive
+                                  ? `${config.bg} ${config.text} border-2 ${config.border}`
+                                  : `bg-white border border-slate-200 text-slate-600 hover:border-${config.text.split('-')[1]}-300 hover:bg-${config.bg.split('-')[1]}-50`
+                              } ${isActive || isUpdating ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                            >
+                              {isUpdating && !isActive ? (
+                                <Loader2 size={16} className="animate-spin" />
+                              ) : (
+                                <Icon size={16} />
+                              )}
+                              {isUpdating && !isActive ? 'Processing...' : config.label}
+                            </button>
+                          )
+                        })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </div>
-  );
+  )
 }
 
-const th = { padding: '14px 20px', color: '#475569', fontWeight: '600', fontSize: '0.85rem' };
-const td = { padding: '14px 20px', color: '#64748b', fontSize: '0.9rem' };
-
-function ModalField({ label, value }) {
+function DetailField({ icon: Icon, label, value }) {
   return (
-    <div>
-      <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: '700', letterSpacing: '0.5px' }}>{label}</p>
-      <p style={{ margin: 0, color: '#1e293b', fontWeight: '500', fontSize: '0.9rem' }}>{value || <span style={{ color: '#cbd5e1' }}>Not provided</span>}</p>
+    <div className="flex items-start gap-3 p-4 bg-slate-50 rounded-xl border border-slate-100">
+      <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
+        <Icon size={16} />
+      </div>
+      <div>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+        <p className="text-sm font-bold text-medigo-navy">{value || <span className="text-slate-400 font-normal">Not provided</span>}</p>
+      </div>
     </div>
-  );
+  )
 }
 
 function CopyableField({ label, value }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(false)
 
   const handleCopy = () => {
     if (value) {
-      navigator.clipboard.writeText(value);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      navigator.clipboard.writeText(value)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     }
-  };
+  }
 
   return (
-    <div style={{ flex: '1 1 calc(20% - 16px)', minWidth: '120px' }}>
-      <p style={{ margin: '0 0 4px 0', fontSize: '0.70rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: '700', letterSpacing: '0.5px' }}>
-        {label}
-      </p>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+    <div>
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+      <div className="flex items-center gap-2">
         <button
           onClick={handleCopy}
-          title="Copy to clipboard"
-          style={{ 
-            background: 'none', border: 'none', cursor: value ? 'pointer' : 'default', 
-            padding: 0, display: 'flex', alignItems: 'center',
-            color: copied ? '#10b981' : '#cbd5e1', transition: 'color 0.2s ease' 
-          }}
+          disabled={!value}
+          className={`flex items-center justify-center w-7 h-7 rounded-lg border transition-colors ${
+            copied
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
+              : 'bg-white border-slate-200 text-slate-400 hover:border-[#008080] hover:text-[#008080]'
+          } ${!value && 'opacity-50 cursor-not-allowed'}`}
         >
-          {copied ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-          )}
+          {copied ? <Check size={14} /> : <Copy size={14} />}
         </button>
-        <p style={{ margin: 0, color: '#1e293b', fontWeight: '600', fontSize: '0.85rem', wordBreak: 'break-word' }}>
-          {value || <span style={{ color: '#cbd5e1', fontWeight: '500' }}>N/A</span>}
+        <p className="text-sm font-bold text-medigo-navy truncate max-w-[120px]">
+          {value || <span className="text-slate-400 font-normal">N/A</span>}
         </p>
       </div>
     </div>
-  );
+  )
 }

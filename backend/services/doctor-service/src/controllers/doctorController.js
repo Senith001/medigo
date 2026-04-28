@@ -126,6 +126,33 @@ export const getMyProfile = async (req, res) => {
   }
 };
 
+// @desc    Update currently logged-in doctor's profile
+// @route   PUT /api/doctors/me
+export const updateMyProfile = async (req, res) => {
+  try {
+    const doctor = await Doctor.findOne({
+      $or: [
+        { email: req.user.email },
+        { userId: req.user.userId }
+      ]
+    });
+
+    if (!doctor) {
+      return res.status(404).json({ success: false, message: "Doctor profile not found." });
+    }
+
+    const updatedDoctor = await Doctor.findByIdAndUpdate(
+      doctor._id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+
+    res.status(200).json({ success: true, message: "Profile updated successfully.", data: updatedDoctor });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to update profile.", error: error.message });
+  }
+};
+
 // @desc    Create new doctor
 // @route   POST /api/doctors
 export const createDoctor = async (req, res) => {

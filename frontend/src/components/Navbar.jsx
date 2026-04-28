@@ -1,8 +1,8 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LogOut, User as UserIcon, Settings, ChevronDown, Menu, X, Shield } from 'lucide-react'
-import { useState } from 'react'
+import { LogOut, User as UserIcon, ChevronDown, Menu, X, Shield } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
 
 export default function Navbar() {
   const { user, logout } = useAuth()
@@ -10,11 +10,26 @@ export default function Navbar() {
   const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const profileRef = useRef(null)
+
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setIsProfileOpen(false)
+      }
+    }
+
+    if (isProfileOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isProfileOpen])
 
   const isActive = (p) => location.pathname === p
 
   const navLinks = [
-    { name: 'Home', path: '/' },
+    { name: 'Home', path: '/dashboard' },
     { name: 'Find Doctors', path: '/search' },
     { name: 'Appointments', path: '/appointments' },
     { name: 'Medical Reports', path: '/reports' },
@@ -62,7 +77,7 @@ export default function Navbar() {
           {/* Desktop Right Side */}
           <div className="hidden md:flex md:items-center md:gap-4">
             {user ? (
-              <div className="relative group">
+              <div className="relative group ml-auto" ref={profileRef}>
                 <button 
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
                   className="flex items-center gap-3 pl-3 pr-2 py-1.5 rounded-full bg-slate-50 border border-slate-100 hover:border-medigo-blue transition-all"
@@ -85,11 +100,12 @@ export default function Navbar() {
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
                       className="absolute right-0 mt-2 w-56 bg-white border border-slate-100 rounded-2xl shadow-premium py-2 z-50 overflow-hidden"
                     >
-                      <Link to="/profile" className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-medigo-blue transition-colors">
+                      <Link
+                        to="/profile"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-medigo-blue transition-colors"
+                      >
                         <UserIcon size={16} /> My Account
-                      </Link>
-                      <Link to="/settings" className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-medigo-blue transition-colors">
-                        <Settings size={16} /> Settings
                       </Link>
                       <div className="h-px bg-slate-100 my-1 mx-2" />
                       <button 

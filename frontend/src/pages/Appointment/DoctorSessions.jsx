@@ -5,7 +5,7 @@ import {
   ChevronLeft, ArrowRight, Star,
   Stethoscope, ShieldCheck,
   Info, Loader2, Hospital,
-  Video, CalendarDays, Award
+  Video, CalendarDays, Award, AlertCircle
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import DashboardLayout from '../../components/DashboardLayout'
@@ -46,6 +46,19 @@ export default function DoctorSessions() {
 
   const hospitals = ['all', ...new Set(sessions.map(s => s.hospital))]
 
+  // Helper to parse "09:00 AM" into minutes from midnight
+  const parseTime = (timeStr) => {
+    if (!timeStr) return 0;
+    const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!match) return 0;
+    let [_, hours, mins, period] = match;
+    hours = parseInt(hours);
+    mins = parseInt(mins);
+    if (period.toUpperCase() === 'PM' && hours !== 12) hours += 12;
+    if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
+    return hours * 60 + mins;
+  };
+
   const filteredSessions = sessions.filter(s => {
     let upcoming = true;
     if (s.date) {
@@ -56,20 +69,19 @@ export default function DoctorSessions() {
         const sessionDate = new Date(y, m - 1, d);
         sessionDate.setHours(0, 0, 0, 0);
 
-        const today = new Date();
-        const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const now = new Date();
+        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
         if (sessionDate < todayMidnight) {
+          // Past date
           upcoming = false;
-        } else if (sessionDate.getTime() === todayMidnight.getTime() && s.endTime) {
-          const [endHourRaw, endMinRaw] = s.endTime.split(':');
-          const endHour = parseInt(endHourRaw, 10);
-          const endMin = parseInt(endMinRaw, 10);
-          if (!isNaN(endHour) && !isNaN(endMin)) {
-            const sessionEnd = new Date(y, m - 1, d, endHour, endMin, 0);
-            if (sessionEnd < new Date()) {
-              upcoming = false;
-            }
+        } else if (sessionDate.getTime() === todayMidnight.getTime()) {
+          // Today: allow if end time hasn't passed
+          const currentMins = now.getHours() * 60 + now.getMinutes();
+          const endMins = parseTime(s.endTime);
+          
+          if (endMins <= currentMins) {
+            upcoming = false;
           }
         }
       }
@@ -80,6 +92,25 @@ export default function DoctorSessions() {
 
     return upcoming && matchesHospital && matchesMode;
   });
+
+  // Check if a session has already started (but not ended)
+  const hasSessionStarted = (session) => {
+    const now = new Date();
+    const datePart = session.date?.split('T')[0];
+    if (!datePart) return false;
+    const [y, m, d] = datePart.split('-').map(Number);
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const sessionDate = new Date(y, m - 1, d);
+    sessionDate.setHours(0, 0, 0, 0);
+
+    if (sessionDate.getTime() !== todayMidnight.getTime()) return false;
+
+    const currentMins = now.getHours() * 60 + now.getMinutes();
+    const startMins = parseTime(session.startTime);
+    const endMins = parseTime(session.endTime);
+
+    return currentMins >= startMins && currentMins < endMins;
+  };
 
   if (loading) return (
     <DashboardLayout isPatient={true}>
@@ -288,7 +319,34 @@ export default function DoctorSessions() {
                         <div className="space-y-4">
                            <AnimatePresence mode="popLayout">
                              {filteredSessions.map((session, i) => {
-                               const isFull = (session.bookedCount || 0) >= (session.maxPatients || 10)
+                               const startMins = parseTime(session.startTime);
+                               const endMins = parseTime(session.endTime);
+                               const totalDuration = endMins - startMins;
+                               const maxPossible = session.maxPatients || 10;
+                               const minsPerPatient = totalDuration / maxPossible;
+
+                               const now = new Date();
+                               const currentTimeMins = now.getHours() * 60 + now.getMinutes();
+                               const isToday = (() => {
+                                 const datePart = session.date?.split('T')[0];
+                                 if (!datePart) return false;
+                                 const [y, m, d] = datePart.split('-').map(Number);
+                                 const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                                 const sessionDate = new Date(y, m - 1, d);
+                                 sessionDate.setHours(0, 0, 0, 0);
+                                 return sessionDate.getTime() === todayMidnight.getTime();
+                               })();
+
+                               let dynamicMax = maxPossible;
+                               if (isToday && currentTimeMins > startMins) {
+                                 const elapsed = currentTimeMins - startMins;
+                                 const slotsLost = Math.floor(elapsed / minsPerPatient);
+                                 dynamicMax = Math.max(0, maxPossible - slotsLost);
+                               }
+
+                               const isFull = (session.bookedCount || 0) >= dynamicMax;
+                               const isTrulyFull = (session.bookedCount || 0) >= maxPossible;
+
                                return (
                                  <motion.div
                                    key={session._id}
@@ -339,10 +397,22 @@ export default function DoctorSessions() {
                                        </div>
 
                                        <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest mt-2">
-                                          <span className={isFull ? 'text-red-500' : 'text-medigo-blue'}>{session.bookedCount || 0}</span>
+                                          <span className={isTrulyFull ? 'text-red-500' : 'text-medigo-blue'}>{session.bookedCount || 0}</span>
                                           <span className="text-slate-300">/</span>
-                                          <span className="text-slate-400">{session.maxPatients || 10} Slots Filled</span>
+                                          <span className="text-slate-400">{dynamicMax} {dynamicMax < maxPossible ? 'Time Limited Slots' : 'Total Slots'}</span>
                                        </div>
+
+                                       {!isFull && (
+                                         <div className="flex items-center gap-1.5 text-[10px] font-black text-medigo-navy uppercase tracking-widest mt-1 bg-slate-50 self-start px-2 py-0.5 rounded">
+                                            <ShieldCheck size={12} className="text-medigo-blue" /> Next Patient No: #{String((session.bookedCount || 0) + 1).padStart(2, '0')}
+                                         </div>
+                                       )}
+
+                                       {hasSessionStarted(session) && (
+                                         <div className="flex items-center gap-1.5 text-[10px] font-black text-amber-500 uppercase tracking-widest mt-1">
+                                            <AlertCircle size={12} /> Session has already begun
+                                         </div>
+                                       )}
                                     </div>
 
                                     {/* Right: Booking Action */}
@@ -357,7 +427,7 @@ export default function DoctorSessions() {
                                           disabled={isFull}
                                           className={`w-full sm:w-auto h-12 px-8 shadow-md ${isFull ? 'bg-slate-200 text-slate-400 shadow-none' : ''}`}
                                         >
-                                          {isFull ? 'Fully Booked' : 'Book Session'}
+                                          {isFull ? (isTrulyFull ? 'Fully Booked' : 'Time Expired') : 'Book Session'}
                                         </Button>
                                     </div>
                                  </motion.div>

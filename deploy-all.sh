@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#      ./deploy-all.sh
+
 echo "🚀 Starting MediGo Full System Deployment..."
 
 # --- BUILD PHASE ---

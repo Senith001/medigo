@@ -1,181 +1,300 @@
-import React, { useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { authAPI } from '../../services/api';
+import { useState } from 'react'
+import { useSearchParams, useNavigate, Link } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  ShieldCheck, Lock, ArrowRight,
+  AlertCircle, Loader2,
+  Stethoscope, ShieldAlert, Cpu, CheckCircle2
+} from 'lucide-react'
+import { authAPI } from '../../services/api'
+import Button from '../../components/ui/Button'
 
 export default function AdminSetup() {
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const token = searchParams.get('token');
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const token = searchParams.get('token')
 
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [success, setSuccess] = useState(false)
 
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
-  const passwordValid = passwordRegex.test(newPassword);
-  const passwordsMatch = newPassword === confirmPassword;
-  const canSubmit = newPassword && confirmPassword && passwordValid && passwordsMatch && !loading;
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
+  const passwordValid = passwordRegex.test(newPassword)
+  const passwordsMatch = newPassword === confirmPassword
+  const canSubmit = newPassword && confirmPassword && passwordValid && passwordsMatch && !loading
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!canSubmit) return;
+    e.preventDefault()
+    if (!canSubmit) return
 
-    setLoading(true);
-    setError(null);
+    setLoading(true)
+    setError(null)
 
     try {
-      await authAPI.setupAdminPassword({ token, newPassword });
-      setSuccess(true);
-      setTimeout(() => navigate('/admin-login', { state: { toast: 'Account activated successfully! Please log in.' } }), 2000);
+      await authAPI.setupAdminPassword({ token, newPassword })
+      setSuccess(true)
+      setTimeout(() => navigate('/admin-login', { state: { toast: 'Account activated successfully! Please log in.' } }), 2000)
     } catch (err) {
-      setError(err.response?.data?.message || 'Something went wrong. Please try again.');
+      setError(err.response?.data?.message || 'Something went wrong. Please try again.')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
+  // Error State - Invalid Token
   if (!token) {
     return (
-      <div style={pageStyle}>
-        <div style={cardStyle}>
-          <div style={{ fontSize: '3rem', marginBottom: '16px' }}>⚠️</div>
-          <h2 style={{ color: '#991b1b', marginBottom: '8px' }}>Invalid Link</h2>
-          <p style={{ color: '#64748b' }}>This activation link is missing or malformed. Please contact your super admin for a new invitation.</p>
-        </div>
+      <div className="min-h-screen bg-slate-950 font-inter flex items-center justify-center p-6 relative overflow-hidden">
+        {/* Background decorations */}
+        <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-red-500/5 rounded-full blur-[150px] -z-10" />
+        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-medigo-blue/5 rounded-full blur-[120px] -z-10" />
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-lg"
+        >
+          {/* Logo */}
+          <div className="flex justify-center mb-8">
+            <Link to="/" className="flex items-center gap-3 group">
+              <div className="w-10 h-10 bg-medigo-blue rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20 group-hover:rotate-12 transition-transform">
+                <Stethoscope size={24} />
+              </div>
+              <span className="text-2xl font-black tracking-tighter text-white italic uppercase">
+                Medi<span className="text-medigo-blue">Go</span>
+              </span>
+            </Link>
+          </div>
+
+          {/* Card */}
+          <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl shadow-black/50">
+            <div className="flex justify-center mb-6">
+              <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center">
+                <ShieldAlert size={32} className="text-red-500" />
+              </div>
+            </div>
+
+            <div className="text-center space-y-3 mb-6">
+              <h2 className="text-2xl font-black text-white tracking-tight">Access Denied</h2>
+              <p className="text-slate-400 text-sm">The invitation link is invalid or has expired.</p>
+            </div>
+
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex gap-3 text-red-400 text-sm mb-6">
+              <AlertCircle size={18} className="shrink-0 mt-0.5" />
+              <span>This activation link is missing or malformed. Please contact your super admin for a new invitation.</span>
+            </div>
+
+            <Link
+              to="/"
+              className="flex items-center justify-center gap-2 w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl transition-colors"
+            >
+              Return to Home
+            </Link>
+          </div>
+
+          {/* Footer */}
+          <div className="mt-8 text-center">
+            <span className="text-[10px] font-black text-slate-700 uppercase tracking-[0.3em]">Session Terminated</span>
+          </div>
+        </motion.div>
       </div>
-    );
+    )
   }
 
+  // Success State
   if (success) {
     return (
-      <div style={pageStyle}>
-        <div style={cardStyle}>
-          <div style={{ fontSize: '3rem', marginBottom: '16px' }}>✅</div>
-          <h2 style={{ color: '#166534', marginBottom: '8px' }}>Account Activated!</h2>
-          <p style={{ color: '#64748b' }}>Your password has been set. Redirecting you to the login page...</p>
-        </div>
+      <div className="min-h-screen bg-slate-950 font-inter flex items-center justify-center p-6 relative overflow-hidden">
+        {/* Background decorations */}
+        <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[150px] -z-10" />
+        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-medigo-blue/5 rounded-full blur-[120px] -z-10" />
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-lg"
+        >
+          {/* Logo */}
+          <div className="flex justify-center mb-8">
+            <Link to="/" className="flex items-center gap-3 group">
+              <div className="w-10 h-10 bg-medigo-blue rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20 group-hover:rotate-12 transition-transform">
+                <Stethoscope size={24} />
+              </div>
+              <span className="text-2xl font-black tracking-tighter text-white italic uppercase">
+                Medi<span className="text-medigo-blue">Go</span>
+              </span>
+            </Link>
+          </div>
+
+          {/* Card */}
+          <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl shadow-black/50">
+            <div className="flex justify-center mb-6">
+              <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center">
+                <CheckCircle2 size={32} className="text-emerald-500" />
+              </div>
+            </div>
+
+            <div className="text-center space-y-3 mb-6">
+              <h2 className="text-2xl font-black text-white tracking-tight">Account Activated</h2>
+              <p className="text-slate-400 text-sm">Your credentials have been secured successfully.</p>
+            </div>
+
+            <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex gap-3 text-emerald-400 text-sm mb-6">
+              <CheckCircle2 size={18} className="shrink-0 mt-0.5" />
+              <span>Your password has been set. Redirecting you to the login page...</span>
+            </div>
+
+            <Link
+              to="/admin-login"
+              className="flex items-center justify-center gap-2 w-full py-3 px-4 bg-medigo-blue hover:bg-medigo-blue-dark text-white font-semibold rounded-xl transition-colors"
+            >
+              Proceed to Login
+              <ArrowRight size={18} />
+            </Link>
+          </div>
+
+          {/* Footer */}
+          <div className="mt-8 text-center">
+            <span className="text-[10px] font-black text-slate-700 uppercase tracking-[0.3em]">Redirecting...</span>
+          </div>
+        </motion.div>
       </div>
-    );
+    )
   }
 
+  // Main Form
   return (
-    <div style={pageStyle}>
-      <div style={cardStyle}>
+    <div className="min-h-screen bg-slate-950 font-inter flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Background decorations */}
+      <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-medigo-blue/5 rounded-full blur-[150px] -z-10" />
+      <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-cyan-500/5 rounded-full blur-[120px] -z-10" />
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-lg"
+      >
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'center', marginBottom: '28px' }}>
-          <div style={{ padding: '6px 10px', backgroundColor: '#1a1a1a', borderRadius: '8px', color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>♡</div>
-          <span style={{ fontSize: '1.5rem', fontWeight: '800', color: '#1a1a1a' }}>MediGo</span>
+        <div className="flex justify-center mb-8">
+          <Link to="/" className="flex items-center gap-3 group">
+            <div className="w-10 h-10 bg-medigo-blue rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20 group-hover:rotate-12 transition-transform">
+              <Stethoscope size={24} />
+            </div>
+            <span className="text-2xl font-black tracking-tighter text-white italic uppercase">
+              Medi<span className="text-medigo-blue">Go</span>
+            </span>
+          </Link>
         </div>
 
-        <h1 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1e293b', marginBottom: '6px', textAlign: 'center' }}>Set Up Your Account</h1>
-        <p style={{ color: '#64748b', textAlign: 'center', marginBottom: '28px', fontSize: '0.9rem' }}>
-          You've been invited to join MediGo as an admin. Create a secure password to activate your account.
-        </p>
-
-        {error && (
-          <div style={{ backgroundColor: '#fef2f2', color: '#b91c1c', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem' }}>
-            {error}
+        {/* Card */}
+        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl shadow-black/50">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full mb-4">
+              <ShieldAlert size={12} className="text-amber-500" />
+              <span className="text-[10px] font-black text-amber-500 uppercase tracking-wider">Admin Invitation</span>
+            </div>
+            <h2 className="text-2xl font-black text-white tracking-tight mb-2">Set Up Your Account</h2>
+            <p className="text-slate-400 text-sm">Create a secure password to activate your administrative access.</p>
           </div>
-        )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-          <div>
-            <label style={labelStyle}>New Password</label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={e => setNewPassword(e.target.value)}
-              required
-              style={inputStyle}
-              placeholder="Create a strong password"
-            />
-            {newPassword && !passwordValid && (
-              <p style={hintStyle}>
-                Must be at least 8 characters with 1 uppercase, 1 lowercase, 1 number, and 1 special character.
-              </p>
+          {/* Error */}
+          <AnimatePresence mode="wait">
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex gap-3 text-red-400 text-sm"
+              >
+                <AlertCircle size={18} className="shrink-0" />
+                {error}
+              </motion.div>
             )}
-          </div>
+          </AnimatePresence>
 
-          <div>
-            <label style={labelStyle}>Confirm Password</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={e => setConfirmPassword(e.target.value)}
-              required
-              style={inputStyle}
-              placeholder="Re-enter your password"
-            />
-            {confirmPassword && !passwordsMatch && (
-              <p style={hintStyle}>Passwords do not match.</p>
-            )}
-          </div>
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-400 ml-1">New Password</label>
+              <div className="relative">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
+                  <Lock size={18} />
+                </div>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  required
+                  placeholder="Create a strong password"
+                  className="w-full h-12 bg-slate-950 border border-slate-800 rounded-xl pl-12 pr-4 text-white outline-none focus:border-medigo-blue focus:ring-2 focus:ring-medigo-blue/20 transition-all placeholder:text-slate-600"
+                />
+              </div>
+              {newPassword && !passwordValid && (
+                <p className="text-red-400 text-xs ml-1">
+                  Must be 8+ chars with uppercase, lowercase, number, and special character.
+                </p>
+              )}
+            </div>
 
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            style={{
-              padding: '12px',
-              borderRadius: '10px',
-              border: 'none',
-              backgroundColor: canSubmit ? '#1a1a1a' : '#94a3b8',
-              color: 'white',
-              fontWeight: '700',
-              fontSize: '1rem',
-              cursor: canSubmit ? 'pointer' : 'not-allowed',
-              marginTop: '4px',
-              transition: 'background-color 0.2s'
-            }}
-          >
-            {loading ? 'Activating...' : 'Activate Account'}
-          </button>
-        </form>
-      </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-400 ml-1">Confirm Password</label>
+              <div className="relative">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
+                  <Lock size={18} />
+                </div>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  required
+                  placeholder="Re-enter your password"
+                  className="w-full h-12 bg-slate-950 border border-slate-800 rounded-xl pl-12 pr-4 text-white outline-none focus:border-medigo-blue focus:ring-2 focus:ring-medigo-blue/20 transition-all placeholder:text-slate-600"
+                />
+              </div>
+              {confirmPassword && !passwordsMatch && (
+                <p className="text-red-400 text-xs ml-1">Passwords do not match.</p>
+              )}
+            </div>
+
+            <Button
+              loading={loading}
+              disabled={!canSubmit}
+              className="w-full h-12 bg-medigo-blue hover:bg-medigo-blue-dark text-white font-semibold rounded-xl shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 size={18} className="animate-spin" />
+                  Activating...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  Activate Account
+                  <ArrowRight size={18} />
+                </span>
+              )}
+            </Button>
+          </form>
+
+          {/* Requirements hint */}
+          <div className="mt-6 pt-6 border-t border-slate-800">
+            <p className="text-xs text-slate-500 text-center">
+              Password must be at least 8 characters with uppercase, lowercase, number, and special character.
+            </p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-8 flex items-center justify-center gap-6">
+          <Link to="/" className="text-xs font-semibold text-slate-500 hover:text-white transition-colors">
+            Return to Home
+          </Link>
+          <span className="text-slate-700">•</span>
+          <span className="text-[10px] font-black text-slate-700 uppercase tracking-wider">Secure Setup</span>
+        </div>
+      </motion.div>
     </div>
-  );
+  )
 }
-
-const pageStyle = {
-  minHeight: '100vh',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  backgroundColor: '#f1f5f9',
-  padding: '24px'
-};
-
-const cardStyle = {
-  backgroundColor: 'white',
-  borderRadius: '20px',
-  padding: '40px 36px',
-  width: '100%',
-  maxWidth: '420px',
-  boxShadow: '0 20px 40px rgba(0,0,0,0.08)'
-};
-
-const labelStyle = {
-  display: 'block',
-  marginBottom: '6px',
-  fontSize: '0.9rem',
-  color: '#475569',
-  fontWeight: '600'
-};
-
-const inputStyle = {
-  width: '100%',
-  padding: '11px 14px',
-  borderRadius: '8px',
-  border: '1px solid #cbd5e1',
-  outline: 'none',
-  fontSize: '0.95rem',
-  boxSizing: 'border-box'
-};
-
-const hintStyle = {
-  color: '#b91c1c',
-  fontSize: '0.8rem',
-  marginTop: '4px',
-  margin: '4px 0 0 0'
-};
