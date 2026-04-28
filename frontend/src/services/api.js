@@ -86,6 +86,7 @@ export const doctorAPI = {
   register: (data) => api.post('/api/doctors', data),
   getProfiles: (params) => api.get('/api/doctors', { params }),
   getMyProfile: () => api.get('/api/doctors/me'),
+  updateMyProfile: (data) => api.put('/api/doctors/me', data),
   getById: (id) => api.get(`/api/doctors/${id}`),
   getProfileByEmail: (email) => api.get(`/api/doctors/profile/${email}`),
 
@@ -120,9 +121,7 @@ export const telemedicineAPI = {
 
 export const reportAPI = {
   upload: (data) =>
-    api.post('/api/reports', data, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    }),
+    api.post('/api/reports', data),
   getAll: () => api.get('/api/reports'),
   getById: (id) => api.get(`/api/reports/${id}`),
   getByPatient: (patientId) => api.get(`/api/reports/patient/${patientId}`),

@@ -4,6 +4,7 @@ import {
   deleteProfileInternal,
   deleteMyProfile,
   getMyProfile,
+  updateMyProfile,
   createDoctor,
   getAllDoctors,
   getDoctorById,
@@ -31,6 +32,7 @@ router.patch("/:id/status", verifyInternalService, updateDoctorStatus);
 // ─── Doctor's own authenticated routes ────────────────────────────────────────
 // NOTE: /me must be declared BEFORE /:id to avoid Express matching "me" as an ID
 router.get("/me", protect, authorize("doctor"), getMyProfile);
+router.put("/me", protect, authorize("doctor"), updateMyProfile);
 router.delete("/me", protect, authorize("doctor"), deleteMyProfile);
 
 // ─── Public routes (patients searching for doctors) ───────────────────────────

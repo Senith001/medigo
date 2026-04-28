@@ -3,13 +3,23 @@ import {
   FileText, Search, Plus, Download, User, Calendar,
   Stethoscope, Send, Paperclip, ArrowUpRight,
   ShieldCheck, Inbox, FolderOpen, X, CheckCircle2,
-  MessageSquare, Clock
+  MessageSquare, Clock, Sparkles, Filter, ChevronRight
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { reportAPI, appointmentAPI } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import DashboardLayout from '../../components/DashboardLayout'
-import Button from '../../components/ui/Button'
+
+// --- Premium UI Components ---
+
+const GlassCard = ({ children, className = "", hover = true }) => (
+  <motion.div
+    whileHover={hover ? { y: -5, transition: { duration: 0.2 } } : {}}
+    className={`bg-white/80 backdrop-blur-xl border border-white/60 shadow-[0_15px_35px_rgba(0,0,0,0.03)] rounded-[2.5rem] overflow-hidden ${className}`}
+  >
+    {children}
+  </motion.div>
+)
 
 export default function PatientRecords() {
   const { user } = useAuth()
@@ -35,7 +45,7 @@ export default function PatientRecords() {
       ])
       if (reportsRes.data.success) setReports(reportsRes.data.data)
       if (apptsRes.data?.appointments) {
-        setAppointments(apptsRes.data.appointments) // store full appointments for messages + patient select
+        setAppointments(apptsRes.data.appointments)
       }
     } catch (err) {
       console.error('Clinical Sync Error:', err)
@@ -92,265 +102,272 @@ export default function PatientRecords() {
 
   return (
     <DashboardLayout isDoctor={true}>
-      <div className="max-w-6xl mx-auto space-y-6 pb-24 font-inter">
+      <div className="max-w-6xl mx-auto px-4 py-8 lg:py-12 space-y-12 font-inter">
 
         {/* ── Header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <p className="text-[11px] font-black text-medigo-blue uppercase tracking-widest mb-1">Patient Files</p>
-            <h1 className="text-3xl font-black text-medigo-navy tracking-tight">
-              Clinical <span className="text-medigo-blue">Repository</span>
-            </h1>
-            <p className="text-slate-400 text-sm font-medium mt-1">Manage medical records shared between you and your patients.</p>
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+          <div className="space-y-4">
+             <div className="flex items-center gap-3">
+                <div className="px-3 py-1 bg-emerald-500/10 rounded-full text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
+                   <ShieldCheck size={12} /> Secure Cloud Vault
+                </div>
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+             </div>
+             <h1 className="text-4xl lg:text-6xl font-black text-medigo-navy tracking-tighter leading-none">
+                Clinical <br />
+                <span className="text-medigo-blue">Repository</span>
+             </h1>
+             <p className="text-slate-400 text-lg font-medium max-w-xl leading-relaxed">
+                Manage and exchange medical records with your patients in a <span className="text-medigo-navy font-bold underline decoration-emerald-400/30">fully encrypted</span> environment.
+             </p>
           </div>
           <button
             onClick={() => setShowUpload(true)}
-            className="inline-flex items-center gap-2 bg-medigo-blue hover:bg-blue-700 text-white font-black text-sm px-6 py-3.5 rounded-2xl shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] active:scale-95 shrink-0"
+            className="px-8 py-5 bg-medigo-navy text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-premium hover:shadow-2xl transition-all active:scale-95 flex items-center gap-3 group"
           >
-            <Plus size={18} /> Send to Patient
+            <Plus size={18} className="group-hover:rotate-90 transition-transform" />
+            <span>Send to Patient</span>
           </button>
         </div>
 
         {/* ── Stats Row ── */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
-            { label: 'Total Files', value: reports.length, icon: FolderOpen, color: 'text-slate-600 bg-slate-50 border-slate-100' },
-            { label: 'Sent by You', value: sentCount, icon: Send, color: 'text-indigo-600 bg-indigo-50 border-indigo-100' },
-            { label: 'From Patients', value: receivedCount, icon: Inbox, color: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
-            { label: 'Patient Notes', value: patientMessages.length, icon: MessageSquare, color: 'text-teal-600 bg-teal-50 border-teal-100' },
-          ].map(stat => (
-            <div key={stat.label} className="bg-white rounded-2xl border border-slate-100 p-5 flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${stat.color}`}>
-                <stat.icon size={20} />
+            { label: 'Total Files', val: reports.length, icon: FolderOpen, color: 'text-slate-600', bg: 'bg-slate-50' },
+            { label: 'Sent by You', val: sentCount, icon: Send, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+            { label: 'From Patients', val: receivedCount, icon: Inbox, color: 'text-blue-600', bg: 'bg-blue-50' },
+            { label: 'Patient Notes', val: patientMessages.length, icon: MessageSquare, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          ].map((stat, i) => (
+            <GlassCard key={i} className="p-6">
+              <div className="flex items-center gap-4">
+                <div className={`w-14 h-14 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center border border-white shadow-sm`}>
+                  <stat.icon size={24} />
+                </div>
+                <div>
+                  <p className="text-2xl font-black text-medigo-navy tracking-tight">{stat.val}</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-black text-medigo-navy">{stat.value}</p>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{stat.label}</p>
-              </div>
-            </div>
+            </GlassCard>
           ))}
         </div>
 
         {/* ── Search + Tabs ── */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-4 flex flex-col sm:flex-row gap-3 items-center">
-          <div className="relative flex-1 w-full">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+        <div className="flex flex-col lg:flex-row gap-6 items-center">
+          <div className="relative flex-1 w-full group">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-medigo-blue transition-colors" size={20} />
             <input
               type="text"
               placeholder="Search by title or patient ID..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full h-11 pl-10 pr-4 bg-slate-50 rounded-xl text-sm font-bold text-medigo-navy outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+              className="w-full h-16 pl-14 pr-6 bg-white/50 backdrop-blur-xl border border-white rounded-[1.5rem] text-sm font-bold text-medigo-navy outline-none focus:ring-4 focus:ring-blue-500/5 transition-all shadow-sm"
             />
           </div>
-          <div className="flex bg-slate-50 p-1 rounded-xl gap-1 shrink-0">
-            {[['all', 'All'], ['sent', 'Sent'], ['received', 'Received'], ['messages', 'Patient Notes']].map(([key, label]) => (
+          <div className="flex bg-white/50 backdrop-blur-xl p-2 rounded-[1.5rem] border border-white gap-1 shrink-0 shadow-sm">
+            {[['all', 'All Files'], ['sent', 'Sent'], ['received', 'Received'], ['messages', 'Patient Notes']].map(([key, label]) => (
               <button
                 key={key}
                 onClick={() => setTab(key)}
-                className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${
-                  tab === key ? 'bg-white text-medigo-blue shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                  tab === key ? 'bg-medigo-navy text-white shadow-lg' : 'text-slate-400 hover:text-medigo-navy hover:bg-white'
                 }`}
               >{label}</button>
             ))}
           </div>
-          <div className="hidden sm:flex items-center gap-2 text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-xl shrink-0">
-            <ShieldCheck size={12} /> Encrypted
-          </div>
         </div>
 
-        {/* ── Records Grid ── */}
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3].map(i => <div key={i} className="h-52 bg-white rounded-2xl border border-slate-100 animate-pulse" />)}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl border-2 border-dashed border-slate-100 py-24 text-center space-y-4">
-            <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto text-slate-200">
-              <FileText size={32} />
-            </div>
-            <h3 className="text-lg font-black text-medigo-navy">No Records Found</h3>
-            <p className="text-slate-400 text-sm max-w-xs mx-auto">
-              {tab === 'received' ? 'No documents shared by patients yet.' : 'Share a document with a patient to get started.'}
-            </p>
-            {tab !== 'received' && (
-              <button onClick={() => setShowUpload(true)} className="inline-flex items-center gap-2 text-medigo-blue font-black text-sm underline underline-offset-4 mt-2">
-                <Plus size={14} /> Send First Document
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <AnimatePresence>
-              {filtered.map((report, idx) => (
-                <motion.div
-                  key={report._id}
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ delay: idx * 0.04 }}
-                  className="bg-white rounded-2xl border border-slate-100 p-6 hover:border-blue-100 hover:shadow-lg transition-all group"
-                >
-                  {/* Card Header */}
-                  <div className="flex items-start justify-between mb-5">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                      report.uploadedBy === 'doctor'
-                        ? 'bg-indigo-50 text-indigo-600'
-                        : 'bg-blue-50 text-medigo-blue'
-                    }`}>
-                      {report.uploadedBy === 'doctor' ? <Stethoscope size={22} /> : <Inbox size={22} />}
-                    </div>
-                    <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${
-                      report.uploadedBy === 'doctor'
-                        ? 'bg-indigo-50 text-indigo-500 border-indigo-100'
-                        : 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                    }`}>
-                      {report.uploadedBy === 'doctor' ? 'Sent' : 'Received'}
-                    </span>
+        {/* ── Records Content ── */}
+        <AnimatePresence mode="wait">
+          {tab !== 'messages' ? (
+            <motion.div
+              key="records"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-8"
+            >
+              {loading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {[1, 2, 3].map(i => <div key={i} className="h-64 bg-white/50 rounded-[2.5rem] border border-white animate-pulse" />)}
+                </div>
+              ) : filtered.length === 0 ? (
+                <GlassCard className="py-24 text-center space-y-6" hover={false}>
+                  <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mx-auto border border-slate-100">
+                    <FileText size={32} className="text-slate-200" />
                   </div>
-
-                  {/* Card Body */}
-                  <div className="space-y-1 mb-4">
-                    <h4 className="font-black text-medigo-navy truncate">{report.reportTitle || 'Untitled Document'}</h4>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{report.reportType}</p>
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-black text-medigo-navy">No Records Found</h3>
+                    <p className="text-slate-400 text-sm font-medium max-w-xs mx-auto">
+                      {tab === 'received' ? 'No documents shared by patients yet.' : 'Share a clinical document to begin synchronization.'}
+                    </p>
                   </div>
-
-                  <div className="flex items-center gap-2 text-xs text-slate-400 font-semibold mb-5">
-                    <User size={12} className="text-medigo-blue/40" />
-                    <span className="truncate">Patient: {report.patientId?.slice(0, 16)}…</span>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 pt-4 border-t border-slate-50">
-                    <button
-                      onClick={() => window.open(report.fileUrl, '_blank')}
-                      className="flex-1 flex items-center justify-center gap-2 h-10 bg-slate-50 hover:bg-medigo-blue hover:text-white text-slate-500 text-xs font-black rounded-xl transition-all border border-slate-100 hover:border-medigo-blue"
+                </GlassCard>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {filtered.map((report, idx) => (
+                    <GlassCard
+                      key={report._id}
+                      className="p-8 group"
                     >
-                      <Download size={14} /> Download
-                    </button>
-                    <button
-                      onClick={() => window.open(report.fileUrl, '_blank')}
-                      className="w-10 h-10 flex items-center justify-center bg-slate-50 hover:bg-blue-50 text-slate-400 hover:text-medigo-blue rounded-xl transition-all border border-slate-100"
-                    >
-                      <ArrowUpRight size={15} />
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-        )}
-      </div>
-
-      {/* ── Patient Messages Section ── */}
-      {tab === 'messages' && (
-        <div className="space-y-4">
-          {patientMessages.length === 0 ? (
-            <div className="bg-white rounded-2xl border-2 border-dashed border-slate-100 py-24 text-center space-y-4">
-              <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto text-slate-200">
-                <MessageSquare size={32} />
-              </div>
-              <h3 className="text-lg font-black text-medigo-navy">No Patient Messages</h3>
-              <p className="text-slate-400 text-sm max-w-xs mx-auto">When patients leave pre-appointment notes, they will appear here.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <AnimatePresence>
-                {patientMessages.map((apt, idx) => (
-                  <motion.div
-                    key={apt._id}
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.04 }}
-                    className="bg-white rounded-2xl border border-slate-100 p-6 hover:border-teal-200 hover:shadow-lg transition-all"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-600">
-                          <MessageSquare size={18} />
+                      <div className="flex items-start justify-between mb-8">
+                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${
+                          report.uploadedBy === 'doctor' ? 'bg-indigo-50 text-indigo-500' : 'bg-blue-50 text-medigo-blue'
+                        }`}>
+                          {report.uploadedBy === 'doctor' ? <Stethoscope size={24} /> : <Inbox size={24} />}
                         </div>
-                        <div>
-                          <p className="text-sm font-black text-medigo-navy">{apt.patientName || 'Patient'}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                            <Clock size={10} /> {apt.appointmentDate ? new Date(apt.appointmentDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                          </p>
+                        <div className={`px-3 py-1.5 rounded-xl border text-[9px] font-black uppercase tracking-widest ${
+                          report.uploadedBy === 'doctor' ? 'bg-indigo-50 text-indigo-500 border-indigo-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                        }`}>
+                          {report.uploadedBy === 'doctor' ? 'Sent' : 'Received'}
                         </div>
                       </div>
-                      <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${
-                        apt.status === 'confirmed' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                        apt.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                        'bg-amber-50 text-amber-600 border-amber-100'
-                      }`}>{apt.status}</span>
-                    </div>
+                      
+                      <div className="space-y-2 mb-8">
+                        <h4 className="text-lg font-black text-medigo-navy truncate group-hover:text-medigo-blue transition-colors">{report.reportTitle || 'Untitled Document'}</h4>
+                        <div className="flex items-center gap-2">
+                           <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{report.reportType}</p>
+                        </div>
+                      </div>
 
-                    <div className="bg-teal-50/60 border border-teal-100 rounded-xl px-4 py-3">
-                      <p className="text-xs font-bold text-medigo-navy leading-relaxed">"{apt.reason}"</p>
-                    </div>
+                      <div className="bg-slate-50/50 rounded-2xl px-4 py-3 flex items-center gap-3 mb-8">
+                        <User size={14} className="text-medigo-blue" />
+                        <span className="text-[11px] font-bold text-slate-500 truncate">Patient: {report.patientId}</span>
+                      </div>
 
-                    <div className="mt-3 flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      <Stethoscope size={11} className="text-teal-500" /> {apt.specialty || 'General'} · {apt.timeSlot || '—'}
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => window.open(report.fileUrl, '_blank')}
+                          className="flex-1 h-12 bg-white border border-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-medigo-navy hover:text-white transition-all shadow-sm flex items-center justify-center gap-2"
+                        >
+                          <Download size={14} /> Download
+                        </button>
+                        <button
+                          onClick={() => window.open(report.fileUrl, '_blank')}
+                          className="w-12 h-12 flex items-center justify-center bg-white border border-slate-100 text-slate-400 hover:text-medigo-blue rounded-xl transition-all shadow-sm"
+                        >
+                          <ArrowUpRight size={18} />
+                        </button>
+                      </div>
+                    </GlassCard>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="messages"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-8"
+            >
+              {patientMessages.length === 0 ? (
+                <GlassCard className="py-24 text-center space-y-6" hover={false}>
+                  <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mx-auto border border-slate-100">
+                    <MessageSquare size={32} className="text-slate-200" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-black text-medigo-navy">No Patient Notes</h3>
+                    <p className="text-slate-400 text-sm font-medium max-w-xs mx-auto">Patient messages from appointment bookings will appear here.</p>
+                  </div>
+                </GlassCard>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {patientMessages.map((apt, idx) => (
+                    <GlassCard
+                      key={apt._id}
+                      className="p-8 group"
+                    >
+                      <div className="flex items-start justify-between mb-8">
+                        <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 rounded-2xl bg-teal-50 flex items-center justify-center text-teal-600 border border-teal-100">
+                            <MessageSquare size={24} />
+                          </div>
+                          <div>
+                            <p className="text-lg font-black text-medigo-navy tracking-tight">{apt.patientName || 'Patient'}</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mt-1">
+                              <Clock size={12} className="text-teal-400" /> 
+                              {apt.appointmentDate ? new Date(apt.appointmentDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className={`px-3 py-1.5 rounded-xl border text-[9px] font-black uppercase tracking-widest ${
+                          apt.status === 'confirmed' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                          apt.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                          'bg-amber-50 text-amber-600 border-amber-100'
+                        }`}>{apt.status}</div>
+                      </div>
+
+                      <div className="bg-slate-50/50 border border-slate-100 rounded-[1.5rem] p-6 relative group-hover:bg-white transition-colors">
+                        <p className="text-sm font-bold text-medigo-navy leading-relaxed italic">"{apt.reason}"</p>
+                      </div>
+
+                      <div className="mt-8 flex items-center gap-4 text-[11px] font-black text-slate-400 uppercase tracking-widest px-1">
+                        <span className="flex items-center gap-2"><Stethoscope size={12} className="text-teal-500" /> {apt.specialty || 'General'}</span>
+                        <div className="w-1 h-1 rounded-full bg-slate-200" />
+                        <span className="flex items-center gap-2"><Clock size={12} className="text-teal-500" /> {apt.timeSlot || '—'}</span>
+                      </div>
+                    </GlassCard>
+                  ))}
+                </div>
+              )}
+            </motion.div>
           )}
-        </div>
-      )}
+        </AnimatePresence>
+      </div>
 
       {/* ── Upload Modal ── */}
       <AnimatePresence>
         {showUpload && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setShowUpload(false)}
-              className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+              className="absolute inset-0 bg-medigo-navy/40 backdrop-blur-md"
             />
             <motion.div
-              initial={{ scale: 0.93, opacity: 0, y: 20 }}
+              initial={{ scale: 0.9, opacity: 0, y: 50 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.93, opacity: 0, y: 20 }}
-              className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
+              exit={{ scale: 0.9, opacity: 0, y: 50 }}
+              className="relative bg-white w-full max-w-xl rounded-[3rem] shadow-2xl overflow-hidden"
             >
-              {/* Modal top accent bar */}
-              <div className="h-1.5 bg-gradient-to-r from-medigo-blue via-indigo-500 to-medigo-teal" />
-
-              <div className="p-8">
-                {/* Success state */}
+              <div className="p-10 lg:p-14">
                 <AnimatePresence>
                   {uploadSuccess && (
                     <motion.div
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      className="absolute inset-0 bg-white rounded-3xl flex flex-col items-center justify-center gap-4 z-10"
+                      className="absolute inset-0 bg-white rounded-[3rem] flex flex-col items-center justify-center gap-6 z-10"
                     >
-                      <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center">
-                        <CheckCircle2 size={40} className="text-emerald-500" />
+                      <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center border-4 border-white shadow-lg">
+                        <CheckCircle2 size={48} className="text-emerald-500" />
                       </div>
-                      <p className="text-xl font-black text-medigo-navy">File Sent!</p>
-                      <p className="text-slate-400 text-sm">The document has been dispatched to the patient.</p>
+                      <div className="text-center space-y-2">
+                         <p className="text-3xl font-black text-medigo-navy tracking-tight">File Dispatched</p>
+                         <p className="text-slate-400 text-sm font-medium">The document is now available in the patient's vault.</p>
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
 
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-xl font-black text-medigo-navy">Send Document to Patient</h2>
-                    <p className="text-slate-400 text-xs mt-0.5">Upload a prescription, lab result, or clinical note</p>
+                <div className="flex items-center justify-between mb-12">
+                  <div className="space-y-1">
+                    <h2 className="text-3xl font-black text-medigo-navy tracking-tight leading-none">Send Document</h2>
+                    <p className="text-slate-400 text-sm font-medium">Securely share clinical records with patients.</p>
                   </div>
-                  <button onClick={() => setShowUpload(false)} className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 transition-all">
-                    <X size={16} />
+                  <button onClick={() => setShowUpload(false)} className="w-14 h-14 flex items-center justify-center rounded-2xl bg-slate-50 hover:bg-red-50 hover:text-red-500 transition-all border border-slate-100 shadow-sm">
+                    <X size={24} />
                   </button>
                 </div>
 
-                <form onSubmit={handleUpload} className="space-y-4">
-                  {/* Patient select */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assign to Patient</label>
+                <form onSubmit={handleUpload} className="space-y-8">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Assign to Patient</label>
                     <select
                       required
-                      className="w-full h-12 bg-slate-50 border border-slate-100 rounded-xl px-4 text-sm font-bold outline-none focus:border-medigo-blue focus:ring-2 focus:ring-blue-100 transition-all"
+                      className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-sm font-bold text-medigo-navy outline-none focus:bg-white focus:border-medigo-blue transition-all shadow-inner"
                       value={uploadForm.patientId}
                       onChange={e => setUploadForm({ ...uploadForm, patientId: e.target.value })}
                     >
@@ -359,67 +376,51 @@ export default function PatientRecords() {
                     </select>
                   </div>
 
-                  {/* Title */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Document Title</label>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Document Title</label>
                     <input
-                      type="text" required placeholder="e.g. Blood Test Results — April 2026"
-                      className="w-full h-12 bg-slate-50 border border-slate-100 rounded-xl px-4 text-sm font-bold outline-none focus:border-medigo-blue focus:ring-2 focus:ring-blue-100 transition-all"
+                      type="text" required placeholder="e.g. Lab Report - Q1"
+                      className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-sm font-bold text-medigo-navy outline-none focus:bg-white focus:border-medigo-blue transition-all shadow-inner"
                       value={uploadForm.title}
                       onChange={e => setUploadForm({ ...uploadForm, title: e.target.value })}
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Type */}
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Document Type</label>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Type</label>
                       <select
-                        className="w-full h-12 bg-slate-50 border border-slate-100 rounded-xl px-4 text-sm font-bold outline-none focus:border-medigo-blue"
+                        className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-sm font-bold text-medigo-navy outline-none focus:bg-white focus:border-medigo-blue transition-all shadow-inner"
                         value={uploadForm.type}
                         onChange={e => setUploadForm({ ...uploadForm, type: e.target.value })}
                       >
                         <option value="Prescription">Prescription</option>
                         <option value="Lab Order">Lab Order</option>
                         <option value="Diagnosis">Diagnosis</option>
-                        <option value="Referral">Referral Letter</option>
                         <option value="Report">Report</option>
                       </select>
                     </div>
 
-                    {/* File */}
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Attach File</label>
-                      <input type="file" required accept=".pdf,.jpg,.jpeg,.png" className="hidden" id="doc-file"
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Attachment</label>
+                      <input type="file" required accept=".pdf,.jpg,.jpeg,.png" className="hidden" id="doc-file-up"
                         onChange={e => setUploadForm({ ...uploadForm, file: e.target.files[0] })} />
-                      <label htmlFor="doc-file"
-                        className="w-full h-12 bg-slate-900 hover:bg-medigo-navy text-white rounded-xl px-4 flex items-center justify-between text-xs font-black cursor-pointer transition-all">
-                        <span className="truncate">{uploadForm.file ? uploadForm.file.name.slice(0, 18) + '…' : 'Choose file'}</span>
-                        <Paperclip size={14} className="shrink-0 ml-2" />
+                      <label htmlFor="doc-file-up"
+                        className="w-full h-16 bg-slate-900 text-white rounded-2xl px-6 flex items-center justify-between text-xs font-black cursor-pointer hover:bg-black transition-all shadow-lg active:scale-95">
+                        <span className="truncate">{uploadForm.file ? uploadForm.file.name : 'Choose File'}</span>
+                        <Paperclip size={18} className="shrink-0" />
                       </label>
                     </div>
                   </div>
 
-                  {/* Notes */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Notes (optional)</label>
-                    <textarea
-                      rows={2}
-                      placeholder="Additional clinical notes for the patient…"
-                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-medigo-blue resize-none transition-all"
-                      value={uploadForm.description}
-                      onChange={e => setUploadForm({ ...uploadForm, description: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="flex gap-3 pt-2">
+                  <div className="flex gap-4 pt-6">
                     <button type="button" onClick={() => setShowUpload(false)}
-                      className="flex-1 h-12 rounded-xl border border-slate-200 text-slate-500 font-black text-sm hover:bg-slate-50 transition-all">
-                      Cancel
+                      className="flex-1 h-16 rounded-2xl border-2 border-slate-100 text-xs font-black text-slate-400 hover:text-slate-600 transition-all uppercase tracking-widest">
+                      Discard
                     </button>
                     <button type="submit" disabled={uploading}
-                      className="flex-1 h-12 rounded-xl bg-medigo-blue hover:bg-blue-700 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all disabled:opacity-60">
-                      {uploading ? 'Sending…' : <><Send size={15} /> Send Document</>}
+                      className="flex-[2] h-16 rounded-2xl bg-medigo-navy text-white font-black text-xs uppercase tracking-[0.2em] shadow-premium hover:shadow-2xl transition-all disabled:opacity-50 flex items-center justify-center gap-3">
+                      {uploading ? 'Encrypting…' : <><Send size={18} /> Send Vault</>}
                     </button>
                   </div>
                 </form>

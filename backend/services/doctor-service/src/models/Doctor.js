@@ -74,6 +74,10 @@ const doctorSchema = new mongoose.Schema(
     offersTelemedicine: {
       type: Boolean,
       default: true
+    },
+    profilePic: {
+      type: String,
+      default: ""
     }
   },
   {
