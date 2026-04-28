@@ -17,6 +17,6 @@ spec:
       containers:
       - name: frontend
         image: medigo-frontend:latest
-        imagePullPolicy: IfNotPresent # Change to IfNotPresent if using DockerHub later
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80
