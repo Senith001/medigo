@@ -161,7 +161,7 @@ export const registerPatient = async (req, res) => {
 };
 
 //============================================
-//             OTP Verification
+//            REGISTER OTP Verification
 //============================================
 
 export const verifyRegistrationOtp = async (req, res) => {
@@ -251,6 +251,69 @@ export const verifyRegistrationOtp = async (req, res) => {
         email: user.email,
         role: user.role
       }
+    });
+  } catch (error) {
+    res.status(500);
+    throw new Error(error.message);
+  }
+};
+
+//============================================
+//            PW RESET OTP Verification
+//============================================
+
+export const verifyResetOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and OTP are required"
+      });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    const otpRecord = await Otp.findOne({
+      userId: user._id,
+      purpose: "RESET_PASSWORD",
+      usedAt: null
+    }).sort({ createdAt: -1 });
+
+    if (!otpRecord) {
+      return res.status(400).json({
+        success: false,
+        message: "No active password reset OTP found."
+      });
+    }
+
+    if (otpRecord.expiresAt < new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP expired"
+      });
+    }
+
+    const isMatch = await otpRecord.compareOtp(otp);
+
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "OTP verified successfully"
     });
   } catch (error) {
     res.status(500);

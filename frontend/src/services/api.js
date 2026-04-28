@@ -37,7 +37,10 @@ export const authAPI = {
   changePassword: (data) => api.put('/api/auth/change-password', data),
   requestDeleteOtp: () => api.post('/api/auth/me/request-delete-otp'),
   deleteMyAccount: (data) => api.delete('/api/auth/me', { data }),
-  setupAdminPassword: (data) => api.post('/api/auth/setup-password', data)
+  setupAdminPassword: (data) => api.post('/api/auth/setup-password', data),
+  forgotPassword: (data) => api.post('/api/auth/forgot-password', data),
+  resetPassword: (data) => api.post('/api/auth/reset-password', data),
+  verifyResetOtp: (data) => api.post('/api/auth/verify-reset-otp', data)
 }
 
 export const adminAPI = {
