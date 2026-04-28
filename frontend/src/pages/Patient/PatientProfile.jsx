@@ -46,7 +46,8 @@ const validatePatientProfileFields = (data) => {
 };
 
 export default function PatientProfile() {
-  const { user, logout } = useAuth();
+  // Safety fallback in case AuthContext is not wrapping this component properly
+  const { user, logout } = useAuth() || {}; 
   const navigate = useNavigate();
   const [profileData, setProfileData]   = useState(null);
   const [loading, setLoading]           = useState(true);
@@ -77,7 +78,7 @@ export default function PatientProfile() {
     (async () => {
       try {
         const response = await patientAPI.getMyProfile();
-        if (response.data.success) {
+        if (response.data && response.data.success) {
           const data = response.data.data;
           setProfileData(data);
           setFormData({
@@ -88,7 +89,8 @@ export default function PatientProfile() {
             gender: data.gender || '',
             address: data.address || '',
             bloodGroup: data.bloodGroup || '',
-            dateOfBirth: data.dateOfBirth ? data.dateOfBirth.split('T')[0] : '',
+            // Safely split date ensuring it's a string
+            dateOfBirth: data.dateOfBirth ? String(data.dateOfBirth).split('T')[0] : '',
             emergencyContactName: data.emergencyContactName || '',
             emergencyContactPhone: data.emergencyContactPhone || '',
             nic: data.nic || ''
@@ -135,14 +137,14 @@ export default function PatientProfile() {
   const handleReset = () => {
     if (profileData) {
       setFormData({
-        title: 'Mr',
+        title: profileData.title || 'Mr',
         fullName: profileData.fullName || '',
         phone: profileData.phone || '',
         email: profileData.email || '',
         gender: profileData.gender || '',
         address: profileData.address || '',
         bloodGroup: profileData.bloodGroup || '',
-        dateOfBirth: profileData.dateOfBirth ? profileData.dateOfBirth.split('T')[0] : '',
+        dateOfBirth: profileData.dateOfBirth ? String(profileData.dateOfBirth).split('T')[0] : '',
         emergencyContactName: profileData.emergencyContactName || '',
         emergencyContactPhone: profileData.emergencyContactPhone || '',
         nic: profileData.nic || ''
@@ -173,7 +175,7 @@ export default function PatientProfile() {
     try {
        const res = await authAPI.deleteMyAccount({ otp: deleteOtp });
        if(res.data.success) {
-          logout();
+          logout?.(); // Safe optional call
           navigate('/login');
        }
     } catch(err) {
