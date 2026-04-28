@@ -6,18 +6,23 @@ const notificationSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    recipientEmail: {
-      type: String,
-    },
-    recipientPhone: {
-      type: String,
-    },
-    recipientName: {
-      type: String,
-    },
+    recipientEmail: { type: String },
+    recipientPhone: { type: String },
+    recipientName: { type: String },
     type: {
       type: String,
-      enum: ['appointment_booked', 'appointment_cancelled', 'appointment_updated'],
+      enum: [
+        // Appointment notifications
+        'appointment_booked',
+        'appointment_cancelled',
+        'appointment_updated',
+        // ✅ FIXED: Payment notifications add
+        'payment_success',
+        'payment_confirmed',
+        'payment_pending',
+        'payment_rejected',
+        'payment_notification',
+      ],
       required: true,
     },
     channel: {

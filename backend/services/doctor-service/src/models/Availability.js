@@ -22,6 +22,32 @@ const availabilitySchema = new mongoose.Schema(
       type: String,
       required: true
     },
+    hospital: {
+      type: String
+    },
+    location: {
+      type: String
+    },
+    fee: {
+      type: Number
+    },
+    bookedCount: {
+      type: Number,
+      default: 0
+    },
+    maxPatients: {
+      type: Number,
+      default: 10
+    },
+    patientInterval: {
+      type: Number,
+      default: 30 // minutes per patient
+    },
+    consultationType: {
+      type: String,
+      enum: ['in-person', 'telemedicine', 'both'],
+      default: 'in-person',
+    },
     isAvailable: {
       type: Boolean,
       default: true

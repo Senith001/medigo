@@ -3,6 +3,7 @@ const Notification = require('../models/Notification');
 const {
   sendEmail,
   buildBookingEmail,
+  buildConfirmationEmail,
   buildCancellationEmail,
   buildUpdateEmail,
 } = require('./emailService');
@@ -38,8 +39,8 @@ const logNotification = async (appointmentId, recipientEmail, recipientName, typ
  */
 const handleAppointmentBooked = async (data) => {
   const recipients = [
-    { name: data.patientName, email: data.patientEmail },
-    { name: data.doctorName, email: data.doctorEmail },
+    { name: data.patientName, email: data.patientEmail, phone: data.patientPhone || null },
+    { name: data.doctorName,  email: data.doctorEmail,  phone: data.doctorPhone  || null },
   ];
 
   for (const recipient of recipients) {
@@ -72,8 +73,8 @@ const handleAppointmentBooked = async (data) => {
  */
 const handleAppointmentCancelled = async (data) => {
   const recipients = [
-    { name: data.patientName, email: data.patientEmail },
-    { name: data.doctorName, email: data.doctorEmail },
+    { name: data.patientName, email: data.patientEmail, phone: data.patientPhone || null },
+    { name: data.doctorName,  email: data.doctorEmail,  phone: data.doctorPhone  || null },
   ];
 
   for (const recipient of recipients) {
@@ -104,18 +105,31 @@ const handleAppointmentCancelled = async (data) => {
  */
 const handleAppointmentUpdated = async (data) => {
   const recipients = [
-    { name: data.patientName, email: data.patientEmail },
-    { name: data.doctorName, email: data.doctorEmail },
+    { name: data.patientName, email: data.patientEmail, phone: data.patientPhone || null },
+    { name: data.doctorName,  email: data.doctorEmail,  phone: data.doctorPhone  || null },
   ];
 
   for (const recipient of recipients) {
-    const emailPayload = buildUpdateEmail({ ...data, recipientName: recipient.name });
+    const emailPayload = data.confirmed
+      ? buildConfirmationEmail({ ...data, recipientName: recipient.name })
+      : buildUpdateEmail({ ...data, recipientName: recipient.name });
 
     try {
       await sendEmail(recipient.email, emailPayload.subject, emailPayload.html);
       await logNotification(data.appointmentId, recipient.email, recipient.name, 'appointment_updated', 'email', 'sent');
     } catch (err) {
       await logNotification(data.appointmentId, recipient.email, recipient.name, 'appointment_updated', 'email', 'failed', err.message);
+    }
+    
+    // SMS Notifications
+    if (recipient.phone) {
+      const smsBody = buildUpdateSMS({ ...data, recipientName: recipient.name });
+      try {
+        await sendSMS(recipient.phone, smsBody);
+        await logNotification(data.appointmentId, recipient.email, recipient.name, 'appointment_updated', 'sms', 'sent');
+      } catch (err) {
+        await logNotification(data.appointmentId, recipient.email, recipient.name, 'appointment_updated', 'sms', 'failed', err.message);
+      }
     }
   }
 };

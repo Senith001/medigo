@@ -50,3 +50,65 @@ services:
       - ./backend/services/payment-service/.env
     volumes:
       - ./backend/services/payment-service/uploads:/app/uploads
+
+#====================================================
+#            TELEMEDICINE SERVICE
+#====================================================
+  telemedicine-service:
+    build:
+      context: ./backend/services/telemedicine-service
+    container_name: medigo-telemedicine-service
+    ports:
+      - "5008:5008"
+    env_file:
+      - ./backend/services/telemedicine-service/.env
+
+#====================================================
+#               DOCTOR SERVICE
+#====================================================
+  doctor-service:
+    build:
+      context: ./backend/services/doctor-service
+    container_name: medigo-doctor-service
+    ports:
+      - "5004:5004"
+    env_file:
+      - ./backend/services/doctor-service/.env
+
+#====================================================
+#            APPOINTMENT SERVICE
+#====================================================
+  appointment-service:
+    build:
+      context: ./backend/services/appointment-service
+    container_name: medigo-appointment-service
+    ports:
+      - "5005:5005"
+    env_file:
+      - ./backend/services/appointment-service/.env
+
+#====================================================
+#          MEDIACLREPORT SERVICE
+#====================================================
+  mediaclreport-service:
+    build:
+      context: ./backend/services/mediaclreport-service
+    container_name: medigo-mediaclreport-service
+    ports:
+      - "5006:5006"
+    env_file:
+      - ./backend/services/mediaclreport-service/.env
+    volumes:
+      - ./backend/services/mediaclreport-service/uploads:/app/uploads
+
+#====================================================
+#           NOTIFICATION SERVICE
+#====================================================
+  notification-service:
+    build:
+      context: ./backend/services/notification-service
+    container_name: medigo-notification-service
+    ports:
+      - "5009:5009"
+    env_file:
+      - ./backend/services/notification-service/.env

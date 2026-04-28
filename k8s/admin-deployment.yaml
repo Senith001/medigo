@@ -15,6 +15,28 @@ spec:
       containers:
       - name: admin-service
         image: medigo-admin-service:latest
-        imagePullPolicy: Never # Crucial for local testing
+        imagePullPolicy: Never
         ports:
         - containerPort: 5003
+        env:
+        # --- Core Settings ---
+        - name: PORT
+          value: "5003"
+        - name: MONGO_URI
+          value: "mongodb+srv://medigoAdmin:mediGo%40SE127@medigo-cluster.ega902t.mongodb.net/admin_db?retryWrites=true&w=majority"
+        
+        # --- Secrets & Keys ---
+        - name: JWT_SECRET
+          value: "medigo_super_secret_key"
+        - name: SERVICE_SECRET
+          value: "medigo_super_secret_key"
+        - name: ADMIN_SUPER_KEY
+          value: "medigo_admin_super_key_123"
+          
+        # --- K8s Internal Networking ---
+        - name: AUTH_SERVICE_URL
+          value: "http://auth-service-network:5001"
+        - name: PATIENT_SERVICE_URL
+          value: "http://patient-service-network:5002"
+        - name: DOCTOR_SERVICE_URL
+          value: "http://doctor-service-network:5004"

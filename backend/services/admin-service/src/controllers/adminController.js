@@ -26,6 +26,22 @@ export const loginAdmin = async (req, res) => {
       });
     }
 
+    const adminCheck = await Admin.findOne({ email: email.toLowerCase() });
+
+    if (!adminCheck) {
+      return res.status(403).json({
+        success: false,
+        message: "Admin profile not found in Admin Service."
+      });
+    }
+
+    if (!adminCheck.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: "Account disabled. Please contact the super admin."
+      });
+    }
+
     res.status(200).json(response.data);
   } catch (error) {
     res.status(error.response?.status || 500).json({
@@ -76,13 +92,13 @@ export const bootstrapSuperAdmin = async (req, res) => {
       data: superadmin
     });
   } catch (error) {
-      return res.status(500).json({ success: false, message: error.message });
-    }
+    return res.status(500).json({ success: false, message: error.message });
+  }
 };
 
 export const createAdmin = async (req, res) => {
   try {
-    const { fullName, email, password, phone } = req.body;
+    const { fullName, email, phone } = req.body;
 
     const existingAdmin = await Admin.findOne({ email: email.toLowerCase() });
     if (existingAdmin) {
@@ -96,7 +112,7 @@ export const createAdmin = async (req, res) => {
     try {
       const authResponse = await httpClient.post(
         `${process.env.AUTH_SERVICE_URL}/api/auth/internal/users`,
-        { fullName, email, password, phone, role: "admin" },
+        { fullName, email, phone, role: "admin" },
         internalHeaders
       );
       authUser = authResponse.data.data;
@@ -113,12 +129,13 @@ export const createAdmin = async (req, res) => {
       fullName: authUser.fullName,
       email: authUser.email,
       phone: authUser.phone,
-      role: "admin"
+      role: "admin",
+      isActive: false  // Stays inactive until they set their password
     });
 
     res.status(201).json({
       success: true,
-      message: "Admin created successfully",
+      message: "Admin invitation sent. They will receive an email to set up their account.",
       data: admin
     });
   } catch (error) {
@@ -140,7 +157,9 @@ export const createAdmin = async (req, res) => {
 
 export const getAdmins = async (req, res) => {
   try {
-    const admins = await Admin.find();
+    // Added the filter to only match documents where role is "admin"
+    const admins = await Admin.find({ role: "admin" });
+
     res.status(200).json({
       success: true,
       count: admins.length,
@@ -149,6 +168,104 @@ export const getAdmins = async (req, res) => {
   } catch (error) {
     res.status(500);
     throw new Error("Failed to fetch admins");
+  }
+};
+
+// Called internally by auth-service after a new admin completes password setup
+export const activateAdmin = async (req, res) => {
+  try {
+    const isMongoId = /^[0-9a-fA-F]{24}$/.test(req.params.id);
+    const query = isMongoId ? { authUserId: req.params.id } : { userId: req.params.id };
+
+    const admin = await Admin.findOne(query);
+
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Admin profile not found." });
+    }
+
+    admin.isActive = true;
+    await admin.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Admin ${admin.fullName} has been activated.`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to activate admin." });
+  }
+};
+
+export const resendAdminInvitation = async (req, res) => {
+  try {
+    const { adminId } = req.params;
+
+    // First fetch the admin profile to get their email
+    const isMongoId = /^[0-9a-fA-F]{24}$/.test(adminId);
+    const query = isMongoId ? { _id: adminId } : { userId: adminId };
+    const admin = await Admin.findOne(query);
+
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Admin not found." });
+    }
+
+    if (admin.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot resend invitation to an already active admin."
+      });
+    }
+
+    // Proxy to auth-service which handles token generation and email
+    await httpClient.post(
+      `${process.env.AUTH_SERVICE_URL}/api/auth/internal/resend-admin-invitation`,
+      { email: admin.email },
+      internalHeaders
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Invitation resent to ${admin.email}.`
+    });
+  } catch (error) {
+    const msg = error.response?.data?.message || "Failed to resend invitation.";
+    res.status(error.response?.status || 500).json({ success: false, message: msg });
+  }
+};
+
+export const toggleAdminStatus = async (req, res) => {
+  try {
+    if (req.user.role !== "superadmin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only superadmins can toggle admin status."
+      });
+    }
+
+    if (req.user.userId === req.params.id || req.user._id.toString() === req.params.id) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot change your own status."
+      });
+    }
+
+    const isMongoId = /^[0-9a-fA-F]{24}$/.test(req.params.id);
+    const query = isMongoId ? { _id: req.params.id } : { userId: req.params.id };
+
+    const admin = await Admin.findOne(query);
+
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Admin not found." });
+    }
+
+    admin.isActive = !admin.isActive;
+    await admin.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Admin ${admin.fullName} has been ${admin.isActive ? 'enabled' : 'disabled'}.`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to update admin status." });
   }
 };
 
@@ -165,6 +282,124 @@ export const getPatients = async (req, res) => {
     throw new Error("Failed to fetch patients");
   }
 };
+
+// ============================================
+// GET PATIENT BY ID - CALL PATIENT CONTROLLER
+// ============================================
+
+export const getPatientById = async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const response = await httpClient.get(
+      `${process.env.PATIENT_SERVICE_URL}/api/patients/${targetId}`,
+      {
+        headers: {
+          Authorization: req.headers.authorization
+        }
+      }
+    );
+    res.status(200).json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({
+      success: false,
+      message: error.response?.data?.message || "Failed to fetch patient details"
+    });
+  }
+};
+
+// ==========================================
+// DOCTOR MANAGEMENT
+// ==========================================
+
+export const getDoctors = async (req, res) => {
+  try {
+    const doctorServiceUrl = process.env.DOCTOR_SERVICE_URL;
+    if (!doctorServiceUrl) {
+      return res.status(500).json({
+        success: false,
+        message: "Admin service misconfiguration: DOCTOR_SERVICE_URL is not defined."
+      });
+    }
+
+    const response = await httpClient.get(
+      `${doctorServiceUrl}/api/doctors`
+    );
+    res.status(200).json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({
+      success: false,
+      message: error.response?.data?.message || "Failed to fetch doctors"
+    });
+  }
+};
+
+export const updateDoctorStatus = async (req, res) => {
+  try {
+    const { status } = req.body
+    console.log("=== updateDoctorStatus ===")
+    console.log("Doctor ID:", req.params.id)
+    console.log("Status:", status)
+    console.log("DOCTOR_SERVICE_URL:", process.env.DOCTOR_SERVICE_URL)
+    console.log("SERVICE_SECRET set?", !!process.env.SERVICE_SECRET)
+
+    if (!['pending', 'verified', 'rejected'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status."
+      })
+    }
+
+    let doctorResponse
+    try {
+      doctorResponse = await httpClient.patch(
+        `${process.env.DOCTOR_SERVICE_URL}/api/doctors/${req.params.id}/status`,
+        { status },
+        internalHeaders
+      )
+      console.log("Doctor-service response:", JSON.stringify(doctorResponse.data))
+    } catch (doctorErr) {
+      console.error("❌ Doctor-service call failed:")
+      console.error("  Status:", doctorErr.response?.status)
+      console.error("  Message:", doctorErr.response?.data)
+      console.error("  URL:", `${process.env.DOCTOR_SERVICE_URL}/api/doctors/${req.params.id}/status`)
+      return res.status(doctorErr.response?.status || 502).json({
+        success: false,
+        message: doctorErr.response?.data?.message || "Doctor service unreachable."
+      })
+    }
+
+    const doctorData = doctorResponse.data?.data?.doctor
+      || doctorResponse.data?.data
+      || doctorResponse.data?.doctor
+      || doctorResponse.data
+    const authUserId = doctorData?.authUserId || req.params.id
+    console.log("Doctor data:", doctorData)
+    console.log("authUserId:", authUserId)
+
+    if (status === 'verified' || status === 'rejected') {
+      try {
+        await httpClient.patch(
+          `${process.env.AUTH_SERVICE_URL}/api/auth/internal/doctors/${authUserId}/verify`,
+          { approve: status === 'verified' },
+          internalHeaders
+        )
+        console.log("✅ Auth-service sync success")
+      } catch (authErr) {
+        console.error("⚠️ Auth-service sync failed (non-fatal):", authErr.message)
+      }
+    }
+
+    res.status(200).json(doctorResponse.data)
+
+  } catch (error) {
+    console.error("❌ updateDoctorStatus crash:", error.message)
+    console.error(error.stack)
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to update doctor status"
+    })
+  }
+}
 
 // ==========================================
 // DELETION ORCHESTRATORS
@@ -264,6 +499,50 @@ export const deletePatientAccount = async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.response?.data?.message || "Failed to delete patient"
+    });
+  }
+};
+
+export const deleteDoctorAccount = async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const isMongoId = /^[0-9a-fA-F]{24}$/.test(targetId);
+
+    // 1. Delete doctor profile from Doctor Service first
+    try {
+      await httpClient.delete(
+        `${process.env.DOCTOR_SERVICE_URL}/api/doctors/internal/${targetId}`,
+        {
+          headers: {
+            "x-service-secret": process.env.SERVICE_SECRET
+          }
+        }
+      );
+    } catch (serviceError) {
+      const status = serviceError.response?.status;
+      if (status !== 404) {
+        return res.status(status || 500).json({
+          success: false,
+          message: serviceError.response?.data?.message || "Failed to delete doctor profile"
+        });
+      }
+    }
+
+    // 2. Delete Auth identity + OTP records
+    await httpClient.delete(
+      `${process.env.AUTH_SERVICE_URL}/api/auth/internal/identities/${targetId}`,
+      internalHeaders
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Doctor account fully deleted"
+    });
+  } catch (error) {
+    console.error("Delete Doctor Error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: error.response?.data?.message || "Failed to delete doctor"
     });
   }
 };

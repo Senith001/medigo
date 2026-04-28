@@ -2,6 +2,10 @@ const mongoose = require('mongoose');
 
 const appointmentSchema = new mongoose.Schema(
   {
+    sessionId: {
+      type: String,
+      default: null, // Link to Availability/Session
+    },
     patientId: {
       type: String,
       required: [true, 'Patient ID is required'],
@@ -77,11 +81,20 @@ const appointmentSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ['unpaid', 'paid', 'refunded'],
+      enum: ['unpaid', 'processing', 'paid', 'refunded'],
       default: 'unpaid',
     },
     meetingLink: {
       type: String,
+      default: null,
+    },
+    // Snapshotted at booking time so display never needs a cross-service call
+    patientNumber: {
+      type: Number,
+      default: null,
+    },
+    maxPatients: {
+      type: Number,
       default: null,
     },
   },
@@ -93,6 +106,9 @@ const appointmentSchema = new mongoose.Schema(
 appointmentSchema.index({ patientId: 1, appointmentDate: -1 });
 appointmentSchema.index({ doctorId: 1, appointmentDate: 1 });
 appointmentSchema.index({ status: 1 });
-appointmentSchema.index({ appointmentDate: 1, doctorId: 1, timeSlot: 1 }, { unique: true });
+appointmentSchema.index(
+  { appointmentDate: 1, doctorId: 1, timeSlot: 1 },
+  { unique: true, partialFilterExpression: { status: { $in: ['pending', 'confirmed'] } } }
+);
 
 module.exports = mongoose.model('Appointment', appointmentSchema);
