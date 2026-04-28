@@ -1,7 +1,15 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
+import {
+  User, Mail, Phone, MapPin, Calendar, Heart, ShieldCheck,
+  KeyRound, Lock, AlertCircle, CheckCircle2, Loader2, ArrowRight,
+  CalendarDays, Stethoscope, Trash2, X, ChevronRight, BadgeCheck,
+  Droplet, Users, Activity
+} from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { patientAPI, authAPI } from '../../services/api'
-import { useNavigate } from 'react-router-dom'
+import Button from '../../components/ui/Button'
 
 const phoneRegex = /^(0[0-9]{9}|(77|76|74|78|75|71|70)[0-9]{7})$/
 const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
@@ -98,6 +106,10 @@ export default function PatientProfile() {
   useEffect(() => {
     setFieldErrors(validatePatientProfileFields(formData))
   }, [formData])
+
+  const newPasswordValid = passwordRegex.test(pwdForm.newPassword)
+  const passwordsMatch = pwdForm.newPassword === pwdForm.confirmPassword
+  const canSubmitPassword = pwdForm.currentPassword && pwdForm.newPassword && pwdForm.confirmPassword && newPasswordValid && passwordsMatch && !pwdLoading
 
   const splitName = (fullName = '') => {
     const parts = fullName.trim().split(/\s+/)
@@ -302,84 +314,119 @@ export default function PatientProfile() {
   }
 
   if (loading && !profileData) {
-    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading profile...</div>
+    return (
+      <div className="max-w-5xl mx-auto flex items-center justify-center py-20 text-slate-400">
+        <Loader2 size={32} className="animate-spin text-medigo-blue mr-3" />
+        <span className="text-sm font-bold">Loading profile...</span>
+      </div>
+    )
   }
 
   if (error) {
-    return <div style={{ padding: '2rem', color: 'red', textAlign: 'center' }}>{error}</div>
+    return (
+      <div className="max-w-5xl mx-auto p-6 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-center">
+        <AlertCircle size={24} className="mx-auto mb-2" />
+        {error}
+      </div>
+    )
   }
 
   const tabs = [
-    { id: 'profile', label: 'My Profile' },
-    { id: 'emergency_contacts', label: 'Emergency Contact Numbers' },
-    { id: 'password', label: 'Change Password' }
+    { id: 'profile', label: 'My Profile', icon: User },
+    { id: 'emergency_contacts', label: 'Emergency Contact', icon: Users },
+    { id: 'password', label: 'Change Password', icon: Lock }
   ]
 
   const hasValidationErrors = Object.values(fieldErrors).some(Boolean)
 
-  const isPasswordInvalid =
-    !pwdForm.newPassword ||
-    !passwordRegex.test(pwdForm.newPassword) ||
-    pwdForm.confirmPassword !== pwdForm.newPassword
-
   return (
-    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '2rem' }}>
-      <div style={containerStyle}>
-        <div style={headerStyle}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-            <div style={avatarStyle}>
+    <div className="max-w-5xl mx-auto space-y-8 pb-20 pt-8">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white rounded-[2rem] border border-slate-100 p-8 shadow-sm"
+      >
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="flex items-center gap-5">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-sky-400 to-medigo-blue flex items-center justify-center text-white text-3xl font-black shadow-lg">
               {profileData?.fullName?.[0]?.toUpperCase() || user?.name?.[0]?.toUpperCase() || 'P'}
             </div>
-
             <div>
-              <h2 style={nameStyle}>{profileData?.fullName || user?.name || 'Patient'}</h2>
-              <p style={mutedTextStyle}>Member ID : {profileData?.userId || 'Loading...'}</p>
-              <p style={mutedTextStyle}>
-                Registered :{' '}
-                {new Date(profileData?.createdAt || Date.now()).toLocaleDateString('en-GB', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric'
-                })}
-              </p>
+              <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Patient Profile</p>
+              <h2 className="text-2xl font-black text-medigo-navy">{profileData?.fullName || user?.name || 'Patient'}</h2>
+              <div className="flex items-center gap-4 mt-1 text-sm text-slate-500 font-medium">
+                <span className="flex items-center gap-1.5">
+                  <BadgeCheck size={14} className="text-medigo-blue" />
+                  ID: {profileData?.userId || 'Loading...'}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <CalendarDays size={14} className="text-slate-400" />
+                  Joined {new Date(profileData?.createdAt || Date.now()).toLocaleDateString('en-GB', {
+                    month: 'short',
+                    year: 'numeric'
+                  })}
+                </span>
+              </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button style={outlineButtonStyle} onClick={() => navigate('/appointments')}>
-              My Appointment
-            </button>
-
-            <button style={primaryButtonStyle} onClick={() => navigate('/book')}>
-              Make An Appointment
-            </button>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              className="border-slate-200 text-slate-600 bg-white shadow-sm h-11"
+              onClick={() => navigate('/appointments')}
+            >
+              <CalendarDays size={18} className="mr-2" /> My Appointments
+            </Button>
+            <Button
+              onClick={() => navigate('/book')}
+              className="bg-medigo-blue hover:bg-blue-600 text-white shadow-lg shadow-blue-500/20 h-11"
+            >
+              <Stethoscope size={18} className="mr-2" /> Book Appointment
+            </Button>
           </div>
         </div>
+      </motion.div>
 
-        <div style={tabWrapperStyle}>
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                ...tabButtonStyle,
-                color: activeTab === tab.id ? '#3b82f6' : '#64748b',
-                borderBottom: activeTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent',
-                fontWeight: activeTab === tab.id ? '500' : '400'
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 px-6 py-4 text-sm font-bold transition-colors border-b-2 -mb-px ${
+              activeTab === tab.id
+                ? 'text-medigo-blue border-medigo-blue'
+                : 'text-slate-500 border-transparent hover:text-slate-700'
+            }`}
+          >
+            <tab.icon size={18} />
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
+      {/* Profile Tab */}
+      <AnimatePresence mode="wait">
         {activeTab === 'profile' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.8rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(100px, 1fr) 3fr 3fr', gap: '1.5rem' }}>
-              <div>
-                <label style={labelStyle}>Title</label>
-                <select name="title" value={formData.title} onChange={handleInputChange} style={inputStyle}>
+          <motion.div
+            key="profile"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-white rounded-[2rem] border border-slate-100 p-8 shadow-sm space-y-6"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+              {/* Title */}
+              <div className="md:col-span-2">
+                <FormLabel>Title</FormLabel>
+                <select
+                  name="title"
+                  value={formData.title}
+                  onChange={handleInputChange}
+                  className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-medigo-navy outline-none focus:border-medigo-blue focus:ring-2 focus:ring-blue-100 transition-all text-sm font-semibold"
+                >
                   <option value="Mr">Mr</option>
                   <option value="Mrs">Mrs</option>
                   <option value="Miss">Miss</option>
@@ -387,66 +434,83 @@ export default function PatientProfile() {
                 </select>
               </div>
 
-              <div>
-                <label style={labelStyle}>First Name</label>
+              {/* First Name */}
+              <div className="md:col-span-5">
+                <FormLabel icon={User}>First Name</FormLabel>
                 <input
                   type="text"
                   name="firstName"
                   value={formData.firstName}
                   onChange={handleInputChange}
-                  style={inputStyle}
+                  className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-medigo-navy outline-none focus:border-medigo-blue focus:ring-2 focus:ring-blue-100 transition-all text-sm font-semibold"
                 />
-                {fieldErrors.fullName && <div style={errorStyle}>{fieldErrors.fullName}</div>}
+                {fieldErrors.fullName && <FieldError>{fieldErrors.fullName}</FieldError>}
               </div>
 
-              <div>
-                <label style={labelStyle}>Last Name</label>
+              {/* Last Name */}
+              <div className="md:col-span-5">
+                <FormLabel>Last Name</FormLabel>
                 <input
                   type="text"
                   name="lastName"
                   value={formData.lastName}
                   onChange={handleInputChange}
-                  style={inputStyle}
+                  className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-medigo-navy outline-none focus:border-medigo-blue focus:ring-2 focus:ring-blue-100 transition-all text-sm font-semibold"
                 />
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Phone */}
               <div>
-                <label style={labelStyle}>Phone</label>
+                <FormLabel icon={Phone}>Phone</FormLabel>
                 <input
                   type="text"
                   name="phone"
                   value={formData.phone}
                   onChange={handleInputChange}
                   placeholder="0771234567"
-                  style={inputStyle}
+                  className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-medigo-navy outline-none focus:border-medigo-blue focus:ring-2 focus:ring-blue-100 transition-all text-sm font-semibold"
                 />
-                {fieldErrors.phone && <div style={errorStyle}>{fieldErrors.phone}</div>}
+                {fieldErrors.phone && <FieldError>{fieldErrors.phone}</FieldError>}
               </div>
 
+              {/* Email */}
               <div>
-                <label style={labelStyle}>Email</label>
-                <input type="email" name="email" value={formData.email} style={disabledInputStyle} disabled />
+                <FormLabel icon={Mail}>Email</FormLabel>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  disabled
+                  className="w-full h-12 bg-slate-100 border border-slate-200 rounded-xl px-4 text-slate-400 outline-none cursor-not-allowed text-sm font-semibold"
+                />
               </div>
             </div>
 
+            {/* Address */}
             <div>
-              <label style={labelStyle}>Address</label>
+              <FormLabel icon={MapPin}>Address</FormLabel>
               <input
                 type="text"
                 name="address"
                 value={formData.address}
                 onChange={handleInputChange}
-                style={inputStyle}
+                className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-medigo-navy outline-none focus:border-medigo-blue focus:ring-2 focus:ring-blue-100 transition-all text-sm font-semibold"
               />
-              {fieldErrors.address && <div style={errorStyle}>{fieldErrors.address}</div>}
+              {fieldErrors.address && <FieldError>{fieldErrors.address}</FieldError>}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {/* Gender */}
               <div>
-                <label style={labelStyle}>Gender</label>
-                <select name="gender" value={formData.gender} onChange={handleInputChange} style={inputStyle}>
+                <FormLabel>Gender</FormLabel>
+                <select
+                  name="gender"
+                  value={formData.gender}
+                  onChange={handleInputChange}
+                  className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-medigo-navy outline-none focus:border-medigo-blue focus:ring-2 focus:ring-blue-100 transition-all text-sm font-semibold"
+                >
                   <option value="">Select</option>
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
@@ -454,222 +518,268 @@ export default function PatientProfile() {
                 </select>
               </div>
 
+              {/* Date of Birth */}
               <div>
-                <label style={labelStyle}>Date of Birth</label>
+                <FormLabel icon={Calendar}>Date of Birth</FormLabel>
                 <input
                   type="date"
                   name="dateOfBirth"
                   value={formData.dateOfBirth}
                   onChange={handleInputChange}
-                  style={inputStyle}
+                  className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-medigo-navy outline-none focus:border-medigo-blue focus:ring-2 focus:ring-blue-100 transition-all text-sm font-semibold"
                 />
               </div>
 
+              {/* Blood Group */}
               <div>
-                <label style={labelStyle}>Blood Group</label>
-                <select name="bloodGroup" value={formData.bloodGroup} onChange={handleInputChange} style={inputStyle}>
+                <FormLabel icon={Droplet}>Blood Group</FormLabel>
+                <select
+                  name="bloodGroup"
+                  value={formData.bloodGroup}
+                  onChange={handleInputChange}
+                  className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-medigo-navy outline-none focus:border-medigo-blue focus:ring-2 focus:ring-blue-100 transition-all text-sm font-semibold"
+                >
                   <option value="">Select</option>
                   {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((group) => (
-                    <option key={group} value={group}>
-                      {group}
-                    </option>
+                    <option key={group} value={group}>{group}</option>
                   ))}
                 </select>
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem' }}>
-              <button style={dangerButtonStyle} onClick={() => setShowDeleteConfirm(true)}>
-                Account Delete
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-slate-100">
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-xl font-semibold text-sm hover:bg-red-100 transition-colors"
+              >
+                <Trash2 size={16} /> Delete Account
               </button>
 
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <button style={secondaryButtonStyle} onClick={handleReset} disabled={updating}>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleReset}
+                  disabled={updating}
+                  className="h-11 px-6 bg-slate-100 text-slate-600 rounded-xl font-semibold text-sm hover:bg-slate-200 transition-colors disabled:opacity-50"
+                >
                   Reset
                 </button>
-
-                <button
-                  style={{
-                    ...saveButtonStyle,
-                    opacity: hasValidationErrors || updating ? 0.6 : 1,
-                    cursor: hasValidationErrors || updating ? 'not-allowed' : 'pointer'
-                  }}
+                <Button
                   onClick={handleUpdate}
                   disabled={hasValidationErrors || updating}
+                  loading={updating}
+                  className="h-11 px-6 bg-medigo-blue hover:bg-blue-600 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/20 disabled:opacity-50"
                 >
-                  {updating ? 'Updating...' : 'Update'}
-                </button>
+                  <CheckCircle2 size={18} className="mr-2" />
+                  Update Profile
+                </Button>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {activeTab === 'emergency_contacts' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.8rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          <motion.div
+            key="emergency"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-white rounded-[2rem] border border-slate-100 p-8 shadow-sm space-y-6"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <label style={labelStyle}>Contact Name</label>
+                <FormLabel icon={User}>Contact Name</FormLabel>
                 <input
                   type="text"
                   name="emergencyContactName"
                   value={formData.emergencyContactName}
                   onChange={handleInputChange}
-                  style={inputStyle}
+                  className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-medigo-navy outline-none focus:border-medigo-blue focus:ring-2 focus:ring-blue-100 transition-all text-sm font-semibold"
                 />
-                {fieldErrors.emergencyContactName && (
-                  <div style={errorStyle}>{fieldErrors.emergencyContactName}</div>
-                )}
+                {fieldErrors.emergencyContactName && <FieldError>{fieldErrors.emergencyContactName}</FieldError>}
               </div>
 
               <div>
-                <label style={labelStyle}>Contact Phone</label>
+                <FormLabel icon={Phone}>Contact Phone</FormLabel>
                 <input
                   type="text"
                   name="emergencyContactPhone"
                   value={formData.emergencyContactPhone}
                   onChange={handleInputChange}
                   placeholder="0771234567"
-                  style={inputStyle}
+                  className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-medigo-navy outline-none focus:border-medigo-blue focus:ring-2 focus:ring-blue-100 transition-all text-sm font-semibold"
                 />
-                {fieldErrors.emergencyContactPhone && (
-                  <div style={errorStyle}>{fieldErrors.emergencyContactPhone}</div>
-                )}
+                {fieldErrors.emergencyContactPhone && <FieldError>{fieldErrors.emergencyContactPhone}</FieldError>}
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-              <button
-                style={{
-                  ...saveButtonStyle,
-                  opacity: hasValidationErrors || updating ? 0.6 : 1,
-                  cursor: hasValidationErrors || updating ? 'not-allowed' : 'pointer'
-                }}
+            <div className="flex justify-end pt-4 border-t border-slate-100">
+              <Button
                 onClick={handleUpdate}
                 disabled={hasValidationErrors || updating}
+                loading={updating}
+                className="h-11 px-6 bg-medigo-blue hover:bg-blue-600 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/20 disabled:opacity-50"
               >
-                {updating ? 'Saving...' : 'Save Changes'}
-              </button>
+                <CheckCircle2 size={18} className="mr-2" />
+                Save Changes
+              </Button>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {activeTab === 'password' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.8rem' }}>
-            <form onSubmit={handlePasswordChange} style={passwordFormStyle}>
-              <div>
-                <label style={labelStyle}>Current Password</label>
-                <input
-                  type="password"
-                  value={pwdForm.currentPassword}
-                  onChange={(e) => setPwdForm({ ...pwdForm, currentPassword: e.target.value })}
-                  required
-                  style={inputStyle}
-                />
+          <motion.div
+            key="password"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-white rounded-[2rem] border border-slate-100 p-8 shadow-sm"
+          >
+            <form onSubmit={handlePasswordChange} className="max-w-md space-y-5">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-medigo-blue">
+                  <ShieldCheck size={24} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Security</p>
+                  <h3 className="text-lg font-black text-medigo-navy">Change Password</h3>
+                </div>
               </div>
 
-              <div>
-                <label style={labelStyle}>New Password</label>
-                <input
-                  type="password"
-                  value={pwdForm.newPassword}
-                  onChange={(e) => setPwdForm({ ...pwdForm, newPassword: e.target.value })}
-                  required
-                  style={inputStyle}
-                />
-                {pwdForm.newPassword && !passwordRegex.test(pwdForm.newPassword) && (
-                  <div style={errorStyle}>
-                    Must be at least 8 characters and contain uppercase, lowercase, number, and special character.
-                  </div>
-                )}
-              </div>
+              <PasswordField
+                label="Current Password"
+                icon={KeyRound}
+                value={pwdForm.currentPassword}
+                onChange={(e) => setPwdForm({ ...pwdForm, currentPassword: e.target.value })}
+              />
 
-              <div>
-                <label style={labelStyle}>Confirm New Password</label>
-                <input
-                  type="password"
-                  value={pwdForm.confirmPassword}
-                  onChange={(e) => setPwdForm({ ...pwdForm, confirmPassword: e.target.value })}
-                  required
-                  style={inputStyle}
-                />
-                {pwdForm.confirmPassword && pwdForm.confirmPassword !== pwdForm.newPassword && (
-                  <div style={errorStyle}>Passwords do not match.</div>
-                )}
-              </div>
+              <PasswordField
+                label="New Password"
+                icon={Lock}
+                value={pwdForm.newPassword}
+                onChange={(e) => setPwdForm({ ...pwdForm, newPassword: e.target.value })}
+                error={pwdForm.newPassword && !newPasswordValid}
+                helperText={pwdForm.newPassword && !newPasswordValid ? 'Must be 8+ chars with uppercase, lowercase, number, and special char.' : null}
+              />
+
+              <PasswordField
+                label="Confirm New Password"
+                icon={ShieldCheck}
+                value={pwdForm.confirmPassword}
+                onChange={(e) => setPwdForm({ ...pwdForm, confirmPassword: e.target.value })}
+                error={pwdForm.confirmPassword && !passwordsMatch}
+                success={pwdForm.confirmPassword && passwordsMatch}
+                helperText={pwdForm.confirmPassword ? (passwordsMatch ? 'Passwords match' : 'Passwords do not match') : null}
+              />
 
               {pwdMessage && (
-                <div
-                  style={{
-                    padding: '10px',
-                    borderRadius: '6px',
-                    backgroundColor: pwdError ? '#fef2f2' : '#f0fdf4',
-                    color: pwdError ? '#b91c1c' : '#15803d',
-                    fontSize: '0.85rem'
-                  }}
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`p-4 rounded-xl flex items-center gap-3 text-sm font-semibold ${
+                    pwdError
+                      ? 'bg-red-50 border border-red-100 text-red-600'
+                      : 'bg-emerald-50 border border-emerald-100 text-emerald-600'
+                  }`}
                 >
+                  {pwdError ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
                   {pwdMessage}
-                </div>
+                </motion.div>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '0.5rem' }}>
-                <button
-                  type="submit"
-                  disabled={pwdLoading || isPasswordInvalid}
-                  style={{
-                    ...saveButtonStyle,
-                    opacity: pwdLoading || isPasswordInvalid ? 0.6 : 1,
-                    cursor: pwdLoading || isPasswordInvalid ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {pwdLoading ? 'Updating...' : 'Update Password'}
-                </button>
-              </div>
+              <Button
+                type="submit"
+                loading={pwdLoading}
+                disabled={!canSubmitPassword}
+                className="w-full h-12 bg-medigo-blue hover:bg-blue-600 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/20 disabled:opacity-50"
+              >
+                {pwdLoading ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 size={18} className="animate-spin" />
+                    Updating...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    Update Password
+                    <ArrowRight size={18} />
+                  </span>
+                )}
+              </Button>
             </form>
-          </div>
+          </motion.div>
         )}
+      </AnimatePresence>
 
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
         {showDeleteConfirm && (
-          <div style={modalOverlayStyle}>
-            <div style={modalBoxStyle}>
-              <h3 style={modalTitleStyle}>Delete Account</h3>
-              <p style={modalTextStyle}>
+          <div
+            onClick={() => setShowDeleteConfirm(false)}
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-white rounded-[2rem] p-8 w-full max-w-md shadow-2xl text-center"
+            >
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-red-50 flex items-center justify-center text-red-500 mb-4">
+                <Trash2 size={32} />
+              </div>
+              <h3 className="text-xl font-black text-medigo-navy mb-2">Delete Account</h3>
+              <p className="text-slate-500 font-medium mb-6">
                 Are you sure you want to permanently delete your account? This action cannot be undone.
               </p>
 
-              {deleteError && <p style={deleteErrorStyle}>{deleteError}</p>}
+              {deleteError && (
+                <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm font-semibold mb-4">
+                  {deleteError}
+                </div>
+              )}
 
-              <div style={{ display: 'flex', gap: '1rem' }}>
+              <div className="flex gap-3">
                 <button
                   onClick={() => {
                     setShowDeleteConfirm(false)
                     setDeleteError('')
                   }}
                   disabled={deleteLoading}
-                  style={modalCancelButtonStyle}
+                  className="flex-1 h-12 bg-slate-100 text-slate-600 rounded-xl font-semibold hover:bg-slate-200 transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
-
                 <button
                   onClick={requestDeletion}
                   disabled={deleteLoading}
-                  style={{
-                    ...modalDangerButtonStyle,
-                    opacity: deleteLoading ? 0.7 : 1
-                  }}
+                  className="flex-1 h-12 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition-colors disabled:opacity-50"
                 >
                   {deleteLoading ? 'Sending OTP...' : 'Yes, Delete'}
                 </button>
               </div>
-            </div>
+            </motion.div>
           </div>
         )}
 
         {showDeleteOtp && (
-          <div style={modalOverlayStyle}>
-            <div style={modalBoxStyle}>
-              <h3 style={modalTitleStyle}>Verify Deletion</h3>
-              <p style={modalTextStyle}>We've sent a 6-digit code to your email. Enter it below to confirm.</p>
+          <div
+            onClick={() => setShowDeleteOtp(false)}
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-white rounded-[2rem] p-8 w-full max-w-md shadow-2xl text-center"
+            >
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 mb-4">
+                <ShieldCheck size={32} />
+              </div>
+              <h3 className="text-xl font-black text-medigo-navy mb-2">Verify Deletion</h3>
+              <p className="text-slate-500 font-medium mb-6">
+                We've sent a 6-digit code to your email. Enter it below to confirm.
+              </p>
 
               <input
                 type="text"
@@ -677,12 +787,16 @@ export default function PatientProfile() {
                 value={deleteOtp}
                 onChange={(e) => setDeleteOtp(e.target.value.replace(/\D/g, ''))}
                 placeholder="000000"
-                style={otpInputStyle}
+                className="w-full h-16 bg-slate-50 border border-slate-200 rounded-xl text-center text-2xl font-black tracking-[0.5em] text-medigo-navy outline-none focus:border-medigo-blue focus:ring-2 focus:ring-blue-100 transition-all mb-4"
               />
 
-              {deleteError && <p style={deleteErrorStyle}>{deleteError}</p>}
+              {deleteError && (
+                <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm font-semibold mb-4">
+                  {deleteError}
+                </div>
+              )}
 
-              <div style={{ display: 'flex', gap: '1rem' }}>
+              <div className="flex gap-3">
                 <button
                   onClick={() => {
                     setShowDeleteOtp(false)
@@ -690,26 +804,77 @@ export default function PatientProfile() {
                     setDeleteError('')
                   }}
                   disabled={deleteLoading}
-                  style={modalCancelButtonStyle}
+                  className="flex-1 h-12 bg-slate-100 text-slate-600 rounded-xl font-semibold hover:bg-slate-200 transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
-
                 <button
                   onClick={confirmDeletion}
                   disabled={deleteLoading || deleteOtp.length !== 6}
-                  style={{
-                    ...modalDangerButtonStyle,
-                    opacity: deleteLoading || deleteOtp.length !== 6 ? 0.7 : 1
-                  }}
+                  className="flex-1 h-12 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition-colors disabled:opacity-50"
                 >
                   {deleteLoading ? 'Verifying...' : 'Confirm Delete'}
                 </button>
               </div>
-            </div>
+            </motion.div>
           </div>
         )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// Helper Components
+function FormLabel({ children, icon: Icon }) {
+  return (
+    <label className="block text-[11px] font-black text-slate-500 uppercase tracking-wider mb-2">
+      <span className="flex items-center gap-2">
+        {Icon && <Icon size={14} className="text-slate-400" />}
+        {children}
+      </span>
+    </label>
+  )
+}
+
+function FieldError({ children }) {
+  return (
+    <p className="text-red-500 text-xs font-medium mt-1.5 flex items-center gap-1">
+      <AlertCircle size={12} />
+      {children}
+    </p>
+  )
+}
+
+function PasswordField({ label, icon: Icon, value, onChange, error, success, helperText }) {
+  return (
+    <div className="space-y-2">
+      <FormLabel icon={Icon}>{label}</FormLabel>
+      <div className="relative">
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+          <Icon size={18} />
+        </div>
+        <input
+          type="password"
+          value={value}
+          onChange={onChange}
+          required
+          className={`w-full h-12 bg-slate-50 border rounded-xl pl-12 pr-4 text-medigo-navy outline-none focus:ring-2 transition-all text-sm font-semibold ${
+            error
+              ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+              : success
+              ? 'border-emerald-300 focus:border-emerald-400 focus:ring-emerald-100'
+              : 'border-slate-200 focus:border-medigo-blue focus:ring-blue-100'
+          }`}
+        />
       </div>
+      {helperText && (
+        <p className={`text-xs font-medium flex items-center gap-1 ${
+          error ? 'text-red-500' : success ? 'text-emerald-600' : 'text-slate-400'
+        }`}>
+          {error ? <AlertCircle size={12} /> : success ? <CheckCircle2 size={12} /> : null}
+          {helperText}
+        </p>
+      )}
     </div>
   )
 }

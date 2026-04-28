@@ -49,18 +49,6 @@ const DashboardLayout = ({ children, isPatient, isDoctor, isAdmin }) => {
               <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
             </button>
 
-            <div className="h-8 w-px bg-slate-100 mx-1 hidden sm:block" />
-
-            {/* Mobile/Default User Chip */}
-            <div className="flex items-center gap-3 pl-3 pr-1 py-1 rounded-full bg-slate-50 border border-slate-100">
-               <div className="text-right hidden sm:block">
-                  <p className="text-[12px] font-bold text-medigo-navy leading-none">{user?.name}</p>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{user?.role}</p>
-               </div>
-               <div className="w-8 h-8 rounded-full bg-medigo-blue text-white flex items-center justify-center text-xs font-black shadow-sm">
-                  {user?.name?.[0].toUpperCase()}
-               </div>
-            </div>
           </div>
         </header>
 
