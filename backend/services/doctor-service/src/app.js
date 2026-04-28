@@ -14,6 +14,12 @@ app.use(morgan("dev"));
 
 app.use("/api/doctors", doctorRoutes);
 app.use("/api/availability", availabilityRoutes);
+
+app.use("/api/doctors/:doctorId/availability", (req, res, next) => {
+  req.body.doctorId = req.params.doctorId;
+  next();
+}, availabilityRoutes);
+
 app.use("/api/prescriptions", prescriptionRoutes);
 
 app.get("/", (req, res) => {
