@@ -175,6 +175,7 @@ export default function Telemedicine() {
                   key={session._id}
                   session={session}
                   index={i}
+                  isDoctor={isDoctor}
                   onJoin={() => navigate(`/telemedicine/lobby/${session.appointmentId}`)}
                   onClick={() => setSelectedAppt(session)}
                 />
@@ -210,7 +211,7 @@ export default function Telemedicine() {
                       <CheckCircle2 size={20} />
                     </div>
                     <div>
-                      <p className="text-sm font-black text-medigo-navy uppercase italic">{session.doctorName}</p>
+                      <p className="text-sm font-black text-medigo-navy uppercase italic">{isDoctor ? session.patientName : session.doctorName}</p>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                         {session.appointmentDate ? format(new Date(session.appointmentDate), 'dd MMM yyyy') : '—'} · {session.status}
                       </p>
@@ -241,7 +242,7 @@ export default function Telemedicine() {
 }
 
 // ── Session Card ─────────────────────────────────────────────────────────────────
-function SessionCard({ session, index, onJoin, onClick }) {
+function SessionCard({ session, index, isDoctor, onJoin, onClick }) {
   const isFull = (session.bookedCount || 0) >= (session.maxPatients || 999)
   const statusLabel = {
     scheduled: 'Scheduled',
@@ -272,7 +273,7 @@ function SessionCard({ session, index, onJoin, onClick }) {
 
         <div className="min-w-0">
           <div className="flex items-center gap-3 mb-1">
-            <h4 className="text-sm font-black text-medigo-navy uppercase italic truncate">{session.doctorName}</h4>
+            <h4 className="text-sm font-black text-medigo-navy uppercase italic truncate">{isDoctor ? session.patientName : session.doctorName}</h4>
             <span className={`px-2.5 py-0.5 text-[9px] font-black uppercase rounded shadow-sm ${
               session.status === 'active'
                 ? 'bg-emerald-50 text-emerald-600'
@@ -319,6 +320,8 @@ function AppointmentDetailModal({ appt, onClose, onJoin }) {
   }
 
   const apptDate = appt.appointmentDate ? new Date(appt.appointmentDate) : null
+  const { user } = useAuth()
+  const isDoctor = user?.role === 'doctor'
 
   return (
     <motion.div
@@ -352,8 +355,8 @@ function AppointmentDetailModal({ appt, onClose, onJoin }) {
                 <Video size={22} className="text-medigo-mint" />
               </div>
               <div>
-                <h2 className="text-2xl font-black tracking-tight leading-tight">{appt.doctorName || 'Unknown Doctor'}</h2>
-                <p className="text-sm opacity-60 font-medium">{appt.specialty || 'General Physician'}</p>
+                <h2 className="text-2xl font-black tracking-tight leading-tight">{isDoctor ? appt.patientName : appt.doctorName || 'Unknown'}</h2>
+                <p className="text-sm opacity-60 font-medium">{isDoctor ? 'Patient' : appt.specialty || 'General Physician'}</p>
               </div>
             </div>
             <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${statusColors[appt.status] || statusColors.scheduled}`}>
@@ -373,9 +376,9 @@ function AppointmentDetailModal({ appt, onClose, onJoin }) {
           {/* Type & Fee */}
           <div className="grid grid-cols-2 gap-4">
             <DetailRow
-              icon={appt.type === 'telemedicine' ? Video : MapPin}
+              icon={Video}
               label="Type"
-              value={appt.type === 'telemedicine' ? 'Video Consultation' : 'In-person Visit'}
+              value="Video Consultation"
             />
             <DetailRow
               icon={CreditCard}

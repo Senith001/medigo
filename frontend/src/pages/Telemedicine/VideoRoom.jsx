@@ -175,7 +175,8 @@ const VideoRoom = () => {
              displayName: authUser?.name || user?.name || "Participant",
              email: authUser?.email || user?.email || ""
            }}
-           onApiReady={(externalApi) => {
+            jwt={jitsiToken}
+            onApiReady={(externalApi) => {
              console.log("[VideoRoom] Jitsi API ready, user role:", authUser?.role);
              setJitsiApi(externalApi);
              
