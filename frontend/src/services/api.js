@@ -84,8 +84,14 @@ export const doctorAPI = {
   getMyProfile: () => api.get('/api/doctors/me'),
   getById: (id) => api.get(`/api/doctors/${id}`),
   getProfileByEmail: (email) => api.get(`/api/doctors/profile/${email}`),
+
   getAvailability: (doctorId) => api.get(`/api/availability/doctor/${doctorId}`),
-  addAvailability: (data) => api.post('/api/availability', data),
+
+  addAvailability: (doctorIdOrData, data) => {
+    const payload = data ? { ...data, doctorId: doctorIdOrData } : doctorIdOrData
+    return api.post('/api/availability', payload)
+  },
+
   deleteAvailability: (id) => api.delete(`/api/availability/${id}`)
 }
 

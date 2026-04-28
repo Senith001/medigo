@@ -19,11 +19,14 @@ export default defineConfig({
       '/api/notifications':    { target: 'http://localhost:5009', changeOrigin: true },
       '/api/prescriptions':    { target: 'http://localhost:5004', changeOrigin: true },
 
+      // 🔥 ADD THIS LINE (VERY IMPORTANT)
+      '/api/availability':     { target: 'http://localhost:5004', changeOrigin: true },
+
       // Static file routes
       '/uploads/payment-slips': { target: 'http://localhost:5007', changeOrigin: true },
       '/uploads':               { target: 'http://localhost:5006', changeOrigin: true },
 
-      // ⚠️ moved inside proxy (your 3000 ports)
+      // old ports (unchanged)
       '/api/auth-old':         { target: 'http://localhost:30001', changeOrigin: true },
       '/api/admin-old':        { target: 'http://localhost:30002', changeOrigin: true },
       '/api/patients-old':     { target: 'http://localhost:30003', changeOrigin: true },
