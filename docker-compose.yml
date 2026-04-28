@@ -1,6 +1,27 @@
 services:
 
 #====================================================
+#                FRONTEND
+#====================================================
+  frontend:
+    build:
+      context: ./frontend
+    container_name: medigo-frontend
+    ports:
+      - "30000:80"
+    depends_on:
+      - auth-service
+      - patient-service
+      - admin-service
+      - doctor-service
+      - appointment-service
+      - mediaclreport-service
+      - payment-service
+      - telemedicine-service
+      - notification-service
+
+
+#====================================================
 #                PATIENT SERVICE
 #====================================================
   patient-service:
