@@ -36,14 +36,37 @@ const to12 = (t) => {
   return `${h}:${min} ${p}`
 }
 
+// Helper to parse "09:00 AM" into minutes from midnight
+const parseTime = (timeStr) => {
+  if (!timeStr) return 0;
+  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match) return 0;
+  let [_, hours, mins, period] = match;
+  hours = parseInt(hours);
+  mins = parseInt(mins);
+  if (period.toUpperCase() === 'PM' && hours !== 12) hours += 12;
+  if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
+  return hours * 60 + mins;
+};
+
 // Determine if a session is upcoming
 const isUpcoming = (session) => {
+  const now = new Date();
   const today = new Date(); today.setHours(0, 0, 0, 0)
+  
   if (session.date) {
     const d = new Date(session.date); d.setHours(0, 0, 0, 0)
-    return d >= today
+    
+    if (d < today) return false;
+    if (d.getTime() === today.getTime()) {
+      // Today: check if end time has passed
+      const currentMins = now.getHours() * 60 + now.getMinutes();
+      const endMins = parseTime(session.endTime);
+      return endMins > currentMins;
+    }
+    return true; // Future date
   }
-  // Recurring: always upcoming (no specific date = repeating schedule)
+  // Recurring: always upcoming
   return true
 }
 
