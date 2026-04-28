@@ -42,6 +42,11 @@ import PaymentHistory from './pages/Patient/PaymentHistory'
 import MyPrescriptions from './pages/Patient/MyPrescriptions'
 import DoctorPrescriptions from './pages/Doctor/Prescriptions'
 
+import ForgotPasswordPage from './pages/Auth/ForgotPasswordPage'
+import VerifyResetOtpPage from './pages/Auth/VerifyResetOtpPage'
+import ResetPasswordPage from './pages/Auth/ResetPasswordPage'
+import PasswordChangedPage from './pages/Auth/PasswordChangedPage'
+
 function Layout() {
   const { token, user } = useAuth()
   const location = useLocation()
@@ -58,6 +63,11 @@ function Layout() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/doctor-register" element={<DoctorRegistration />} />
         <Route path="/verify-otp" element={<VerifyOTPPage />} />
+
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/verify-reset-otp" element={<VerifyResetOtpPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/password-changed" element={<PasswordChangedPage />} />
 
         {/* Admin Auth */}
         <Route path="/admin-login" element={<AdminLogin />} />

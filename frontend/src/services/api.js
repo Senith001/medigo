@@ -32,12 +32,16 @@ api.interceptors.response.use(
 export const authAPI = {
   login: (data) => api.post('/api/auth/login', data),
   register: (data) => api.post('/api/auth/register/patient', data),
+  registerDoctor: (data) => api.post('/api/auth/register/doctor', data),
   verifyOtp: (data) => api.post('/api/auth/verify-otp', data),
   getMe: () => api.get('/api/auth/me'),
   changePassword: (data) => api.put('/api/auth/change-password', data),
   requestDeleteOtp: () => api.post('/api/auth/me/request-delete-otp'),
   deleteMyAccount: (data) => api.delete('/api/auth/me', { data }),
-  setupAdminPassword: (data) => api.post('/api/auth/setup-password', data)
+  setupAdminPassword: (data) => api.post('/api/auth/setup-password', data),
+  forgotPassword: (data) => api.post('/api/auth/forgot-password', data),
+  resetPassword: (data) => api.post('/api/auth/reset-password', data),
+  verifyResetOtp: (data) => api.post('/api/auth/verify-reset-otp', data)
 }
 
 export const adminAPI = {

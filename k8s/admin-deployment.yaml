@@ -15,7 +15,7 @@ spec:
       containers:
       - name: admin-service
         image: medigo-admin-service:latest
-        imagePullPolicy: Never
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5003
         env:

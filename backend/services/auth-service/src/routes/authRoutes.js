@@ -17,6 +17,7 @@ import {
   setupAdminPassword,
   resendAdminInvitation,
   verifyDoctorInternal,
+  verifyResetOtp
 } from "../controllers/authController.js";
 import { protect, authorize, verifyInternalService } from "../middlewares/authMiddleware.js";
 
@@ -25,6 +26,7 @@ const router = express.Router();
 router.post("/register/patient", registerPatient);
 router.post("/register/doctor", registerDoctor);
 router.post("/verify-otp", verifyRegistrationOtp);
+router.post('/verify-reset-otp', verifyResetOtp);
 router.post("/login", login);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);

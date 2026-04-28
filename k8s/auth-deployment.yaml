@@ -15,7 +15,7 @@ spec:
       containers:
       - name: auth-service
         image: medigo-auth-service:latest
-        imagePullPolicy: Never
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5001
         env:

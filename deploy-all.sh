@@ -32,7 +32,7 @@ echo "Building Payment Service..."
 docker build -t medigo-payment-service:latest backend/services/payment-service
 
 echo "Building Medical Report Service..."
-docker build -t medigo-medicalreport-service:latest backend/services/medicalreport-service
+docker build -t medigo-mediaclreport-service:latest backend/services/mediaclreport-service
 
 echo "Building Notification Service..."
 docker build -t medigo-notification-service:latest backend/services/notification-service
