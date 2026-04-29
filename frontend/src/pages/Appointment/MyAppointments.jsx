@@ -14,7 +14,7 @@ import DashboardLayout from '../../components/DashboardLayout'
 import Button from '../../components/ui/Button'
 
 const STATUS_STYLES = {
-  pending:   'bg-amber-100 text-amber-700 border-amber-200',
+  pending: 'bg-amber-100 text-amber-700 border-amber-200',
   confirmed: 'bg-blue-100 text-blue-700 border-blue-200',
   completed: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   cancelled: 'bg-red-100 text-red-700 border-red-200',
@@ -79,7 +79,24 @@ export default function MyAppointments() {
 
   const upcoming = appointments
     .filter(a => classifyAppointment(a) === 'upcoming')
-    .sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate))
+    .sort((a, b) => {
+      const dateDiff = new Date(a.appointmentDate) - new Date(b.appointmentDate);
+      if (dateDiff !== 0) return dateDiff;
+
+      const parseTime = (str) => {
+        if (!str) return 0;
+        const match = str.match(/(\d+):(\d+)\s*(AM|PM)/i);
+        if (!match) return 0;
+        let [, hrs, mins, ampm] = match;
+        hrs = parseInt(hrs);
+        mins = parseInt(mins);
+        if (ampm.toUpperCase() === 'PM' && hrs < 12) hrs += 12;
+        if (ampm.toUpperCase() === 'AM' && hrs === 12) hrs = 0;
+        return hrs * 60 + mins;
+      };
+
+      return parseTime(a.timeSlot) - parseTime(b.timeSlot);
+    })
 
   const past = appointments
     .filter(a => classifyAppointment(a) === 'past')
@@ -132,11 +149,10 @@ export default function MyAppointments() {
         <div className="flex items-center gap-2 bg-white p-2 rounded-[2rem] border border-slate-100 shadow-sm w-fit">
           <button
             onClick={() => setTab('upcoming')}
-            className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl text-sm font-black transition-all duration-200 ${
-              tab === 'upcoming'
+            className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl text-sm font-black transition-all duration-200 ${tab === 'upcoming'
                 ? 'bg-medigo-navy text-white shadow-lg'
                 : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
-            }`}
+              }`}
           >
             <CalendarClock size={16} />
             Upcoming
@@ -148,11 +164,10 @@ export default function MyAppointments() {
           </button>
           <button
             onClick={() => setTab('past')}
-            className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl text-sm font-black transition-all duration-200 ${
-              tab === 'past'
+            className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl text-sm font-black transition-all duration-200 ${tab === 'past'
                 ? 'bg-medigo-navy text-white shadow-lg'
                 : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
-            }`}
+              }`}
           >
             <History size={16} />
             History
@@ -178,11 +193,10 @@ export default function MyAppointments() {
                   <button
                     key={f}
                     onClick={() => setHistoryFilter(f)}
-                    className={`px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-widest border transition-all ${
-                      historyFilter === f
+                    className={`px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-widest border transition-all ${historyFilter === f
                         ? 'bg-medigo-navy text-white border-medigo-navy shadow-md'
                         : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600'
-                    }`}
+                      }`}
                   >
                     {f}
                   </button>
@@ -319,9 +333,8 @@ function AppointmentCard({ appt, index, isPast, onCancel, onShowClinic, onViewDe
     >
       {/* Upcoming left accent stripe */}
       {!isPast && (
-        <div className={`absolute left-0 top-6 bottom-6 w-1 rounded-full ${
-          appt.status === 'confirmed' ? 'bg-medigo-blue' : 'bg-amber-400'
-        }`} />
+        <div className={`absolute left-0 top-6 bottom-6 w-1 rounded-full ${appt.status === 'confirmed' ? 'bg-medigo-blue' : 'bg-amber-400'
+          }`} />
       )}
 
       <div className="flex flex-col lg:flex-row lg:items-center gap-6 p-6 sm:p-8">
@@ -390,11 +403,10 @@ function AppointmentCard({ appt, index, isPast, onCancel, onShowClinic, onViewDe
           {/* Session queue position — shown when data is available */}
           {appt.patientNumber && appt.maxPatients && (
             <div className="flex items-center gap-3">
-              <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[11px] font-black ${
-                appt.status === 'confirmed'
+              <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[11px] font-black ${appt.status === 'confirmed'
                   ? 'bg-blue-50 border-blue-200 text-blue-700'
                   : 'bg-slate-50 border-slate-200 text-slate-500'
-              }`}>
+                }`}>
                 <Users size={12} />
                 Patient #{appt.patientNumber} of {appt.maxPatients}
               </div>
@@ -567,7 +579,7 @@ function AppointmentDetailModal({ appt, onClose }) {
 
   const statusColors = {
     confirmed: 'bg-blue-100 text-blue-700',
-    pending:   'bg-amber-100 text-amber-700',
+    pending: 'bg-amber-100 text-amber-700',
     completed: 'bg-emerald-100 text-emerald-700',
     cancelled: 'bg-red-100 text-red-700',
     'no-show': 'bg-slate-100 text-slate-600',
@@ -738,8 +750,8 @@ function RatingModal({ appt, onClose }) {
     setRatingVal(val)
     setJustRated(true)
     setTimeout(() => {
-       setJustRated(false)
-       onClose()
+      setJustRated(false)
+      onClose()
     }, 1500)
   }
 
@@ -763,44 +775,44 @@ function RatingModal({ appt, onClose }) {
         </button>
 
         <div className="p-10 text-center space-y-6">
-           <div className="w-20 h-20 mx-auto rounded-full bg-slate-50 flex items-center justify-center">
-             <Star size={32} className="text-amber-400" fill="currentColor" />
-           </div>
-           <div>
-             <h2 className="text-2xl font-black text-medigo-navy tracking-tight mb-2">Rate your Visit</h2>
-             <p className="text-slate-500 text-sm font-medium">How was your medical consultation with {appt.doctorName}?</p>
-           </div>
-           
-           <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
-             <div className="flex justify-center gap-2">
-                 {[1, 2, 3, 4, 5].map((star) => (
-                   <button 
-                     key={star}
-                     disabled={justRated || ratingVal > 0}
-                     onMouseEnter={() => setHoveredStar(star)}
-                     onMouseLeave={() => setHoveredStar(0)}
-                     onClick={() => handleRate(star)}
-                     className="transition-transform hover:scale-110 disabled:hover:scale-100"
-                   >
-                     <Star 
-                       size={40} 
-                       fill={(hoveredStar || ratingVal) >= star ? "#f59e0b" : "transparent"} 
-                       className={`${(hoveredStar || ratingVal) >= star ? 'text-amber-400 drop-shadow-lg' : 'text-slate-200'} transition-all`}
-                     />
-                   </button>
-                 ))}
-             </div>
-             <AnimatePresence>
-               {justRated && (
-                 <motion.p 
-                   initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
-                   className="text-xs font-black text-emerald-600 uppercase tracking-widest mt-6"
-                 >
-                   Thank you for submitting your feedback!
-                 </motion.p>
-               )}
-             </AnimatePresence>
-           </div>
+          <div className="w-20 h-20 mx-auto rounded-full bg-slate-50 flex items-center justify-center">
+            <Star size={32} className="text-amber-400" fill="currentColor" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-medigo-navy tracking-tight mb-2">Rate your Visit</h2>
+            <p className="text-slate-500 text-sm font-medium">How was your medical consultation with {appt.doctorName}?</p>
+          </div>
+
+          <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+            <div className="flex justify-center gap-2">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  disabled={justRated || ratingVal > 0}
+                  onMouseEnter={() => setHoveredStar(star)}
+                  onMouseLeave={() => setHoveredStar(0)}
+                  onClick={() => handleRate(star)}
+                  className="transition-transform hover:scale-110 disabled:hover:scale-100"
+                >
+                  <Star
+                    size={40}
+                    fill={(hoveredStar || ratingVal) >= star ? "#f59e0b" : "transparent"}
+                    className={`${(hoveredStar || ratingVal) >= star ? 'text-amber-400 drop-shadow-lg' : 'text-slate-200'} transition-all`}
+                  />
+                </button>
+              ))}
+            </div>
+            <AnimatePresence>
+              {justRated && (
+                <motion.p
+                  initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
+                  className="text-xs font-black text-emerald-600 uppercase tracking-widest mt-6"
+                >
+                  Thank you for submitting your feedback!
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </motion.div>
     </motion.div>

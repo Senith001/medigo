@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
+    "dev": "npx kill-port 5009 && nodemon src/index.js",
     "test": "jest --coverage"
   },
   "dependencies": {
@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "jest": "^29.7.0",
+    "kill-port": "^2.0.1",
     "nodemon": "^3.0.1",
     "supertest": "^6.3.3"
   }

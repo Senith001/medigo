@@ -50,8 +50,32 @@ export default function PatientDashboard() {
 
   // Derived logic for upcoming and recent
   const upcomingAppointments = appointments
-    .filter(a => new Date(a.appointmentDate) >= new Date() && ['pending', 'confirmed'].includes(a.status))
-    .sort((a,b) => new Date(a.appointmentDate) - new Date(b.appointmentDate))
+    .filter(a => {
+      const apptDate = new Date(a.appointmentDate)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      apptDate.setHours(0, 0, 0, 0)
+      return apptDate >= today && ['pending', 'confirmed'].includes(a.status)
+    })
+    .sort((a,b) => {
+      const dateDiff = new Date(a.appointmentDate) - new Date(b.appointmentDate);
+      if (dateDiff !== 0) return dateDiff;
+      
+      // Time-based fallback
+      const parseTime = (str) => {
+        if (!str) return 0;
+        const match = str.match(/(\d+):(\d+)\s*(AM|PM)/i);
+        if (!match) return 0;
+        let [ , hrs, mins, ampm] = match;
+        hrs = parseInt(hrs);
+        mins = parseInt(mins);
+        if (ampm.toUpperCase() === 'PM' && hrs < 12) hrs += 12;
+        if (ampm.toUpperCase() === 'AM' && hrs === 12) hrs = 0;
+        return hrs * 60 + mins;
+      };
+      
+      return parseTime(a.timeSlot) - parseTime(b.timeSlot);
+    })
   
   const nextAppointment = upcomingAppointments.length > 0 ? upcomingAppointments[0] : null
   const recentHistory = appointments.filter(a => a.status === 'completed').slice(0, 3)
