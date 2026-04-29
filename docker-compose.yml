@@ -1,12 +1,103 @@
 services:
+  auth-service:
+    build: ./backend/services/auth-service
+    container_name: auth-service
+    ports:
+      - "5001:5001"
+    env_file:
+      - ./backend/services/auth-service/.env.docker
 
-#====================================================
-#                FRONTEND
-#====================================================
+  patient-service:
+    build: ./backend/services/patient-service
+    container_name: patient-service
+    ports:
+      - "5002:5002"
+    env_file:
+      - ./backend/services/patient-service/.env.docker
+    depends_on:
+      - auth-service
+
+  admin-service:
+    build: ./backend/services/admin-service
+    container_name: admin-service
+    ports:
+      - "5003:5003"
+    env_file:
+      - ./backend/services/admin-service/.env.docker
+    depends_on:
+      - auth-service
+
+  doctor-service:
+    build: ./backend/services/doctor-service
+    container_name: doctor-service
+    ports:
+      - "5004:5004"
+    env_file:
+      - ./backend/services/doctor-service/.env.docker
+    depends_on:
+      - auth-service
+
+  appointment-service:
+    build: ./backend/services/appointment-service
+    container_name: appointment-service
+    ports:
+      - "5005:5005"
+    env_file:
+      - ./backend/services/appointment-service/.env.docker
+    depends_on:
+      - auth-service
+      - patient-service
+      - doctor-service
+
+  mediaclreport-service:
+    build: ./backend/services/mediaclreport-service
+    container_name: mediaclreport-service
+    ports:
+      - "5006:5006"
+    env_file:
+      - ./backend/services/mediaclreport-service/.env.docker
+    volumes:
+      - ./backend/services/mediaclreport-service/uploads:/app/uploads
+    depends_on:
+      - auth-service
+
+  payment-service:
+    build: ./backend/services/payment-service
+    container_name: payment-service
+    ports:
+      - "5007:5007"
+    env_file:
+      - ./backend/services/payment-service/.env.docker
+    volumes:
+      - ./backend/services/payment-service/uploads:/app/uploads
+    depends_on:
+      - auth-service
+      - appointment-service
+
+  telemedicine-service:
+    build: ./backend/services/telemedicine-service
+    container_name: telemedicine-service
+    ports:
+      - "5008:5008"
+    env_file:
+      - ./backend/services/telemedicine-service/.env.docker
+    depends_on:
+      - auth-service
+      - appointment-service
+
+  notification-service:
+    build: ./backend/services/notification-service
+    container_name: notification-service
+    ports:
+      - "5009:5009"
+    env_file:
+      - ./backend/services/notification-service/.env.docker
+    depends_on:
+      - auth-service
+
   frontend:
-    build:
-      context: ./frontend
-    container_name: medigo-frontend
+    build: ./frontend
+    container_name: frontend
     ports:
       - "30000:80"
     depends_on:
@@ -19,117 +110,3 @@ services:
       - payment-service
       - telemedicine-service
       - notification-service
-
-
-#====================================================
-#                PATIENT SERVICE
-#====================================================
-  patient-service:
-    build:
-      context: ./backend/services/patient-service
-    container_name: medigo-patient-service
-    ports:
-      - "5002:5002"
-    env_file:
-      - ./backend/services/patient-service/.env
-
-#====================================================
-#                AUTH SERVICE
-#====================================================
-  auth-service:
-    build:
-      context: ./backend/services/auth-service
-    container_name: medigo-auth-service
-    ports:
-      - "5001:5001" 
-    env_file:
-      - ./backend/services/auth-service/.env
-
-
-#====================================================
-#                ADMIN SERVICE
-#====================================================
-  admin-service:
-    build:
-      context: ./backend/services/admin-service
-    container_name: medigo-admin-service
-    ports:
-      - "5003:5003" 
-    env_file:
-      - ./backend/services/admin-service/.env
-
-#====================================================
-#               PAYMENT SERVICE
-#====================================================
-  payment-service:
-    build:
-      context: ./backend/services/payment-service
-    container_name: medigo-payment-service
-    ports:
-      - "5007:5007"
-    env_file:
-      - ./backend/services/payment-service/.env
-    volumes:
-      - ./backend/services/payment-service/uploads:/app/uploads
-
-#====================================================
-#            TELEMEDICINE SERVICE
-#====================================================
-  telemedicine-service:
-    build:
-      context: ./backend/services/telemedicine-service
-    container_name: medigo-telemedicine-service
-    ports:
-      - "5008:5008"
-    env_file:
-      - ./backend/services/telemedicine-service/.env
-
-#====================================================
-#               DOCTOR SERVICE
-#====================================================
-  doctor-service:
-    build:
-      context: ./backend/services/doctor-service
-    container_name: medigo-doctor-service
-    ports:
-      - "5004:5004"
-    env_file:
-      - ./backend/services/doctor-service/.env
-
-#====================================================
-#            APPOINTMENT SERVICE
-#====================================================
-  appointment-service:
-    build:
-      context: ./backend/services/appointment-service
-    container_name: medigo-appointment-service
-    ports:
-      - "5005:5005"
-    env_file:
-      - ./backend/services/appointment-service/.env
-
-#====================================================
-#          MEDIACLREPORT SERVICE
-#====================================================
-  mediaclreport-service:
-    build:
-      context: ./backend/services/mediaclreport-service
-    container_name: medigo-mediaclreport-service
-    ports:
-      - "5006:5006"
-    env_file:
-      - ./backend/services/mediaclreport-service/.env
-    volumes:
-      - ./backend/services/mediaclreport-service/uploads:/app/uploads
-
-#====================================================
-#           NOTIFICATION SERVICE
-#====================================================
-  notification-service:
-    build:
-      context: ./backend/services/notification-service
-    container_name: medigo-notification-service
-    ports:
-      - "5009:5009"
-    env_file:
-      - ./backend/services/notification-service/.env
