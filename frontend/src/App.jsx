@@ -40,6 +40,8 @@ import PatientRecords from './pages/Doctor/PatientRecords'
 import ReportCenter from './pages/Report/ReportCenter'
 import PaymentHistory from './pages/Patient/PaymentHistory'
 import MyPrescriptions from './pages/Patient/MyPrescriptions'
+import InvoiceView from './pages/Payment/InvoiceView'
+import SlipView from './pages/Payment/SlipView'
 import DoctorPrescriptions from './pages/Doctor/Prescriptions'
 
 import ForgotPasswordPage from './pages/Auth/ForgotPasswordPage'
@@ -115,6 +117,8 @@ function Layout() {
         {/* Payment */}
         <Route path="/payment/:appointmentId" element={<ProtectedRoute roles={['patient']}><PaymentSelector /></ProtectedRoute>} />
         <Route path="/payment/bank-transfer/:appointmentId" element={<ProtectedRoute roles={['patient']}><BankTransferForm /></ProtectedRoute>} />
+        <Route path="/payment/invoice/:paymentId" element={<ProtectedRoute roles={['patient']}><InvoiceView /></ProtectedRoute>} />
+        <Route path="/payment/slip/:paymentId" element={<ProtectedRoute roles={['patient']}><SlipView /></ProtectedRoute>} />
         <Route path="/payment/success" element={<StripeCallback status="success" />} />
         <Route path="/payment/cancel" element={<StripeCallback status="cancel" />} />
 

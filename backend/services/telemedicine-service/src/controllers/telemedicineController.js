@@ -2,6 +2,7 @@ import TelemedicineSession from "../models/TelemedicineSession.js";
 import generateRoomName from "../utils/generateRoomName.js";
 import { generateJitsiMeetingLink } from "../services/jitsiService.js";
 import axios from "axios";
+import jwt from "jsonwebtoken";
 
 const getUserIdentity = (user) => user.id || user.userId;
 const TELEMEDICINE_TIMEZONE = "Asia/Colombo";
@@ -64,11 +65,16 @@ const toSessionResponse = (sessionDoc) => {
 
 // Check whether the current user is allowed to view or join this session.
 const canAccessSession = (session, user) => {
-  return (
-    user.role === "admin" ||
-    session.patientId === getUserIdentity(user) ||
-    session.doctorId === getUserIdentity(user)
-  );
+  if (!user) return false;
+  if (user.role === "admin") return true;
+  
+  const userId = getUserIdentity(user);
+  
+  if (user.role === "doctor") {
+    return session.doctorId === userId;
+  }
+  
+  return session.patientId === userId;
 };
 
 // Only sessions that have not started yet can be updated or deleted.
@@ -93,6 +99,28 @@ const allowedStatusTransitions = {
   active: ["ended"],
   ended: [],
   cancelled: [],
+};
+
+// Fetch doctor profile _id from doctor-service using email
+const getDoctorProfileId = async (email) => {
+  try {
+    const doctorServiceUrl = process.env.DOCTOR_SERVICE_URL || "http://localhost:5003";
+    console.log(`[getDoctorProfileId] Looking up doctor email: ${email} from ${doctorServiceUrl}`);
+    const res = await axios.get(
+      `${doctorServiceUrl}/api/doctors/profile/${email}`,
+      {
+        headers: {
+          "x-service-secret": process.env.SERVICE_SECRET,
+        },
+      }
+    );
+    const doctorId = res.data?.data?._id || null;
+    console.log(`[getDoctorProfileId] SUCCESS - found doctor ID: ${doctorId}`);
+    return doctorId;
+  } catch (err) {
+    console.error(`[getDoctorProfileId] FAILED for email ${email}:`, err.message, err.response?.status);
+    return null;
+  }
 };
 
 // Fetch trusted appointment details from appointment-service.
@@ -466,6 +494,66 @@ const getAllSessions = async (req, res) => {
   }
 };
 
+const getMySessions = async (req, res) => {
+  try {
+    const { status, appointmentId, page = 1, limit = 20 } = req.query;
+    const parsedPage = Math.max(1, parseInt(page, 10) || 1);
+    const parsedLimit = Math.max(1, parseInt(limit, 10) || 20);
+    const skip = (parsedPage - 1) * parsedLimit;
+    const filter = {};
+    const userId = getUserIdentity(req.user);
+
+    console.log(`[getMySessions] User role: ${req.user.role}, User ID: ${userId}, Email: ${req.user.email}`);
+
+    if (req.user.role === "patient") {
+      filter.patientId = userId;
+      console.log(`[getMySessions] Patient filter: patientId = ${userId}`);
+    } else if (req.user.role === "doctor") {
+      // Try to resolve doctor profile ID from doctor-service, fall back to auth user ID
+      let doctorProfileId = userId;
+      try {
+        const resolved = await getDoctorProfileId(req.user.email);
+        if (resolved) {
+          doctorProfileId = resolved;
+          console.log(`[getMySessions] Resolved doctor ID: ${doctorProfileId}`);
+        }
+      } catch (err) {
+        console.log(`[getMySessions] Doctor-service unavailable, using auth user ID: ${userId}`);
+      }
+      filter.doctorId = doctorProfileId;
+      console.log(`[getMySessions] Doctor filter: doctorId = ${filter.doctorId}`);
+    } else if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied." });
+    }
+
+    if (status) filter.status = status;
+    if (appointmentId) filter.appointmentId = appointmentId;
+
+    console.log(`[getMySessions] Querying with filter:`, filter);
+
+    const total = await TelemedicineSession.countDocuments(filter);
+    const sessions = await TelemedicineSession.find(filter)
+      .sort({ scheduledAt: 1, createdAt: -1 })
+      .skip(skip)
+      .limit(parsedLimit);
+
+    console.log(`[getMySessions] Found ${total} sessions (returning ${sessions.length})`);
+
+    return res.status(200).json({
+      total,
+      page: parsedPage,
+      totalPages: Math.ceil(total / parsedLimit),
+      sessions: sessions.map(toSessionResponse),
+    });
+  } catch (error) {
+    console.error("getMySessions error:", error.message);
+
+    return res.status(500).json({
+      message: "Server error fetching your telemedicine sessions.",
+    });
+  }
+};
+
 const getSessionById = async (req, res) => {
   try {
     const session = await TelemedicineSession.findById(req.params.id);
@@ -474,7 +562,26 @@ const getSessionById = async (req, res) => {
       return res.status(404).json({ message: "Session not found." });
     }
 
-    if (!canAccessSession(session, req.user)) {
+    // Check access - for doctors, try to resolve profile ID but fall back to auth user ID
+    const userId = getUserIdentity(req.user);
+    let hasAccess = false;
+
+    if (req.user.role === "patient") {
+      hasAccess = session.patientId === userId;
+    } else if (req.user.role === "doctor") {
+      let doctorId = userId;
+      try {
+        const resolved = await getDoctorProfileId(req.user.email);
+        if (resolved) doctorId = resolved;
+      } catch (err) {
+        // Fall back to auth user ID
+      }
+      hasAccess = session.doctorId === doctorId;
+    } else if (req.user.role === "admin") {
+      hasAccess = true;
+    }
+
+    if (!hasAccess) {
       return res.status(403).json({ message: "Access denied." });
     }
 
@@ -500,7 +607,26 @@ const getSessionByAppointmentId = async (req, res) => {
       });
     }
 
-    if (!canAccessSession(session, req.user)) {
+    // Check access - for doctors, try to resolve profile ID but fall back to auth user ID
+    const userId = getUserIdentity(req.user);
+    let hasAccess = false;
+
+    if (req.user.role === "patient") {
+      hasAccess = session.patientId === userId;
+    } else if (req.user.role === "doctor") {
+      let doctorId = userId;
+      try {
+        const resolved = await getDoctorProfileId(req.user.email);
+        if (resolved) doctorId = resolved;
+      } catch (err) {
+        // Fall back to auth user ID
+      }
+      hasAccess = session.doctorId === doctorId;
+    } else if (req.user.role === "admin") {
+      hasAccess = true;
+    }
+
+    if (!hasAccess) {
       return res.status(403).json({ message: "Access denied." });
     }
 
@@ -514,18 +640,46 @@ const getSessionByAppointmentId = async (req, res) => {
 
 const joinSession = async (req, res) => {
   try {
+    console.log(`[joinSession] User ${req.user.id} (${req.user.role}) attempting to join session ${req.params.id}`);
+    
     const session = await TelemedicineSession.findById(req.params.id);
 
     if (!session) {
+      console.log(`[joinSession] Session ${req.params.id} NOT FOUND`);
       return res.status(404).json({ message: "Session not found." });
     }
 
-    if (!canAccessSession(session, req.user)) {
+    console.log(`[joinSession] Session found. Status: ${session.status}, meetingLink: ${session.meetingLink ? 'EXISTS' : 'MISSING'}`);
+
+    // Check access - for doctors, try to resolve profile ID but fall back to auth user ID
+    const userId = getUserIdentity(req.user);
+    let hasAccess = false;
+
+    if (req.user.role === "patient") {
+      hasAccess = session.patientId === userId;
+    } else if (req.user.role === "doctor") {
+      let doctorId = userId;
+      try {
+        const resolved = await getDoctorProfileId(req.user.email);
+        if (resolved) doctorId = resolved;
+      } catch (err) {
+        // Fall back to auth user ID
+      }
+      hasAccess = session.doctorId === doctorId;
+    } else if (req.user.role === "admin") {
+      hasAccess = true;
+    }
+
+    if (!hasAccess) {
+      console.log(`[joinSession] Access DENIED for user ${req.user.id}`);
       return res.status(403).json({ message: "Access denied." });
     }
 
+    console.log(`[joinSession] Access GRANTED`);
+
     // Do not allow users to join sessions that are already finished or cancelled.
     if (["ended", "cancelled"].includes(session.status)) {
+      console.log(`[joinSession] Cannot join - session status is ${session.status}`);
       return res.status(400).json({
         message: `Cannot join a session with status: ${session.status}.`,
       });
@@ -533,19 +687,84 @@ const joinSession = async (req, res) => {
 
     // The first join moves the session from scheduled to waiting.
     if (session.status === "scheduled") {
+      console.log(`[joinSession] Moving session from scheduled to waiting`);
       session.status = "waiting";
       await session.save();
     }
 
+    console.log(`[joinSession] Returning meeting link: ${session.meetingLink}`);
     return res.status(200).json({
       message: "Session ready to join.",
       meetingLink: session.meetingLink,
       session: toSessionResponse(session),
     });
   } catch (error) {
-    console.error("joinSession error:", error.message);
+    console.error("[joinSession] ERROR:", error.message);
+    console.error(error);
 
     return res.status(500).json({ message: "Server error joining session." });
+  }
+};
+
+// Generate a short-lived Jitsi JWT for a session and user
+const getJitsiToken = async (req, res) => {
+  try {
+    const session = await TelemedicineSession.findById(req.params.id);
+
+    if (!session) return res.status(404).json({ message: "Session not found." });
+
+    // Check access
+    const userId = getUserIdentity(req.user);
+    let hasAccess = false;
+
+    if (req.user.role === "patient") {
+      hasAccess = session.patientId === userId;
+    } else if (req.user.role === "doctor") {
+      let doctorId = userId;
+      try {
+        const resolved = await getDoctorProfileId(req.user.email);
+        if (resolved) doctorId = resolved;
+      } catch (err) {
+        // fallback
+      }
+      hasAccess = session.doctorId === doctorId;
+    } else if (req.user.role === "admin") {
+      hasAccess = true;
+    }
+
+    if (!hasAccess) return res.status(403).json({ message: "Access denied." });
+
+    const appId = process.env.JITSI_APP_ID;
+    const appSecret = process.env.JITSI_APP_SECRET;
+    const jitsiBase = process.env.JITSI_BASE_URL || "meet.jit.si";
+
+    if (!appId || !appSecret) {
+      return res.status(501).json({ message: "Jitsi JWT not configured on server." });
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const payload = {
+      aud: "jitsi",
+      iss: appId,
+      sub: jitsiBase.replace(/^https?:\/\//, ""),
+      room: session.roomName,
+      exp: now + 60 * 5, // 5 minutes
+      context: {
+        user: {
+          name: req.user.name || req.user.email || "",
+          email: req.user.email || "",
+          id: getUserIdentity(req.user),
+          moderator: req.user.role === "doctor",
+        },
+      },
+    };
+
+    const token = jwt.sign(payload, appSecret, { algorithm: "HS256" });
+
+    return res.status(200).json({ token });
+  } catch (err) {
+    console.error("[getJitsiToken] ERROR:", err.message);
+    return res.status(500).json({ message: "Failed to generate jitsi token." });
   }
 };
 
@@ -557,8 +776,12 @@ const updateSession = async (req, res) => {
       return res.status(404).json({ message: "Session not found." });
     }
 
-    if (req.user.role !== "admin" && session.doctorId !== getUserIdentity(req.user)) {
-      return res.status(403).json({ message: "Access denied." });
+    if (req.user.role !== "admin") {
+      // For doctors, use auth user ID directly (no cross-service lookup)
+      const userId = getUserIdentity(req.user);
+      if (req.user.role === "doctor" && session.doctorId !== userId) {
+        return res.status(403).json({ message: "Access denied." });
+      }
     }
 
     if (!isUpcomingSession(session)) {
@@ -627,8 +850,12 @@ const updateSessionStatus = async (req, res) => {
       return res.status(404).json({ message: "Session not found." });
     }
 
-    if (req.user.role !== "admin" && session.doctorId !== getUserIdentity(req.user)) {
-      return res.status(403).json({ message: "Access denied." });
+    if (req.user.role !== "admin") {
+      // For doctors, use auth user ID directly (no cross-service lookup)
+      const userId = getUserIdentity(req.user);
+      if (req.user.role === "doctor" && session.doctorId !== userId) {
+        return res.status(403).json({ message: "Access denied." });
+      }
     }
 
     // Read the allowed next statuses for the session's current state.
@@ -786,6 +1013,7 @@ const syncAppointmentUpdate = async (req, res) => {
 export {
   createSession,
   createSessionFromAppointment,
+  getMySessions,
   getAllSessions,
   getSessionById,
   getSessionByAppointmentId,
@@ -794,4 +1022,5 @@ export {
   updateSessionStatus,
   deleteSession,
   syncAppointmentUpdate,
+  getJitsiToken,
 };

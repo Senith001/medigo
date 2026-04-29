@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   CreditCard, CheckCircle2, XCircle, Clock,
   RefreshCw, Receipt, Building2, AlertCircle,
-  ArrowRight, Search
+  ArrowRight, Search, FileText
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { paymentAPI } from '../../services/api'
@@ -33,6 +34,7 @@ const METHOD_LABEL = {
 
 export default function PaymentHistory() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -161,7 +163,7 @@ export default function PaymentHistory() {
               <table className="w-full text-left">
                 <thead>
                   <tr className="border-b border-slate-50">
-                    {['Invoice', 'Doctor', 'Amount', 'Method', 'Date', 'Status'].map(h => (
+                    {['Invoice', 'Doctor', 'Amount', 'Method', 'Date', 'Status', 'Action'].map(h => (
                       <th key={h} className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest">{h}</th>
                     ))}
                   </tr>
@@ -202,6 +204,31 @@ export default function PaymentHistory() {
                             <StatusIcon size={12} />
                             {p.status}
                           </span>
+                        </td>
+                        <td className="px-6 py-5">
+                          <div className="flex items-center gap-2">
+                            <motion.button
+                              whileHover={{ scale: 1.08 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => navigate(`/payment/invoice/${p._id}`)}
+                              className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 hover:bg-medigo-blue hover:text-white text-medigo-blue transition-all duration-200 shadow-sm hover:shadow-md group"
+                              title="View Invoice"
+                            >
+                              <FileText size={18} className="group-hover:scale-110 transition-transform" />
+                            </motion.button>
+                            {p.paymentSlipUrl && (
+                              <motion.button
+                                whileHover={{ scale: 1.08 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => navigate(`/payment/slip/${p._id}`)}
+                                className="flex items-center justify-center gap-1.5 px-3 h-10 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white transition-all duration-200 shadow-sm hover:shadow-md group font-semibold text-xs"
+                                title="View Payment Slip"
+                              >
+                                <FileText size={16} className="group-hover:scale-110 transition-transform" />
+                                <span>View Slip</span>
+                              </motion.button>
+                            )}
+                          </div>
                         </td>
                       </motion.tr>
                     )

@@ -9,24 +9,47 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { telemedicineAPI } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 
 const VideoRoom = () => {
   const { sessionId } = useParams();
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [user, setUser] = useState(null);
+  const [jitsiApi, setJitsiApi] = useState(null);
+  const [jitsiToken, setJitsiToken] = useState(null);
 
   useEffect(() => {
     const fetchSession = async () => {
       try {
+        console.log("[VideoRoom] Fetching session data for", sessionId);
         const userData = JSON.parse(localStorage.getItem("user") || "{}");
+        console.log("[VideoRoom] User from localStorage:", userData);
+        console.log("[VideoRoom] User from AuthContext:", authUser);
         setUser(userData);
         
-        const { data } = await telemedicineAPI.join(sessionId);
-        setSession(data.session);
+        const { data } = await telemedicineAPI.getById(sessionId);
+        console.log("[VideoRoom] Session fetched successfully", data);
+        setSession(data);
+
+        // Try to fetch a Jitsi JWT for authenticated rooms (if backend configured)
+        try {
+          const tokenRes = await telemedicineAPI.getJitsiToken(sessionId);
+          const token = tokenRes?.data?.token;
+          if (token) {
+            console.log("[VideoRoom] Received Jitsi JWT");
+            setJitsiToken(token);
+          } else {
+            console.log("[VideoRoom] No Jitsi JWT available from server");
+          }
+        } catch (tErr) {
+          console.warn("[VideoRoom] Could not obtain Jitsi JWT:", tErr?.response?.data || tErr.message);
+        }
       } catch (err) {
+        console.error("[VideoRoom] Failed to fetch session", err?.response?.data || err?.message);
         setError("Failed to initialize secure video vault.");
       } finally {
         setTimeout(() => setLoading(false), 800);
@@ -118,10 +141,22 @@ const VideoRoom = () => {
            roomName={session.roomName}
            configOverwrite={{
              startWithAudioMuted: true,
-             disableModeratorIndicator: true,
+             disableModeratorIndicator: false,
              startScreenSharing: false,
              enableEmailInStats: false,
              prejoinPageEnabled: false,
+             lobbyModeEnabled: false,
+             membersOnly: false,
+             disableLobbyView: true,
+             allowUserInteraction: true,
+             waitForNamePrompt: false,
+             enableLobbyChat: false,
+             focusOnBrowserTab: true,
+             // For doctors (moderators), start with video/audio capabilities
+             ...(authUser?.role === "doctor" && {
+               startWithVideoMuted: false,
+               startWithAudioMuted: false
+             }),
              toolbarButtons: [
                'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
                'fodeviceselection', 'hangup', 'profile', 'chat', 'recording',
@@ -137,13 +172,55 @@ const VideoRoom = () => {
              SHOW_WATERMARK_FOR_GUESTS: false,
            }}
            userInfo={{
-             displayName: user?.name || "Patient",
-             email: user?.email || ""
+             displayName: authUser?.name || user?.name || "Participant",
+             email: authUser?.email || user?.email || ""
            }}
-           onApiReady={(externalApi) => {
+            jwt={jitsiToken}
+            onApiReady={(externalApi) => {
+             console.log("[VideoRoom] Jitsi API ready, user role:", authUser?.role);
+             setJitsiApi(externalApi);
+             
+             // If doctor, make them a moderator so they can start the meeting
+             if (authUser?.role === "doctor") {
+               console.log("[VideoRoom] Promoting doctor to moderator");
+               try {
+                 externalApi.executeCommand('toggleAudioOnly', false);
+                 console.log("[VideoRoom] Doctor privileges enabled");
+               } catch (err) {
+                 console.error("[VideoRoom] Failed to set doctor privileges:", err);
+               }
+             }
+             
              externalApi.addEventListener('videoConferenceLeft', () => {
+               console.log("[VideoRoom] User left conference");
                telemedicineAPI.updateStatus(session._id, "ended");
                navigate("/dashboard");
+             });
+             
+             externalApi.addEventListener('participantJoined', (participant) => {
+               console.log("[VideoRoom] Participant joined:", participant);
+             });
+             
+             externalApi.addEventListener('conferenceJoined', () => {
+               console.log("[VideoRoom] Conference joined successfully");
+               
+               // For doctors, try to get moderator status
+               if (authUser?.role === "doctor") {
+                 console.log("[VideoRoom] Setting up doctor as moderator");
+                 try {
+                   // Get the current room object
+                   const room = externalApi.getRoomName?.() || session.roomName;
+                   console.log("[VideoRoom] Current room:", room);
+                   
+                   // Attempt to enable moderator capabilities
+                   externalApi.executeCommand?.('setVideoQuality', 720);
+                   externalApi.executeCommand?.('toggleLobby', false);
+                   
+                   console.log("[VideoRoom] Doctor moderator setup complete");
+                 } catch (err) {
+                   console.warn("[VideoRoom] Could not set full moderator privileges:", err?.message);
+                 }
+               }
              });
            }}
            getIFrameRef={(iframeRef) => {

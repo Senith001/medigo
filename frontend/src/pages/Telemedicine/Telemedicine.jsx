@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format } from 'date-fns'
-import { appointmentAPI } from '../../services/api'
+import { telemedicineAPI } from '../../services/api'
 import DashboardLayout from '../../components/DashboardLayout'
 import Button from '../../components/ui/Button'
 import { useAuth } from '../../context/AuthContext'
@@ -40,15 +40,22 @@ export default function Telemedicine() {
   const fetchTeleAppointments = async () => {
     try {
       setLoading(true)
-      const res = await appointmentAPI.getAll()
-      if (res.data?.appointments) {
-        const tele = res.data.appointments
-          .filter(apt => apt.type === 'telemedicine')
-          .sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate))
+      console.log('Fetching telemedicine sessions. User role:', user?.role, 'User ID:', user?.id)
+      const res = await telemedicineAPI.getAll()
+
+      console.log('API response:', res.data)
+      if (res.data?.sessions) {
+        const tele = res.data.sessions
+          .sort((a, b) => new Date(a.scheduledAt || a.createdAt) - new Date(b.scheduledAt || b.createdAt))
+        console.log('Sessions loaded:', tele.length)
         setAppointments(tele)
+      } else {
+        console.log('No sessions in response')
+        setAppointments([])
       }
     } catch (err) {
-      console.error(err)
+      console.error('Fetch error:', err)
+      setAppointments([])
     } finally {
       setLoading(false)
     }
@@ -57,21 +64,21 @@ export default function Telemedicine() {
   useEffect(() => { fetchTeleAppointments() }, [])
 
   // ── Categories ────────────────────────────────────────────────────────────────
-  // Live: confirmed + today
+  // Live: active/waiting + today
   const liveSessions = appointments.filter(
-    apt => apt.status === 'confirmed' && isToday(apt.appointmentDate)
+    apt => ['active', 'waiting'].includes(apt.status) && isToday(apt.appointmentDate)
   )
-  // Upcoming: confirmed/pending + future date (not today)
+  // Upcoming: scheduled/waiting/active + future date (not today)
   const upcomingSessions = appointments.filter(
     apt =>
-      ['confirmed', 'pending'].includes(apt.status) &&
+      ['scheduled', 'waiting', 'active'].includes(apt.status) &&
       isUpcomingDate(apt.appointmentDate) &&
       !isToday(apt.appointmentDate)
   )
-  // Past: completed/cancelled OR any confirmed/pending with a past date
+  // Past: ended/cancelled OR any session with a past date
   const pastSessions = appointments.filter(
     apt =>
-      ['completed', 'cancelled', 'no-show'].includes(apt.status) ||
+      ['ended', 'cancelled'].includes(apt.status) ||
       (!isUpcomingDate(apt.appointmentDate) && !isToday(apt.appointmentDate))
   )
 
@@ -97,7 +104,9 @@ export default function Telemedicine() {
             </div>
             <h1 className="text-3xl font-black text-medigo-navy tracking-tight uppercase italic">Tele<span className="text-medigo-blue">medicine</span></h1>
           </div>
-          <p className="text-slate-500 font-medium italic">Video consultations with your doctors</p>
+          <p className="text-slate-500 font-medium italic">
+            {isDoctor ? 'Manage your upcoming consultation sessions' : 'Video consultations with your doctors'}
+          </p>
         </div>
 
         {/* Live Session Alert */}
@@ -121,7 +130,7 @@ export default function Telemedicine() {
                 </div>
               </div>
               <Button
-                onClick={() => navigate(`/telemedicine/lobby/${liveSessions[0]._id}`)}
+                onClick={() => navigate(`/telemedicine/lobby/${liveSessions[0].appointmentId}`)}
                 className="relative z-10 h-14 px-8 rounded-2xl bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-600/20 font-black uppercase text-xs tracking-widest"
               >
                 Join Now <PlayCircle size={18} className="ml-2" />
@@ -149,9 +158,15 @@ export default function Telemedicine() {
               </div>
               <div className="space-y-2">
                 <h3 className="text-xl font-black text-medigo-navy uppercase italic">No Virtual Sessions Scheduled</h3>
-                <p className="text-slate-400 font-medium max-w-sm mx-auto italic">Start a digital consultation by selecting the Telemedicine option when booking a specialist.</p>
+                <p className="text-slate-400 font-medium max-w-sm mx-auto italic">
+                  {isDoctor 
+                    ? 'You have no upcoming consultation sessions. Patients will see your availability and book with you.' 
+                    : 'Start a digital consultation by selecting the Telemedicine option when booking a specialist.'}
+                </p>
               </div>
-              <Button onClick={() => navigate('/search')} variant="outline" className="rounded-2xl h-12">Search Doctors</Button>
+              <Button onClick={() => navigate(isDoctor ? '/doctor/availability' : '/search')} variant="outline" className="rounded-2xl h-12">
+                {isDoctor ? 'Manage Availability' : 'Search Doctors'}
+              </Button>
             </div>
           ) : (
             <div className="grid gap-4">
@@ -160,7 +175,8 @@ export default function Telemedicine() {
                   key={session._id}
                   session={session}
                   index={i}
-                  onJoin={() => navigate(`/telemedicine/lobby/${session._id}`)}
+                  isDoctor={isDoctor}
+                  onJoin={() => navigate(`/telemedicine/lobby/${session.appointmentId}`)}
                   onClick={() => setSelectedAppt(session)}
                 />
               ))}
@@ -189,13 +205,13 @@ export default function Telemedicine() {
                 >
                   <div className="flex items-center gap-4">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      session.status === 'completed' ? 'bg-emerald-50 text-emerald-500' :
+                      session.status === 'ended' ? 'bg-emerald-50 text-emerald-500' :
                       session.status === 'cancelled' ? 'bg-red-50 text-red-400' : 'bg-slate-50 text-slate-400'
                     }`}>
                       <CheckCircle2 size={20} />
                     </div>
                     <div>
-                      <p className="text-sm font-black text-medigo-navy uppercase italic">{session.doctorName}</p>
+                      <p className="text-sm font-black text-medigo-navy uppercase italic">{isDoctor ? session.patientName : session.doctorName}</p>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                         {session.appointmentDate ? format(new Date(session.appointmentDate), 'dd MMM yyyy') : '—'} · {session.status}
                       </p>
@@ -217,7 +233,7 @@ export default function Telemedicine() {
           <AppointmentDetailModal
             appt={selectedAppt}
             onClose={() => setSelectedAppt(null)}
-            onJoin={() => navigate(`/telemedicine/lobby/${selectedAppt._id}`)}
+            onJoin={() => navigate(`/telemedicine/lobby/${selectedAppt.appointmentId}`)}
           />
         )}
       </AnimatePresence>
@@ -226,8 +242,15 @@ export default function Telemedicine() {
 }
 
 // ── Session Card ─────────────────────────────────────────────────────────────────
-function SessionCard({ session, index, onJoin, onClick }) {
+function SessionCard({ session, index, isDoctor, onJoin, onClick }) {
   const isFull = (session.bookedCount || 0) >= (session.maxPatients || 999)
+  const statusLabel = {
+    scheduled: 'Scheduled',
+    waiting: 'Waiting',
+    active: 'Live',
+    ended: 'Completed',
+    cancelled: 'Cancelled'
+  }[session.status] || session.status
 
   return (
     <motion.div
@@ -250,11 +273,19 @@ function SessionCard({ session, index, onJoin, onClick }) {
 
         <div className="min-w-0">
           <div className="flex items-center gap-3 mb-1">
-            <h4 className="text-sm font-black text-medigo-navy uppercase italic truncate">{session.doctorName}</h4>
+            <h4 className="text-sm font-black text-medigo-navy uppercase italic truncate">{isDoctor ? session.patientName : session.doctorName}</h4>
             <span className={`px-2.5 py-0.5 text-[9px] font-black uppercase rounded shadow-sm ${
-              session.status === 'confirmed' ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'
+              session.status === 'active'
+                ? 'bg-emerald-50 text-emerald-600'
+                : session.status === 'waiting'
+                  ? 'bg-teal-50 text-teal-600'
+                  : session.status === 'cancelled'
+                    ? 'bg-red-50 text-red-600'
+                    : session.status === 'ended'
+                      ? 'bg-slate-100 text-slate-600'
+                      : 'bg-indigo-50 text-indigo-600'
             }`}>
-              {session.status === 'confirmed' ? 'Scheduled' : session.status}
+              {statusLabel}
             </span>
           </div>
           <div className="flex items-center gap-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest italic flex-wrap">
@@ -281,14 +312,16 @@ function SessionCard({ session, index, onJoin, onClick }) {
 // ── Appointment Detail Modal ──────────────────────────────────────────────────────
 function AppointmentDetailModal({ appt, onClose, onJoin }) {
   const statusColors = {
-    confirmed: 'bg-blue-100 text-blue-700',
-    pending:   'bg-amber-100 text-amber-700',
-    completed: 'bg-emerald-100 text-emerald-700',
+    scheduled: 'bg-blue-100 text-blue-700',
+    waiting:   'bg-teal-100 text-teal-700',
+    active: 'bg-emerald-100 text-emerald-700',
+    ended: 'bg-slate-100 text-slate-700',
     cancelled: 'bg-red-100 text-red-700',
-    'no-show': 'bg-slate-100 text-slate-600',
   }
 
   const apptDate = appt.appointmentDate ? new Date(appt.appointmentDate) : null
+  const { user } = useAuth()
+  const isDoctor = user?.role === 'doctor'
 
   return (
     <motion.div
@@ -322,11 +355,11 @@ function AppointmentDetailModal({ appt, onClose, onJoin }) {
                 <Video size={22} className="text-medigo-mint" />
               </div>
               <div>
-                <h2 className="text-2xl font-black tracking-tight leading-tight">{appt.doctorName || 'Unknown Doctor'}</h2>
-                <p className="text-sm opacity-60 font-medium">{appt.specialty || 'General Physician'}</p>
+                <h2 className="text-2xl font-black tracking-tight leading-tight">{isDoctor ? appt.patientName : appt.doctorName || 'Unknown'}</h2>
+                <p className="text-sm opacity-60 font-medium">{isDoctor ? 'Patient' : appt.specialty || 'General Physician'}</p>
               </div>
             </div>
-            <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${statusColors[appt.status] || statusColors.pending}`}>
+            <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${statusColors[appt.status] || statusColors.scheduled}`}>
               {appt.status}
             </span>
           </div>
@@ -343,9 +376,9 @@ function AppointmentDetailModal({ appt, onClose, onJoin }) {
           {/* Type & Fee */}
           <div className="grid grid-cols-2 gap-4">
             <DetailRow
-              icon={appt.type === 'telemedicine' ? Video : MapPin}
+              icon={Video}
               label="Type"
-              value={appt.type === 'telemedicine' ? 'Video Consultation' : 'In-person Visit'}
+              value="Video Consultation"
             />
             <DetailRow
               icon={CreditCard}
@@ -412,7 +445,7 @@ function AppointmentDetailModal({ appt, onClose, onJoin }) {
             >
               Close
             </Button>
-            {appt.status === 'confirmed' && (
+            {['scheduled', 'waiting', 'active'].includes(appt.status) && (
               <Button
                 onClick={() => { onClose(); onJoin() }}
                 className="flex-1 h-12 rounded-2xl bg-teal-600 hover:bg-teal-700 shadow-lg shadow-teal-600/20"

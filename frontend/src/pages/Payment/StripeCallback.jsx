@@ -21,10 +21,11 @@ const StripeCallback = ({ status }) => {
       }
 
       try {
-        const { data } = await paymentAPI.approve(sessionId); // Assuming success is autoverified
-        setPayment(data.payment);
+        // Call backend success endpoint to verify and mark the payment using the Stripe session id
+        const { data } = await paymentAPI.verifyStripeSession(sessionId);
+        setPayment(data.payment || data);
       } catch (err) {
-        setError("We couldn't verify your payment. Please contact support.");
+        setError(err.response?.data?.message || "We couldn't verify your payment. Please contact support.");
       } finally {
         setLoading(false);
       }
@@ -82,7 +83,22 @@ const StripeCallback = ({ status }) => {
                 Go to Dashboard
                 <ArrowRight className="w-5 h-5" />
               </button>
-              <button className="w-full bg-slate-100 text-slate-600 py-4 rounded-2xl font-bold hover:bg-slate-200 transition flex items-center justify-center gap-2">
+              <button
+                onClick={() => {
+                  if (!payment) return;
+                  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Invoice ${payment.invoiceNumber}</title><style>body{font-family:Arial,Helvetica,sans-serif;padding:24px;color:#111}header{display:flex;justify-content:space-between;align-items:center}h1{margin:0}table{width:100%;border-collapse:collapse;margin-top:16px}td,th{padding:8px;border:1px solid #eee;text-align:left}footer{margin-top:24px;color:#666;font-size:13px}</style></head><body><header><div><h1>MEDIGO</h1><div>Invoice: ${payment.invoiceNumber}</div></div><div><strong>Paid</strong><div>${new Date(payment.paidAt).toLocaleString()}</div></div></header><section><h2>Payment Details</h2><table><tr><th>Invoice</th><td>${payment.invoiceNumber}</td></tr><tr><th>Amount</th><td>${payment.amount} ${payment.currency}</td></tr><tr><th>Patient</th><td>${payment.patientName} (${payment.patientEmail})</td></tr><tr><th>Doctor</th><td>${payment.doctorName}</td></tr><tr><th>Method</th><td>${payment.paymentMethod}</td></tr><tr><th>Appointment</th><td>${payment.appointmentId}</td></tr></table></section><footer>This is a system generated receipt for your consultation payment.</footer></body></html>`;
+                  const blob = new Blob([html], { type: 'text/html' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `invoice-${payment.invoiceNumber}.html`;
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                  URL.revokeObjectURL(url);
+                }}
+                className="w-full bg-slate-100 text-slate-600 py-4 rounded-2xl font-bold hover:bg-slate-200 transition flex items-center justify-center gap-2"
+              >
                 <Download className="w-5 h-5" />
                 Download Receipt
               </button>
